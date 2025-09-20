@@ -12,6 +12,10 @@
 
 ### 环境准备
 
+### agent 初识
+1. RecAt
+2. PlanSlove
+
 ### 构建第一个只能体
 
 ### 通过 google adk 理解 basic-agent
