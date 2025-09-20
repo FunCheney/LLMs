@@ -7,9 +7,9 @@ tqdm >= 4.66.1             # ch05; ch07
 numpy >= 1.26, < 2.1       # dependency of several other libraries like torch and pandas
 pandas >= 2.2.1            # ch06
 psutil >= 5.9.5            # ch07; already installed automatically as dependency of torch
-google-adk[database]==0.3.0
-yfinace==0.2.56
-psutil==5.9.5
+google-adk[database]==0.3.0 # anents: google adk
+yfinance==0.2.56
+psutil==5.9.8
 litellm==1.66.3
 google-generativeai==0.8.5
 python-dotenv==1.1.0

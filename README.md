@@ -14,8 +14,8 @@
 
 ### agent 初识
 1. RecAt
-2. PlanSlove
+2. PlanSolve
 
-### 构建第一个只能体
+### 构建第一个智能体
 
 ### 通过 google adk 理解 basic-agent
