@@ -9,7 +9,7 @@ load_dotenv()
 
 class HelloAgentsLLM:
 
-    def __init__(self, model: str, base_url: str, api_key: str = None, timeout: int = None):
+    def __init__(self, model: str = None, base_url: str = None, api_key: str = None, timeout: int = None):
         """
             初始化客户端。优先使用传入参数，如果未提供，则从环境变量加载。
         """
@@ -46,7 +46,7 @@ class HelloAgentsLLM:
             return "".join(collect_content)
         except Exception as e:
             print(e)
-            return None
+            return ""
 
 
 if __name__ == "__main__":

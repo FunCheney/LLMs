@@ -1,7 +1,6 @@
-from agents.HelloAgentsLLM import HelloAgentsLLM
-from agents.tools import ToolExecutor
+from HelloAgentsLLM import HelloAgentsLLM
+from tools import ToolExecutor,search
 import re
-from agents.tools import search
 
 # ReAct 提示词模板
 REACT_PROMPT_TEMPLATE = """
