@@ -5,11 +5,31 @@
 
 ### 2.理解分词过程与位置嵌入
 
+1. [手搓大模型--理解词嵌入与分词器](https://mp.weixin.qq.com/s/hoyNXu5LPXeO8LvQtsrsow)
+2. [手搓大模型--为大模型准备输入数据](https://mp.weixin.qq.com/s/YFG67hFVLUBrF4LAi_x72Q)
+3. 代码实现：02_ch2
+
+
 ### 3.深入理解注意力机制
+1. [手搓大模型--实现简单的注意力机制](https://mp.weixin.qq.com/s/h8iyFWyvAzMzmaJkWYt2xQ)
+2. [手搓大模型--实现带有可训练权重的自注意力机制](https://mp.weixin.qq.com/s/FStj2Lro-snSJdJrh2yQsQ)
+3. [手搓大模型--实现因果自注意力机制](https://mp.weixin.qq.com/s/ME7LHvyJip-sQGgNjmD9Nw)
+4. [手搓大模型--实现多头自注意力机制](https://mp.weixin.qq.com/s/WHKxrdzoiyVnhK_XSvd07Q)
+5. [手搓大模型--实现一个 ChatGPT 框架](https://mp.weixin.qq.com/s/y9mPs_WuLMEN4KyVukntyw)
+6. [手搓大模型--实现 transformer](https://mp.weixin.qq.com/s/zhsxpXvx7nVWtCCP_4tqbQ)
+7. 代码实现：03_ch3
 
 ### 4.实现 GPT 模型并生成文本
+1. [手搓大模型--用你手搓的大模型生成文本](https://mp.weixin.qq.com/s/qExnsj6qm_1864hW0929eA)
+2. [手搓大模型--如何评估模型生成文本质量](https://mp.weixin.qq.com/s/aiIcp49tow26H0uQRzXihQ)
+3. 代码实现：04_ch4
 
 ### 5.预训练
+1. [手搓到模型--如何训练模型](https://mp.weixin.qq.com/s/ToqMTjSUsX0Rawki_h3Wcg)
+2. [手搓大模型--控制模型的生成结果](https://mp.weixin.qq.com/s/tue307MaG4h5BvTStvGJFA)
+3. [手搓大模型--加载开源模型权重，生成预测文本](https://mp.weixin.qq.com/s/nV8lbZsLZGpB6xUzPx0z5Q)
+4. 代码实现：05_ch5
+
 
 ### 6.分类微调
 06_ch6
