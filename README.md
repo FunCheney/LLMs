@@ -1,7 +1,9 @@
 # 手搓大模型
 
 ### 1.环境准备
-00_setup 安装构建大模型的环境
+
+1. 00_setup 安装构建大模型的环境
+2. [大模型基础](https://mp.weixin.qq.com/s/N1PsqYRtFJOO40ZKhbB-YA)
 
 ### 2.理解分词过程与位置嵌入
 
