@@ -1,6 +1,8 @@
 
  **📖 从理论，设计，实践 三个方面研究 AI Agent
+ 
  🧑‍💻 学习使用成熟的人工智能智能体库，如smolagents、LlamaIndex和LangGraph。
+
  🤗 Keep Learning, stay awesome
  
 ### 学习路线 & 与计划安排
@@ -69,9 +71,32 @@
             {"role": "user", "content": "Can you give me an example?"},
          ]
       ```
-6. 
+6. 工具（Tool）
+    工具是给大模型的一个方法，这个方法有明确的目的，也就是说这个方法有具体的功能。比如说：查询天气，检索信息。你可以创建任何你用到的东西作为一个
+    工具。一个好的工具会增强大模型的能力，不如：你想执行算术运算，给大模型一个计算器，会比给他一个其他的大模型有更好的效果。
 
-8. 
+7. 行动 （Actions）
+    
 
-#### 2025.11.03 - 2025.11.09**
+
+8. 模型上下文协议（MCP）：统一的工具接口
+
+
+9. 
+
+#### 2025.11.03 - 2025.11.09
+
+1. Thought-Action-Observation
+   1. Thought: Agent 决定下一步骤要干啥什么。 
+   2. Action: Agent 使用具体的工具。 
+   3. Observation: Agent 对工具的结果进行反思。
+2. The Thought-Action-Observation Cycle
+   1. Thought-Action-Observation 这三个组件一起工作。以写代码为例: 智能体使用一个 while 循环，直到只能体的目标完成。
+   2. 在很多只能体框架中，这个指导原则，嵌入在 系统的提示词中。确保每个每一轮的对话都遵循这个知道规则。
+3. Chain-of-Thought
+   1. 是一个提示词技巧，用来指导模型一步一步的思考问题，生成最终的答案。
+4. ReAct: Reasoning + Acting
+   1. 是一个提示词技巧，鼓励模型一步一步的思考，并且可以在步骤之间使用工具。
+5.
+
 

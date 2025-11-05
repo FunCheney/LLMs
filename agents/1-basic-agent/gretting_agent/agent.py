@@ -1,4 +1,5 @@
 from google.adk.agents import Agent
+from openai.types.responses import tool
 
 root_agent = Agent(
     name="greeting_agent",
