@@ -8,13 +8,13 @@ from typing import Dict
 from langchain_core.prompts import PromptTemplate
 from langchain_community.llms import Ollama
 #  (或新版本的等效导入)
-from langchain.memory import ConversationBufferMemory
+from langchain_classic.memory import ConversationBufferMemory
 # (或新版本的等效导入)
-from langchain.chains import LLMChain
+from langchain_classic.chains import LLMChain
 
 
 # 全局 Memory 映射：{session_id: ConversationBufferMemory 实例}
-SESSION_MEMORIES: Dict[str, any] = {}  # TODO: 将 any 替换为正确的类型
+SESSION_MEMORIES: Dict[str, ConversationBufferMemory] = {}  # TODO: 将 any 替换为正确的类型
 
 
 def chat_with_langchain_memory(message: str, session_id: str) -> dict:
@@ -38,25 +38,49 @@ def chat_with_langchain_memory(message: str, session_id: str) -> dict:
     """
     global SESSION_MEMORIES
 
-    # TODO: 学生需要实现此函数
-    #
-    # 实现步骤建议:
     # 1. 检查 session_id 是否存在对应的 Memory，不存在则创建
-    # 2. 创建 Ollama LLM 实例
-    # 3. 创建 PromptTemplate（包含历史上下文）
-    # 4. 创建 LLMChain，连接 Prompt、LLM 和 Memory
-    # 5. 运行链并获取响应
-    # 6. 返回响应和 memory_variables
+    if session_id not in SESSION_MEMORIES:
+        SESSION_MEMORIES[session_id] = ConversationBufferMemory(
+            memory_key="history",
+            return_messages=False
+        )
 
-    # 提示：
-    # 1. 检查 session_id 是否存在对应的 Memory，不存在则创建
-    # 2. 创建 Ollama LLM 实例
-    # 3. 创建 PromptTemplate（包含历史上下文）
-    # 4. 创建 LLMChain，连接 Prompt、LLM 和 Memory
-    # 5. 运行链并获取响应
-    # 6. 返回响应和 memory_variables
+    memory = SESSION_MEMORIES[session_id]
 
-    raise NotImplementedError("请实现 chat_with_langchain_memory 函数")
+    # 2. 创建 Ollama LLM 实例
+    llm = Ollama(model="llama3:latest")  # 可以根据需要更改模型
+
+    # 3. 创建 PromptTemplate（包含历史上下文）
+    prompt_template = PromptTemplate(
+        input_variables=["history", "input"],
+        template="""基于以下对话历史回答问题：
+
+        {history}
+        
+        当前问题: {input}
+        
+        请提供有帮助的回答:"""
+    )
+
+    # 4. 创建 LLMChain，连接 Prompt、LLM 和 Memory
+    chain = LLMChain(
+        llm=llm,
+        prompt=prompt_template,
+        memory=memory,
+        verbose=False  # 设置为 True 可以查看详细执行过程
+    )
+
+    # 5. 运行链并获取响应
+    response = chain.invoke({"input": message})
+
+    # 获取当前的 memory 变量
+    memory_variables = memory.load_memory_variables({})
+
+    # 6. 返回响应和 memory_variables
+    return {
+        "response": response["text"],
+        "memory_variables": memory_variables
+    }
 
 
 def get_memory_summary(session_id: str) -> str:
@@ -79,21 +103,23 @@ def get_memory_summary(session_id: str) -> str:
     """
     global SESSION_MEMORIES
 
-    # TODO: 学生需要实现此函数
-    #
-    # 实现步骤建议:
     # 1. 检查 session_id 是否存在
-    # 2. 获取 Memory 的 buffer 或 chat_memory
-    # 3. 格式化消息历史为可读字符串
-    # 4. 返回格式化结果
+    if session_id not in SESSION_MEMORIES:
+        return f"会话 {session_id} 不存在"
 
-    # 提示：
-    # 1. 检查 session_id 是否存在
-    # 2. 获取 Memory 的 buffer 或 chat_memory
-    # 3. 格式化消息历史为可读字符串
-    # 4. 返回格式化结果
+    memory = SESSION_MEMORIES[session_id]
 
-    raise NotImplementedError("请实现 get_memory_summary 函数")
+    # 2. 获取 Memory 的 buffer
+    memory_variables = memory.load_memory_variables({})
+
+    # 3. 格式化消息历史为可读字符串
+    history_text = memory_variables.get("history", "")
+
+    # 如果历史为空，返回提示
+    if not history_text.strip():
+        return ""
+
+    return history_text
 
 
 def clear_memory(session_id: str = None):
@@ -107,8 +133,12 @@ def clear_memory(session_id: str = None):
 
     if session_id is None:
         SESSION_MEMORIES.clear()
+        print("所有会话记忆已清除")
     elif session_id in SESSION_MEMORIES:
         del SESSION_MEMORIES[session_id]
+        print(f"会话 {session_id} 的记忆已清除")
+    else:
+        print(f"会话 {session_id} 不存在")
 
 
 # 测试代码（可选，用于学生本地调试）
