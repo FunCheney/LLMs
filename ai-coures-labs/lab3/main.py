@@ -167,3 +167,45 @@ if __name__ == "__main__":
     print(f"\n验证信息持久化:")
     print(f"  包含电话号码: {'13800138000' in summary}")
     print(f"  包含邮箱: {'test@example.com' in summary}")
+
+
+    session_a = "alice"
+    session_b = "bob"
+
+    # Session A 发送消息
+    chat_with_langchain_memory("我喜欢Python编程", session_a)
+    chat_with_langchain_memory("我在学习AI技术", session_a)
+
+    # Session B 发送消息
+    chat_with_langchain_memory("我喜欢Java开发", session_b)
+    chat_with_langchain_memory("我在研究区块链", session_b)
+
+    # 获取两个会话的摘要
+    summary_a = get_memory_summary(session_a)
+    summary_b = get_memory_summary(session_b)
+
+    # 验证 Session A 的摘要包含自己的内容
+    assert "Python" in summary_a, \
+        f"Session A 的摘要应包含 'Python'，实际:\n{summary_a[:100]}"
+
+    assert "AI" in summary_a or "ai" in summary_a.lower(), \
+        f"Session A 的摘要应包含 'AI'，实际:\n{summary_a[:100]}"
+
+    # 验证 Session A 的摘要不包含 Session B 的内容
+    assert "Java" not in summary_a, \
+        f"Session A 的摘要不应包含 Session B 的内容（Java），实际:\n{summary_a[:100]}"
+
+    assert "区块链" not in summary_a, \
+        f"Session A 的摘要不应包含 Session B 的内容（区块链），实际:\n{summary_a[:100]}"
+
+    # 验证 Session B 的摘要包含自己的内容
+    assert "Java" in summary_b, \
+        f"Session B 的摘要应包含 'Java'，实际:\n{summary_b[:100]}"
+
+    # 验证 Session B 的摘要不包含 Session A 的内容
+    assert "Python" not in summary_b, \
+        f"Session B 的摘要不应包含 Session A 的内容（Python），实际:\n{summary_b[:100]}"
+
+    print(f"✓ 跨会话隔离测试通过")
+    print(f"Session A 摘要:\n{summary_a[:100]}...")
+    print(f"Session B 摘要:\n{summary_b[:100]}...")

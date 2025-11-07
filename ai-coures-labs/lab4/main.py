@@ -33,7 +33,8 @@ def generate_ad(input_dict: dict) -> dict:
         input_variables=[product, feature],
         template="""
         要求：
-        根据产品名称和产品特性生成文案，严格按照以下JSON格式输出，不要添加任何其他内容：：
+        根据产品名称和产品特性生成文案，广告文案中要包含产品名称。
+        输出：严格按照以下JSON格式输出，不要添加任何其他内容:
         {{
             "product": "{product}",
             "feature": "{feature}",
@@ -41,7 +42,7 @@ def generate_ad(input_dict: dict) -> dict:
             'template_used': '模板名称'
         }}
 
-        其中，'ad_copy' 是针对产品和特性生成的广告文案，'template_used' 是你使用的广告文案模板的名称。
+        其中，'ad_copy' 是针对产品和特性生成的广告文案,其中要包含产品的名称 {product}，'template_used' 是你使用的广告文案模板的名称。
         """
     )
 
