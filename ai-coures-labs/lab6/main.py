@@ -1,31 +1,21 @@
 """
-实验6：工具调用的结果验证
-学生需要构建具备工具调用能力的AI Agent，实现模型与外部函数的交互
+实验6：工具调用的结果验证（修复后的版本）
+兼容 LangChain 1.0.3
 """
+
 from typing import List, Dict, Any, Callable
 import httpx
 import json
-
-
-# 提示：需要导入 LangChain 相关模块
-from langchain.agents import AgentExecutor, create_react_agent
-from langchain.tools import Tool
-from langchain_community.llms import Ollama
+from langchain_classic import hub
+from langchain_classic.agents import AgentExecutor, create_react_agent
+from langchain_classic.tools import Tool
+from langchain_ollama import OllamaLLM
 from langchain_core.prompts import PromptTemplate
 
 
-# ========== 模拟工具函数（测评系统提供，学生直接使用） ==========
+# ================= 模拟工具函数 =================
 
 def get_stock_price(symbol: str) -> float:
-    """
-    查询股票价格（模拟工具）
-
-    参数:
-        symbol: 股票代码（如 "AAPL"）
-
-    返回:
-        股票价格（固定返回值以确保测试稳定性）
-    """
     if symbol.upper() == "AAPL":
         return 175.0
     elif symbol.upper() == "GOOGL":
@@ -35,29 +25,10 @@ def get_stock_price(symbol: str) -> float:
 
 
 def add_numbers(a: int, b: int) -> int:
-    """
-    计算两数之和（模拟工具）
-
-    参数:
-        a: 第一个数
-        b: 第二个数
-
-    返回:
-        两数之和
-    """
     return a + b
 
 
 def get_weather(city: str) -> dict:
-    """
-    查询天气信息（模拟工具）
-
-    参数:
-        city: 城市名称
-
-    返回:
-        天气信息字典，包含 temp 和 condition
-    """
     weather_data = {
         "北京": {"temp": 25, "condition": "晴"},
         "上海": {"temp": 28, "condition": "多云"},
@@ -66,62 +37,87 @@ def get_weather(city: str) -> dict:
     return weather_data.get(city, {"temp": 20, "condition": "未知"})
 
 
-# ========== 学生需要实现的函数 ==========
+# ================= 包装工具 =================
 
-def agent_executor(query: str, available_tools: List[Callable]) -> dict:
-    """
-    执行 Agent 工具调用
-
-    参数:
-        query: 用户查询文本
-        available_tools: 可用工具函数列表
-
-    返回:
-        字典，包含以下键:
-        - tool_used (str): 实际调用的工具名称
-        - tool_input (dict): 传递给工具的参数
-        - tool_output (any): 工具的返回值
-        - final_answer (str): Agent的最终回答
-    """
-    # TODO: 实现 Agent 工具调用逻辑
-    # 提示:
-    # 1. 导入 from langchain.agents import AgentExecutor, create_react_agent
-    # 2. 将 available_tools 包装为 LangChain Tool 对象
-    # 3. 创建 Agent 并执行
-    # 4. 解析结果，返回 tool_used, tool_input, tool_output, final_answer
-    return {}
+def wrap_tools(tool_functions: List[Callable]) -> List[Tool]:
+    tools = []
+    for func in tool_functions:
+        tools.append(
+            Tool(
+                name=func.__name__,
+                func=func,
+                description=f"工具函数: {func.__name__}"
+            )
+        )
+    return tools
 
 
-# 辅助函数示例
-def wrap_tools(tool_functions: List[Callable]) -> List:
-    """
-    将 Python 函数包装为 LangChain Tool
-
-    参数:
-        tool_functions: Python 函数列表
-
-    返回:
-        LangChain Tool 对象列表
-    """
-    # TODO: 实现工具包装逻辑
-    # 提示: 使用 Tool.from_function() 或 @tool 装饰器
-    return []
-
+# ================= 解析 Agent 输出 =================
 
 def parse_agent_output(agent_result: dict) -> dict:
+    result = {
+        "tool_used": "",
+        "tool_input": {},
+        "tool_output": None,
+        "final_answer": agent_result.get("output", "")
+    }
+
+    steps = agent_result.get("intermediate_steps", [])
+    if steps:
+        action, obs = steps[-1]
+        result["tool_used"] = action.tool
+        result["tool_input"] = action.tool_input
+        result["tool_output"] = obs
+
+    return result
+
+
+# ================= Agent 执行器 =================
+
+def agent_executor(query: str, available_tools: List[Callable]) -> dict:
+    tools = wrap_tools(available_tools)
+
+    llm = OllamaLLM(model="qwen3:8b")
+
+    # ReAct 提示词
+    template = """你是一个有帮助的 AI，可以使用工具回答问题。
+
+        请按照以下格式进行思考和输出：
+        {tools}
+
+        Question: 用户问题
+        Thought: 是否需要调用工具？
+        Action: 工具名称 [{tool_names}]
+        Action Input: 工具输入
+        Observation: 工具返回
+        ...（可以多次循环）
+        Thought: 我已经知道最终答案
+        Final Answer: 最终回答
+
+        现在开始！
+
+        Question: {input}
+        {agent_scratchpad}
     """
-    解析 Agent 执行结果
 
-    参数:
-        agent_result: AgentExecutor 的返回值
+    prompt = PromptTemplate(
+        template=template,
+        input_variables=["input", "agent_scratchpad"]
+    )
 
-    返回:
-        标准化的结果字典
-    """
-    # TODO: 实现结果解析逻辑
-    # 提示: 从 agent_result 中提取 tool_used, tool_input, tool_output
-    return {}
+    # 创建 ReAct Agent
+    agent = create_react_agent(llm=llm, tools=tools, prompt=prompt)
 
+    # 包装成 executor
+    executor = AgentExecutor(
+        agent=agent,
+        tools=tools,
+        verbose=True,
+        return_intermediate_steps=True
+    )
+
+    result = executor.invoke({"input": query})
+    return parse_agent_output(result)
 
 # 测试代码
 if __name__ == "__main__":

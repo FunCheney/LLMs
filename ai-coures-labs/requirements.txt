@@ -8,3 +8,4 @@ httpx>=0.25.0
 langgraph>=0.2.0
 chromadb>=0.4.22
 langchain-chroma>=0.1.0
+langchain-ollama>=0.1.0
