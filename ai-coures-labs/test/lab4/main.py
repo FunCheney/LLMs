@@ -38,11 +38,12 @@ def generate_ad(input_dict: dict) -> dict:
         {{
             "product": "{product}",
             "feature": "{feature}",
-            'ad_copy': '广告文案',
-            'template_used': '模板名称'
+            "ad_copy": "广告文案",
+            "template_used": "模板名称"
         }}
 
-        其中，'ad_copy' 是针对产品和特性生成的广告文案,其中要包含产品的名称 {product}，'template_used' 是你使用的广告文案模板的名称。
+        其中，ad_copy 是针对产品和特性生成的广告文案,其中要包含产品的名称 {product} 与核心特性 {feature}，
+            template_used 是你使用的广告文案模板的名称。
         """
     )
 
