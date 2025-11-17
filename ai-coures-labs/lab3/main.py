@@ -1,155 +1,169 @@
 """
-实验6：工具调用的结果验证（修复后的版本）
-兼容 LangChain 1.0.3
+实验3：记忆系统的内容检索
+学生需要使用 LangChain 的 ConversationBufferMemory 管理会话历史
 """
-from typing import List, Callable
-from langchain_community.tools import Tool
+from typing import Dict
+
+# 提示：需要导入 LangChain 相关模块
 from langchain_core.prompts import PromptTemplate
 from langchain_community.llms import Ollama
-from langchain.agents import AgentExecutor
-from langchain_cohere import ChatCohere, create_cohere_react_agent
+#  (或新版本的等效导入)
+from langchain_classic.memory import ConversationBufferMemory
+# (或新版本的等效导入)
+from langchain_classic.chains import LLMChain
 
 
-# ================= 模拟工具函数 =================
-
-def get_stock_price(symbol: str) -> float:
-    if symbol.upper() == "AAPL":
-        return 175.0
-    elif symbol.upper() == "GOOGL":
-        return 140.5
-    else:
-        return 100.0
+# 全局 Memory 映射：{session_id: ConversationBufferMemory 实例}
+SESSION_MEMORIES: Dict[str, ConversationBufferMemory] = {}  # TODO: 将 any 替换为正确的类型
 
 
-def add_numbers(a: int, b: int) -> int:
-    return a + b
+def chat_with_langchain_memory(message: str, session_id: str) -> dict:
+    """
+    使用 LangChain 的 ConversationBufferMemory 进行对话
 
+    参数:
+        message: 用户消息
+        session_id: 会话ID
 
-def get_weather(city: str) -> dict:
-    weather_data = {
-        "北京": {"temp": 25, "condition": "晴"},
-        "上海": {"temp": 28, "condition": "多云"},
-        "深圳": {"temp": 30, "condition": "雨"},
-    }
-    return weather_data.get(city, {"temp": 20, "condition": "未知"})
+    返回:
+        字典，包含:
+        - response (str): AI回复
+        - memory_variables (dict): ConversationBufferMemory 的内部变量
 
+    实现要求:
+        1. 使用 ConversationBufferMemory 管理每个 session 的历史
+        2. 将 Memory 对象与 Ollama LLM 集成
+        3. memory_variables 应包含 'history' 键
+        4. 不同 session 的 Memory 必须独立
+    """
+    global SESSION_MEMORIES
 
-# ================= 包装工具 =================
-
-def wrap_tools(tool_functions: List[Callable]) -> List[Tool]:
-    tools = []
-    for func in tool_functions:
-        tools.append(
-            Tool(
-                name=func.__name__,
-                func=func,
-                description=f"工具函数: {func.__name__}"
-            )
+    # 1. 检查 session_id 是否存在对应的 Memory，不存在则创建
+    if session_id not in SESSION_MEMORIES:
+        SESSION_MEMORIES[session_id] = ConversationBufferMemory(
+            memory_key="history",
+            return_messages=False
         )
-    return tools
 
+    memory = SESSION_MEMORIES[session_id]
 
-# ================= 解析 Agent 输出 =================
+    # 2. 创建 Ollama LLM 实例
+    llm = Ollama(model="llama3:latest")  # 可以根据需要更改模型
 
-def parse_agent_output(agent_result: dict) -> dict:
-    result = {
-        "tool_used": "",
-        "tool_input": {},
-        "tool_output": None,
-        "final_answer": agent_result.get("output", "")
+    # 3. 创建 PromptTemplate（包含历史上下文）
+    prompt_template = PromptTemplate(
+        input_variables=["history", "input"],
+        template="""基于以下对话历史回答问题：
+
+        {history}
+        
+        当前问题: {input}
+        
+        请提供有帮助的回答:"""
+    )
+
+    # 4. 创建 LLMChain，连接 Prompt、LLM 和 Memory
+    chain = LLMChain(
+        llm=llm,
+        prompt=prompt_template,
+        memory=memory,
+        verbose=False  # 设置为 True 可以查看详细执行过程
+    )
+
+    # 5. 运行链并获取响应
+    response = chain.invoke({"input": message})
+
+    # 获取当前的 memory 变量
+    memory_variables = memory.load_memory_variables({})
+
+    # 6. 返回响应和 memory_variables
+    return {
+        "response": response["text"],
+        "memory_variables": memory_variables
     }
 
-    steps = agent_result.get("intermediate_steps", [])
-    if steps:
-        action, obs = steps[-1]
-        result["tool_used"] = action.tool
-        result["tool_input"] = action.tool_input
-        result["tool_output"] = obs
 
-    return result
+def get_memory_summary(session_id: str) -> str:
+    """
+    获取指定会话的完整历史记录摘要
 
+    参数:
+        session_id: 会话ID
 
-# ================= Agent 执行器 =================
+    返回:
+        格式化的历史记录字符串，如:
+        "User: 你好\nAI: 你好！有什么可以帮助你的吗？\nUser: ..."
 
-def agent_executor(query: str, available_tools: List[Callable]) -> dict:
-    tools = wrap_tools(available_tools)
+        如果会话不存在，返回空字符串或提示信息
 
-    llm = Ollama(model="qwen3:8b")
+    实现要求:
+        1. 返回人类可读的格式
+        2. 包含完整的用户输入和AI回复
+        3. 对不存在的 session_id，返回空字符串或提示
+    """
+    global SESSION_MEMORIES
 
-    # ReAct 提示词
-    template = """你是一个有帮助的 AI，可以使用工具回答问题。
+    # 1. 检查 session_id 是否存在
+    if session_id not in SESSION_MEMORIES:
+        return f"会话 {session_id} 不存在"
 
-请按照以下格式进行思考和输出：
+    memory = SESSION_MEMORIES[session_id]
 
-Question: 用户问题
-Thought: 是否需要调用工具？
-Action: 工具名称
-Action Input: 工具输入
-Observation: 工具返回
-...（可以多次循环）
-Thought: 我已经知道最终答案
-Final Answer: 最终回答
+    # 2. 获取 Memory 的 buffer
+    memory_variables = memory.load_memory_variables({})
 
-现在开始！
+    # 3. 格式化消息历史为可读字符串
+    history_text = memory_variables.get("history", "")
 
-Question: {input}
-{agent_scratchpad}
-"""
+    # 如果历史为空，返回提示
+    if not history_text.strip():
+        return ""
 
-    prompt = PromptTemplate(
-        template=template,
-        input_variables=["input", "agent_scratchpad"]
-    )
-
-    # 创建 ReAct Agent
-    agent = create_cohere_react_agent(llm=llm, tools=tools, prompt=prompt)
-
-    # 包装成 executor
-    executor = AgentExecutor(
-        agent=agent,
-        tools=tools,
-        verbose=True,
-        return_intermediate_steps=True
-    )
-
-    result = executor.invoke({"input": query})
-    return parse_agent_output(result)
+    return history_text
 
 
-# 测试代码
+def clear_memory(session_id: str = None):
+    """
+    清除会话记忆（辅助函数，用于测试）
+
+    参数:
+        session_id: 要清除的会话ID，如果为 None 则清除所有会话
+    """
+    global SESSION_MEMORIES
+
+    if session_id is None:
+        SESSION_MEMORIES.clear()
+        print("所有会话记忆已清除")
+    elif session_id in SESSION_MEMORIES:
+        del SESSION_MEMORIES[session_id]
+        print(f"会话 {session_id} 的记忆已清除")
+    else:
+        print(f"会话 {session_id} 不存在")
+
+
+# 测试代码（可选，用于学生本地调试）
 if __name__ == "__main__":
-    # 准备工具列表
-    tools = [get_stock_price, add_numbers, get_weather]
+    # 清空记忆
+    clear_memory()
 
-    # 测试1：股票价格查询
-    print("=== 测试1：股票价格查询 ===")
-    try:
-        result1 = agent_executor("苹果公司的股价是多少？", tools)
-        print(f"使用工具: {result1['tool_used']}")
-        print(f"工具输入: {result1['tool_input']}")
-        print(f"工具输出: {result1['tool_output']}")
-        print(f"最终回答: {result1['final_answer'][:50]}...")
-    except Exception as e:
-        print(f"错误: {e}")
+    # 测试对话
+    print("=== 测试 LangChain Memory ===")
+    session_id = "test_session"
 
-    # 测试2：数学计算
-    print("\n=== 测试2：数学计算 ===")
-    try:
-        result2 = agent_executor("计算15加27等于多少", tools)
-        print(f"使用工具: {result2['tool_used']}")
-        print(f"工具输入: {result2['tool_input']}")
-        print(f"工具输出: {result2['tool_output']}")
-        print(f"最终回答: {result2['final_answer'][:50]}...")
-    except Exception as e:
-        print(f"错误: {e}")
+    result1 = chat_with_langchain_memory("我的电话是13800138000", session_id)
+    print(f"第1次对话:")
+    print(f"  Response: {result1['response'][:50]}")
+    print(f"  Memory variables keys: {result1['memory_variables'].keys()}")
 
-    # 测试3：天气查询
-    print("\n=== 测试3：天气查询 ===")
-    try:
-        result3 = agent_executor("北京的天气怎么样？", tools)
-        print(f"使用工具: {result3['tool_used']}")
-        print(f"工具输入: {result3['tool_input']}")
-        print(f"工具输出: {result3['tool_output']}")
-        print(f"最终回答: {result3['final_answer'][:50]}...")
-    except Exception as e:
-        print(f"错误: {e}")
+    result2 = chat_with_langchain_memory("我的邮箱是test@example.com", session_id)
+    print(f"\n第2次对话:")
+    print(f"  Response: {result2['response'][:50]}")
+
+    # 获取历史摘要
+    summary = get_memory_summary(session_id)
+    print(f"\n历史摘要:\n{summary}")
+
+    # 验证信息是否保存
+    print(f"\n验证信息持久化:")
+    print(f"  包含电话号码: {'13800138000' in summary}")
+    print(f"  包含邮箱: {'test@example.com' in summary}")
