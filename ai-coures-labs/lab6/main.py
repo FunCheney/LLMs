@@ -4,8 +4,6 @@
 """
 import json
 from typing import List, Dict, Any, Callable
-
-from langchain_classic import hub
 from langchain_classic.agents import AgentExecutor, create_react_agent
 from langchain_classic.tools import Tool
 from langchain_ollama import OllamaLLM
