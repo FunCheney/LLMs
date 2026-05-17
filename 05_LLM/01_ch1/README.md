@@ -20,7 +20,7 @@ ctrl + c
  conda deactivate 
 ```
 
-查看虚拟环境列表
+查看虚拟环境列表con
 ```angular2html
 conda env list 
 ```
