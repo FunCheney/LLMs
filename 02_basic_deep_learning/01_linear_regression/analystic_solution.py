@@ -37,5 +37,5 @@ print(y_predict)
 # 绘图展示
 plt.plot(X_new, y_predict, 'r-')
 plt.plot(X, y, 'b.')
-plt.axis([0, 2, 0, 15])
+plt.axis([0.0, 2.0, 0.0, 15.0])
 plt.show()
