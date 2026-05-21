@@ -21,12 +21,13 @@ X_b = np.c_[np.ones((100, 1)), X]
 
 # 实现解析解的公式求解 θ=(X^T X)^-1 * X^T * y
 theta = np.linalg.inv(X_b.T.dot(X_b)).dot(X_b.T).dot(y)
-print(theta)
+print(f'theta: {theta}')
 
 
 # 使用模型去做预测
 X_new = np.array([[0],
                   [2]])
+print(X_new)
 X_new_b = np.c_[np.ones((2, 1)), X_new]
 
 print(X_new_b)
