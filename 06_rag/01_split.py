@@ -30,4 +30,7 @@ overlap_spit(text, 100, 50)
 
 
 # 递归
-from langchain.te
+from langchain_classic.text_splitter import RecursiveCharacterTextSplitter
+
+
+
