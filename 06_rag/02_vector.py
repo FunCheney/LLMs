@@ -15,4 +15,4 @@ print(unit_vector)
 angle = np.arctan2(v[1], v[0]) * 180 / np.pi
 print(angle)
 
-# 向量之间可以计算距离
+# 向量之间可以计算距离 （余弦相似度或者欧几里得距离）
