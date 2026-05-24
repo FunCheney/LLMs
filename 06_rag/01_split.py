@@ -28,9 +28,14 @@ def overlap_spit(text, n, stride):
 
 overlap_spit(text, 100, 50)
 
-
+print('=========================')
 # 递归
 from langchain_classic.text_splitter import RecursiveCharacterTextSplitter
-
-
-
+splitter = RecursiveCharacterTextSplitter(
+    chunk_size=40,
+    chunk_overlap=10,
+    length_function=len,
+)
+chunks = splitter.split_text(text)
+for chunk in chunks:
+    print(chunk)
