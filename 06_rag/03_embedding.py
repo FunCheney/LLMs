@@ -8,6 +8,9 @@ import os
 
 load_dotenv(verbose=True)
 
+
+
+# 使用在线大模型
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"),base_url=os.getenv("OPENAI_API_URL"))
 
 def get_embedding(text, model = "text-"):
@@ -20,3 +23,5 @@ def get_embedding(text, model = "text-"):
 vec = get_embedding(["苹果"])
 print(f'第一个向量 {vec[0]}')
 print(f'向量的纬度 {len(vec)}')
+
+# 使用本地
