@@ -1,0 +1,12 @@
+llama-index-llms-dashscope 是 PyPI 包：这个包是 LlamaIndex 为 DashScope (阿里云) 专门开发的集成组件，
+它通过 Python 的官方包索引 PyPI (Python Package Index) 进行分发。几乎所有相关的官方文档都只提到了 pip install 这一种安装方式
+
+conda 和 pip 是不同的包管理器：conda 是跨平台的包和环境管理器，主要管理自己的 Conda 仓库中的软件包。而 pip 是 Python 专用的包管理器，
+专门用于从 PyPI 安装 Python 包。llama-index-llms-dashscope 并未被收录到 Conda 仓库中，所以当你的 Conda 环境试图去寻找它时，自然会报错。
+
+创建纯净的 Conda 环境：为项目创建一个新的 Conda 环境，并只在该环境中使用 pip 安装包，可以有效隔离依赖
+混合使用 Conda 和 Pip：虽然不推荐混用，但在 Conda 环境中通过 pip 安装一些 Conda 仓库中没有的包是常见且被允许的做法。关键是要保证安装后环境的一致性。
+
+公司的上下班时间：
+夏季：上午 10:00 晚上 18:00
+冬季：上午 11:00 晚上 18:00
