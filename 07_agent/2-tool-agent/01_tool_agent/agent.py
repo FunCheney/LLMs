@@ -3,7 +3,7 @@ from google.adk.agents import Agent
 from google.adk.tools import google_search
 
 root_agent = Agent(
-    name='tool_agent',
+    name='01_tool_agent',
     model="gemini-2.0-flash",
     description="Tool Agent",
     instruction="""
