@@ -156,7 +156,7 @@ class ReflectionAgent:
 
 
 if __name__ == '__main__':
-    # 1. 初始化LLM客户端 (请确保你的 .env 和 llm_client.py 文件配置正确)
+    # 1. 初始化LLM客户端 (请确保你的  和 llm_client.py 文件配置正确)
     try:
         BASE_URL = "https://api-inference.modelscope.cn/v1/"
         MODEL_ID = "Qwen/Qwen2.5-72B-Instruct"

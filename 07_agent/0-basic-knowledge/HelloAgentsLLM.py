@@ -3,7 +3,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 from typing import List, Dict
 
-# 加载 .env 中的环境变量
+# 加载  中的环境变量
 load_dotenv()
 
 

@@ -15,12 +15,12 @@ model = "qwen3.6-plus-2026-04-02"
 api_key = os.getenv("QWEN_API_KEY")
 api_base_url = os.getenv("QWEN_API_URL")
 
-# llm = DashScope(model=model, api_key=api_key, api_base_url=api_base_url,
-#                 is_chat_model=True, max_tokens=1024)
-#
-# response = llm.complete("推荐一个为期5天的北京旅游攻略")
-#
-# print(response)
+llm = DashScope(model=model, api_key=api_key, api_base_url=api_base_url,
+                is_chat_model=True, max_tokens=1024)
+
+response = llm.complete("推荐一个为期5天的北京旅游攻略")
+
+print(response)
 
 # 实现简单的 RAG 流程
 Settings.llm = DashScope(model=model, api_key=api_key, api_base_url=api_base_url)
