@@ -6,8 +6,6 @@ from llama_index.llms.dashscope import DashScope
 from dotenv import load_dotenv
 import os
 
-from nltk.corpus.reader import documents
-
 load_dotenv()
 
 model = "qwen3.6-plus-2026-04-02"
