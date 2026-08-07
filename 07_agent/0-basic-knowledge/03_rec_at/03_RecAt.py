@@ -1,5 +1,5 @@
-from HelloAgentsLLM import HelloAgentsLLM
-from tools import ToolExecutor,search
+from  hello_agent.HelloAgentsLLM import HelloAgentsLLM
+from hello_agent.tools import ToolExecutor,search
 import re
 
 # ReAct 提示词模板
@@ -112,7 +112,7 @@ class RecAtAgent:
 
 if __name__ == '__main__':
     BASE_URL = "https://api-inference.modelscope.cn/v1/"
-    MODEL_ID = "Qwen/Qwen2.5-72B-Instruct"
+    MODEL_ID = "deepseek-ai/DeepSeek-V4-Flash-0731"
     llm = HelloAgentsLLM(MODEL_ID, BASE_URL, None, 60)
     tool_executor = ToolExecutor()
     search_desc = "一个网页搜索引擎。当你需要回答关于时事、事实以及在你的知识库中找不到的信息时，应使用此工具。"

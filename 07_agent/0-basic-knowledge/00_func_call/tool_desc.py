@@ -1,5 +1,3 @@
-from openai.types.responses import tool
-
 from Tool import Tool
 
 
