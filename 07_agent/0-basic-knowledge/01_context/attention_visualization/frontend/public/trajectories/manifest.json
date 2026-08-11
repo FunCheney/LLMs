@@ -1,0 +1,65 @@
+[
+  {
+    "filename": "trajectory_20250914_211312.json",
+    "id": "20250914_211312",
+    "timestamp": "2025-09-14 21:13:13",
+    "category": "ReAct",
+    "query": "What's the weather like in Vancouver right now?"
+  },
+  {
+    "filename": "trajectory_20250914_211442.json",
+    "id": "20250914_211442",
+    "timestamp": "2025-09-14 21:14:44",
+    "category": "ReAct",
+    "query": "Calculate the exact compound interest on $5,000 invested at 6% annual interest rate for 30 years, compounded monthly."
+  },
+  {
+    "filename": "trajectory_20250918_203008.json",
+    "id": "20250918_203008",
+    "timestamp": "2025-09-18 20:30:08",
+    "category": "ReAct",
+    "query": "What's the weather like in Vancouver right now?"
+  },
+  {
+    "filename": "trajectory_20250930_193645.json",
+    "id": "20250930_193645",
+    "timestamp": "2025-09-30 19:36:45",
+    "category": "ReAct",
+    "query": "What's the weather like in Vancouver right now?"
+  },
+  {
+    "filename": "trajectory_20260811_162012.json",
+    "id": "20260811_162012",
+    "timestamp": "2026-08-11 16:20:12",
+    "category": "Knowledge",
+    "query": "What is the capital of France?"
+  },
+  {
+    "filename": "trajectory_20260811_162018.json",
+    "id": "20260811_162018",
+    "timestamp": "2026-08-11 16:20:18",
+    "category": "Math",
+    "query": "Calculate 25 * 4 + 10"
+  },
+  {
+    "filename": "trajectory_20260811_162024.json",
+    "id": "20260811_162024",
+    "timestamp": "2026-08-11 16:20:24",
+    "category": "Creative",
+    "query": "Write a haiku about spring"
+  },
+  {
+    "filename": "trajectory_20260811_162030.json",
+    "id": "20260811_162030",
+    "timestamp": "2026-08-11 16:20:30",
+    "category": "Reasoning",
+    "query": "If all cats are animals, and some animals are pets, can we conclude that all cats are pets?"
+  },
+  {
+    "filename": "trajectory_20260811_162036.json",
+    "id": "20260811_162036",
+    "timestamp": "2026-08-11 16:20:36",
+    "category": "Code",
+    "query": "Write a Python function to calculate factorial"
+  }
+]
