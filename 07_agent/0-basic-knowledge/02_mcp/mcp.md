@@ -1,6 +1,7 @@
 ### MCP 是什么
 
 MCP（Model Context Protocol）是 工具与 AI 客户端之间的开放协议：
+MCP 解决的问题：让“外部工具、资源、提示词模板”等能力，能够按统一协议被不同 AI 应用发现和使用。
 
 1. 独立的 MCP Server 暴露标准接口：list_tools、call_tool、read_resource 等 
 2. MCP Client（如 Cursor、Claude Desktop）连接 Server，拿到工具列表 
