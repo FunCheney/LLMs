@@ -313,3 +313,8 @@ cython_debug/
 *.egg-info
 
 .idea
+/00_basic_tools/05_pytorch/00_load_data/data/MNIST/raw/
+/00_basic_tools/05_pytorch/00_load_data/data/FashionMNIST/raw/
+/07_agent/node_modules/
+/00_basic_tools/05_pytorch/05_save_load_model/model_weight.pth
+/00_basic_tools/05_pytorch/04_optimizing_model_parameters/data/

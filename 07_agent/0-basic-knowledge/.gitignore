@@ -1,1 +1,4 @@
 .env
+
+/01_context/attention_visualization/frontend/
+/01_context/attention_visualization/qwen3-0.6b/
