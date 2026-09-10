@@ -19,6 +19,7 @@
 """
 
 import json
+from time import sleep
 from typing import Literal
 import os
 import dotenv
@@ -37,7 +38,7 @@ dotenv.load_dotenv()
 # 2. 创建 LLM
 # ============================================================
 llm = ChatOpenAI(
-    model="kimi-k3",
+    model="kimi-k2.6",
     api_key=os.getenv("MOONSHOT_API_KEY"),
     base_url=os.getenv("KIMI_BASE_URL"),
 )
@@ -227,7 +228,7 @@ builder.add_edge("finish_response", END)
 builder.add_edge("bug_tracking", END)
 builder.add_edge("human_review", END)
 
-graph = builder.compile()
+email_assistant = builder.compile()
 
 if __name__ == "__main__":
 
@@ -241,7 +242,7 @@ if __name__ == "__main__":
     Thanks!
     """
 
-    result = graph.invoke({
+    result = email_assistant.invoke({
         "email_content": email,
         "classification": None,
         "messages": [

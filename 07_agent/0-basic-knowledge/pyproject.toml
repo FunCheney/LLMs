@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "agentevals>=0.0.9",
     "aiohttp>=3.9.0",
     "black>=23.0.0",
     "grandalf>=0.8",

@@ -1,3 +1,37 @@
+# EVAL_DATASET = [
+#     {
+#         "inputs": {
+#             "email_content": """
+# Hi,
+#
+# I forgot my password and cannot log into my account.
+#
+# How can I reset it?
+#
+# Thanks!
+# """
+#         },
+#         "outputs": {
+#             "intent": "question"
+#         },
+#     },
+#     {
+#         "inputs": {
+#             "email_content": """
+# Hi,
+#
+# I found a serious bug in the application.
+# The page crashes whenever I open my profile.
+#
+# Thanks.
+# """
+#         },
+#         "outputs": {
+#             "intent": "bug"
+#         },
+#     },
+# ]
+
 EVAL_DATASET = [
     {
         "inputs": {
@@ -12,22 +46,8 @@ Thanks!
 """
         },
         "outputs": {
-            "intent": "question"
-        },
-    },
-    {
-        "inputs": {
-            "email_content": """
-Hi,
-
-I found a serious bug in the application.
-The page crashes whenever I open my profile.
-
-Thanks.
-"""
-        },
-        "outputs": {
-            "intent": "bug"
+            "intent": "question",
+            "expected_tool": "search_docs" # 添加期望的工具，用来评估 tool call
         },
     },
 ]
