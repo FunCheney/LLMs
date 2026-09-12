@@ -1,39 +1,58 @@
 """
-本例把整个评估链路变成：
-LangSmith Dataset
-       │
-       │
-       ├── input
-       │     └── email_content
-       │
-       └── reference_outputs
-             └── messages
-                    │
-                    ▼
-              client.evaluate()
-                    │
-                    ▼
-              target_agent
-                    │
-                    ▼
-             actual messages
-                    │
-                    ▼
-          Trajectory Evaluator
-                    │
-                    ▼
-                  PASS
-                  FAIL
-修改点：
-1. Reference 不需要包含最终回答
-2. 先建立一个真正的 Reference
-3. 让 search_docs 的参数允许语义变化
+这个版本的目标不是评估“回答得好不好”，而是评估 Agent 是否按照预期的方式完成任务。
+我们现在有一个 Email Assistant：
+    用户邮件
+       ↓
+    classify_intent
+       ↓
+    question ?
+       ↓
+    support_agent
+       ↓
+    需要查询文档？
+       ↓
+    search_docs
+       ↓
+    support_agent
+       ↓
+    最终回答
+对于这封：
+    I forgot my password and cannot log into my account.
 
+    How can I reset it?
+
+我们期望 Agent：
+    Human
+      ↓
+    AI → search_docs
+      ↓
+    Tool → search_docs
+      ↓
+    AI → final answer
+
+所以 V4 要验证的是：
+
+Agent 有没有走这条正确的“行为路径”。
+
+修改点：
+1. 把 Target 的 trajectory 简化成 Assistant Messages
+2. Reference 也只描述这两个 Assistant Message
+3. 这里有一个容易误解的地方
+    Reference 的第二个 AIMessage 为什么 content=""？
+    因为 AgentEvals 的 strict trajectory evaluation 允许 message content 不同。
+    官方文档明确说，strict 要求：
+        相同 message
+            +
+        相同顺序
+            +
+        相同 tool calls
+    但允许 message content 不同
+4. 换一个 Dataset 名称
 """
 
 import json
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
 from langsmith import Client
 
 from agentevals.trajectory.match import (
@@ -47,7 +66,7 @@ from email_assistant import email_assistant
 # 1. Dataset
 # ============================================================
 
-DATASET_NAME = "email-assistant-trajectory-v3"
+DATASET_NAME = "email-assistant-trajectory-v4"
 
 
 # ============================================================
@@ -63,18 +82,8 @@ EVAL_DATASET = [
                 "Thanks!"
             )
         },
-
         "outputs": {
             "messages": [
-                {
-                    "role": "user",
-                    "content": (
-                        "I forgot my password and cannot log into "
-                        "my account.\n\n"
-                        "How can I reset it?\n\n"
-                        "Thanks!"
-                    ),
-                },
                 {
                     "role": "assistant",
                     "content": "",
@@ -82,12 +91,14 @@ EVAL_DATASET = [
                         {
                             "function": {
                                 "name": "search_docs",
-                                "arguments": json.dumps({
-                                    "query": "password reset"
-                                }),
+                                "arguments": "{}",
                             }
                         }
                     ],
+                },
+                {
+                    "role": "assistant",
+                    "content": "",
                 },
             ]
         },
@@ -117,12 +128,19 @@ def target_email_assistant(inputs: dict) -> dict:
         "response": "",
     })
 
-    print("\n===== ACTUAL TRAJECTORY =====")
-    for message in result["messages"]:
+    assistant_messages = [
+        message
+        for message in result["messages"]
+        if isinstance(message, AIMessage)
+    ]
+
+    print("\n===== ASSISTANT TRAJECTORY =====")
+    for i, message in enumerate(assistant_messages):
+        print(f"\n--- {i} ---")
         print(message)
 
     return {
-        "messages": result["messages"],
+        "messages": assistant_messages
     }
 
 
@@ -217,7 +235,7 @@ if __name__ == "__main__":
         ],
 
         experiment_prefix=(
-            "email-assistant-trajectory-v3"
+            "email-assistant-trajectory-v4"
         ),
         max_concurrency=1,
     )
@@ -228,3 +246,21 @@ if __name__ == "__main__":
         "Check the experiment in LangSmith."
     )
 
+"""
+们把 Email Assistant Evaluation 做成下面这条路线：
+                         Email Assistant
+                               │
+              ┌────────────────┼────────────────┐
+              ↓                ↓                ↓
+        Classification      Tool Call       Trajectory
+              │                │                │
+          intent 对吗？      Tool 对吗？      行为路径对吗？
+              │                │                │
+              └────────────────┼────────────────┘
+                               ↓
+                         Final Answer
+                               ↓
+                       Answer Evaluation
+                               ↓
+                         Overall Quality
+"""
