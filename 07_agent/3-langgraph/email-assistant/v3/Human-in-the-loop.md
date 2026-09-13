@@ -8,3 +8,33 @@
 
 ### 为什么必须有 Checkpointer？
 
+
+
+## 学习路线
+
+```
+                 Email Assistant
+                       │
+        ┌──────────────┴──────────────┐
+        │                             │
+       V1                            V2
+     Agent                     Agent + Evaluation
+        │                             │
+        │                   ┌─────────┼─────────┐
+        │                   │         │         │
+        │                Triage    ToolCall  Response
+        │                             │
+        │                         Trajectory
+        │
+        ▼
+       V3
+   Agent + HITL
+        │
+        ├── interrupt()
+        ├── Checkpointer
+        ├── thread_id
+        └── Human Decision
+              ├── approve
+              ├── edit
+              └── reject
+```
