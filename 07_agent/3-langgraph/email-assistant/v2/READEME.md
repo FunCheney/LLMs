@@ -249,16 +249,74 @@ Triage
 
 
 #### 3. Triage 为什么通常可以用确定性 Evaluation？
-因为它是一个分类问题。
+因为它是一个分类问题。因此它很适合：Deterministic Evaluation
 
 
-
-### 第二层：Triage Evaluation
-
-
-### 第三层：Triage Evaluation
+### 第二层：Tool Call Evaluation
+在 Triage 之后，Agent 需要决定：我应该使用哪个工具。因此 Tool Call Evaluation 就是用来评估 Agent 选择的工具是否正确。
 
 
-### 第四层：Triage Evaluation
+#### Tool Call 和 Triage 有什么区别？
+Triage: Agent 理解的用户的问题。
+Tool Call: Agent 选择的工具。
+
+如果 Agent 在 Triage 层做出的了正确的判断，说明它正确的理解了用户的问题。但是如果选择错了工具，说明没有把正确的理解转化成正确的动作。
+
+
+### 第三层：Trajectory Evaluation
+这一步，Evaluation 开始从 ”做了什么“ 升级到 ”整个过程怎么做的？“。Trajectory Evaluation 用来评价：Agent 是否按照预期的行为路径完成任务。
+
+#### 为什么 Tool Call Evaluation 还不够？
+
+假设我们只检查：
+```text
+Agent called search_docs
+```
+
+结果：
+```text
+search_docs ✅
+```
+
+但 Agent 实际执行：
+```text
+Human
+ ↓
+AI(search_docs)
+ ↓
+Tool(search_docs)
+ ↓
+AI(search_docs)
+ ↓
+Tool(search_docs)
+ ↓
+AI(search_docs)
+ ↓
+Tool(search_docs)
+ ↓
+AI(final)
+```
+
+它虽然调用了正确工具，但可能：
+
+* 无限循环 
+* 重复搜索 
+* 没有正确结束 
+* 调用了不必要的工具
+
+所以：
+```text
+Tool Call Evaluation
+```
+
+
+只能告诉我们： 某个动作对不对。
+
+而： Trajectory Evaluation 告诉我们： 动作组合起来形成的行为过程对不对。
+
+
+### 第四层：Response Evaluation
+
+Agent 最终给用户的答案是怎么样的？
 
 
