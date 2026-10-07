@@ -1,11 +1,12 @@
 from collections import defaultdict
+from retrieval import RetrievalResult
 
 
 def reciprocal_rank_fusion(
     ranked_lists: dict[str, list[str]],
     top_k: int = 5,
     rrf_k: int = 60,
-) -> list[tuple[str, float]]:
+) -> list[RetrievalResult]:
     """
     将多路检索结果按排名融合。
 
@@ -17,11 +18,32 @@ def reciprocal_rank_fusion(
     if rrf_k <= 0:
         raise ValueError("rrf_k must be greater than 0")
 
-    scores: dict[str, float] = defaultdict(float)
+    scores: dict[str, float] = {}
+    results_by_id: dict[str, RetrievalResult] = {}
 
-    for chunk_ids in ranked_lists.values():
-        for rank, chunk_id in enumerate(chunk_ids, start=1):
-            scores[chunk_id] += 1.0 / (rrf_k + rank)
+    for results in ranked_lists:
+        for rank, result in enumerate(results, start=1):
+            result_id = result.id
 
-    ordered = sorted(scores.items(), key=lambda item: item[1], reverse=True)
-    return ordered[:top_k]
+            scores[result_id] = (
+                    scores.get(result_id, 0.0)
+                    + 1.0 / (rrf_k + rank)
+            )
+
+            results_by_id[result_id] = result
+
+    ranked_ids = sorted(
+        scores,
+        key=lambda result_id: scores[result_id],
+        reverse=True,
+    )
+
+    return [
+        RetrievalResult(
+            id=result_id,
+            text=results_by_id[result_id].text,
+            metadata=results_by_id[result_id].metadata,
+            score=scores[result_id],
+        )
+        for result_id in ranked_ids
+    ]
