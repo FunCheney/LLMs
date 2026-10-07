@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List
-from embedding_types import EmbeddingResult
+from embedding.embedding_types import EmbeddingResult
 
 """
                  ┌────────────────────┐
