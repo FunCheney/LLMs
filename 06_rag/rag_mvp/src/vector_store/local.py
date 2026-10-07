@@ -2,7 +2,7 @@ from typing import List
 import pickle
 from pathlib import Path
 
-from vector_store_types import VectorRecord
+from vector_store.vector_store_types import VectorRecord
 
 def dot_product(a: List[float], b: List[float]) -> float:
     return sum(x * y for x, y in zip(a, b))
@@ -31,3 +31,20 @@ class LocalVectorIndex:
 
         return scored_vectors[:top_k]
 
+    def save(self, path: str| Path) -> None:
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        with path.open('wb') as f:
+            pickle.dump(self.records, f)
+
+
+    @classmethod
+    def load(cls, path: str| Path) -> "LocalVectorIndex":
+        path = Path(path)
+        with path.open('rb') as f:
+            records = pickle.load(f)
+
+        index = cls()
+        index.records = records
+        return index

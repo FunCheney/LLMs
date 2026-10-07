@@ -1,5 +1,5 @@
 from embedding import BGEM3EmbeddingProvider
-from vector_store import LocalVectorIndex, VectorRecord
+from vector_store.local import LocalVectorIndex, VectorRecord
 
 def main():
     embedding = BGEM3EmbeddingProvider()
@@ -23,14 +23,15 @@ def main():
     texts = [text for _,text in documents]
     embeddings = embedding.embed_documents(texts)
 
-    for (chunk_id, text), embedding in zip(documents, embeddings):
-        index.add(VectorRecord(chunk_id, text,  metadata={}, embedding=embedding.vector,))
+    for (chunk_id, text), embedding_result in zip(documents, embeddings):
+        index.add(VectorRecord(chunk_id, text,  metadata={}, embedding=embedding_result.vector,))
 
     print("index size:", index.count())
     query = "Python 如何读取 PDF？"
 
     query_embedding = embedding.embed_text(query)
     results = index.search(query_embedding.vector,  top_k=2,)
+    index.save("data/vector_index.pkl")
     print("\nQuery:", query)
 
     print("\nResults:")

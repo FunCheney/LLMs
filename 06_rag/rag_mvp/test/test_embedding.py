@@ -8,14 +8,14 @@ def test_embed_text_should_return_fixed_dimension():
         dimension=4,
     )
 
-    vector = provider.embed_text(
+    result = provider.embed_text(
         "What is Kafka?"
     )
 
-    assert len(vector) == 4
+    assert len(result.vector) == 4
     assert all(
         isinstance(value, float)
-        for value in vector
+        for value in result.vector
     )
 
 
@@ -30,13 +30,13 @@ def test_embed_documents_should_return_same_number_of_vectors():
         "Consumer",
     ]
 
-    vectors = provider.embed_documents(texts)
+    results = provider.embed_documents(texts)
 
-    assert len(vectors) == len(texts)
+    assert len(results) == len(texts)
 
     assert all(
-        len(vector) == 4
-        for vector in vectors
+        len(result.vector) == 4
+        for result in results
     )
 
 

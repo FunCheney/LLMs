@@ -1,5 +1,5 @@
-from vetore_store.local import LocalVectorIndex
-from vetore_store.vetor_store_types import VectorRecord
+from vector_store.local import LocalVectorIndex
+from vector_store.vector_store_types import VectorRecord
 
 
 __all__ = [
