@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List
+from embedding_types import EmbeddingResult
 
 """
                  ┌────────────────────┐
@@ -15,7 +16,7 @@ Chunks ─────────►│ embed_documents()  │
 """
 class EmbeddingProvider(ABC):
     @abstractmethod
-    def embed_text(self, text: str) -> List[float]:
+    def embed_text(self, text: str) -> EmbeddingResult:
         """
         将单个文本转换成向量
         用户 Query
@@ -28,7 +29,7 @@ class EmbeddingProvider(ABC):
         """
         raise NotImplementedError
     @abstractmethod
-    def embed_documents(self, documents: List[str]) -> List[List[float]]:
+    def embed_documents(self, documents: List[str]) -> List[EmbeddingResult]:
         """
             将多个文本转化成向量
             Chunk 1 ─┐
