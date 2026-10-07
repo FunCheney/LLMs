@@ -5,7 +5,7 @@ from ingestion.storage import load_chunks_jsonl
 
 def main():
     chunks = load_chunks_jsonl(
-        Path("../data/processed/chunks.jsonl")
+        Path("data/processed/chunks.jsonl")
     )
 
     cross_page_count = 0

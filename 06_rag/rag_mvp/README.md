@@ -9,6 +9,8 @@
 
 交付物： 可以被检索的结构化文档数据。
 
+当前状态：已完成。PDF / HTML 解析后保留章节、页码和 `source_uri`，输出 `data/processed/chunks.jsonl`，并用 `scripts/review_chunks.py` 抽检。
+
 ### Phase 2：检索系统
 阶段 2 · 混合检索
 核心能力

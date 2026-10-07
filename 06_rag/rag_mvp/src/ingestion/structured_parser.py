@@ -1,72 +1,74 @@
-from ingestion.heading_detector import (
-    SectionTracker,
-    detect_heading,
-)
-from src.ingestion.structured_units import (
-    StructuredParagraph,
-)
+import re
+
+from ingestion.heading_detector import SectionTracker, detect_heading
+from schemas import StructuredParagraph
+
+NOISE_LINE_PATTERN = re.compile(r"^(?:\d{1,3}|[A-Z]|P+)$")
 
 
-def parse_structured_paragraphs(
-    pages: list[dict],
-) -> list[StructuredParagraph]:
+def is_noise_line(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped:
+        return False
+    return NOISE_LINE_PATTERN.fullmatch(stripped) is not None
+
+
+def parse_structured_paragraphs(pages: list[dict]) -> list[StructuredParagraph]:
     """
-    按页面顺序解析标题和段落。
-
-    这是基础版本：
-    - 按空行划分段落
-    - 按行识别标题
-    - 维护章节路径
+    按页面顺序解析标题和段落，允许段落跨页，不允许标题被写进正文。
     """
     tracker = SectionTracker()
-    paragraphs = []
+    paragraphs: list[StructuredParagraph] = []
+    current_lines: list[tuple[str, int]] = []
+
+    def flush_paragraph() -> None:
+        if not current_lines:
+            return
+
+        content = "\n".join(text for text, _ in current_lines).strip()
+        if not content:
+            current_lines.clear()
+            return
+
+        page_spans: list[tuple[int, int, int]] = []
+        offset = 0
+        for index, (text, page_number) in enumerate(current_lines):
+            if index:
+                offset += 1
+            start = offset
+            offset += len(text)
+            page_spans.append((start, offset, page_number))
+
+        pages_used = [page for _, page in current_lines]
+        paragraphs.append(
+            StructuredParagraph(
+                content=content,
+                page_start=min(pages_used),
+                page_end=max(pages_used),
+                section_title=tracker.get_current_title(),
+                section_path=tracker.get_path(),
+                page_spans=page_spans,
+            )
+        )
+        current_lines.clear()
 
     for page in pages:
         page_number = page["page_number"]
-        text = page["text"]
+        for raw_line in page.get("text", "").splitlines():
+            line = raw_line.strip()
+            if not line:
+                flush_paragraph()
+                continue
+            if is_noise_line(line):
+                continue
 
-        lines = text.splitlines()
-        current_lines: list[str] = []
-
-        def flush_paragraph():
-            if not current_lines:
-                return
-
-            content = "\n".join(
-                current_lines
-            ).strip()
-
-            if not content:
-                return
-
-            paragraphs.append(
-                StructuredParagraph(
-                    content=content,
-                    page_start=page_number,
-                    page_end=page_number,
-                    section_title=(
-                        tracker.get_current_title()
-                    ),
-                    section_path=tracker.get_path(),
-                )
-            )
-
-            current_lines.clear()
-
-        for line in lines:
             heading = detect_heading(line)
-
             if heading is not None:
                 flush_paragraph()
                 tracker.update(heading)
                 continue
 
-            if not line.strip():
-                flush_paragraph()
-                continue
+            current_lines.append((line, page_number))
 
-            current_lines.append(line.strip())
-
-        flush_paragraph()
-
+    flush_paragraph()
     return paragraphs

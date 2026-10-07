@@ -1,4 +1,4 @@
-from src.ingestion.storage import load_chunks_jsonl
+from ingestion.storage import load_chunks_jsonl
 
 
 def main():
