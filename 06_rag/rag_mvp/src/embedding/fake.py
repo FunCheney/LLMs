@@ -1,7 +1,7 @@
 from typing import List
 
-from base import EmbeddingProvider
-from embedding_types import EmbeddingResult
+from embedding.base import EmbeddingProvider
+from embedding.embedding_types import EmbeddingResult
 
 class FakeEmbeddingProvider(EmbeddingProvider):
     def __init__(self, dimension: int=4):
