@@ -1,3 +1,20 @@
+"""
+本地向量索引的构建与检索（Phase 2 的入口层）。
+
+数据流：
+
+    chunks.jsonl
+        ↓  load_chunks_jsonl
+    src/indexing/vector_index.py  →  build_local_index()
+        ↓  embed_documents（分批）
+    LocalVectorIndex  →  data/index/local.pkl
+
+    search_cli.py  →  search_local_index()  →  打印 Top-K + metadata
+
+脚本 scripts/build_vector_index.py 负责调用 build_local_index，
+把「读 jsonl → 批量向量化 → 落盘」串起来。
+"""
+
 from pathlib import Path
 
 from embedding.base import EmbeddingProvider
@@ -6,15 +23,6 @@ from ingestion.storage import load_chunks_jsonl
 from vector_store.local import LocalVectorIndex
 from vector_store.vector_store_types import VectorRecord
 
-"""
-chunks.jsonl
-    ↓  load_chunks_jsonl
-src/indexing/vector_index.py  →  build_local_index()
-    ↓  embed_documents (分批)
-LocalVectorIndex  →  data/index/local.pkl
-
-search_cli.py  →  search_local_index()  →  打印 Top-K + metadata
-"""
 
 def build_local_index(
     chunks_path: str | Path,
@@ -36,11 +44,13 @@ def build_local_index(
         raise ValueError(f"No chunks found in {chunks_path}")
 
     index = LocalVectorIndex()
+    # 分批向量化：控制显存/内存占用，也便于观察进度
     for start in range(0, len(chunks), batch_size):
         batch = chunks[start : start + batch_size]
         texts = [item["content"] for item in batch]
         embeddings = embedder.embed_documents(texts)
 
+        # 防御性校验：向量数量必须与文本数量一致，否则记录会错位
         if len(embeddings) != len(batch):
             raise RuntimeError(
                 f"Embedding count mismatch: got {len(embeddings)}, expected {len(batch)}"

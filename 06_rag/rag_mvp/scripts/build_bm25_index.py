@@ -1,3 +1,12 @@
+"""
+CLI：构建 BM25 稀疏索引（data/index/bm25.pkl）。
+
+用法：
+    uv run python scripts/build_bm25_index.py
+
+基于 jieba 分词，用于关键词检索；与向量索引一起支撑 hybrid 模式。
+"""
+
 import argparse
 from pathlib import Path
 

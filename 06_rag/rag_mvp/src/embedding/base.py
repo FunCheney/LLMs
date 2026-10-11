@@ -1,8 +1,9 @@
-from abc import ABC, abstractmethod
-from typing import List
-from embedding.embedding_types import EmbeddingResult
-
 """
+Embedding 抽象层：定义所有向量化实现的统一接口。
+
+设计意图：上层（检索、索引构建）只依赖 EmbeddingProvider 抽象，
+不关心底层用的是 BGE-M3、假向量还是别的模型，从而方便替换与单测。
+
                  ┌────────────────────┐
                  │ EmbeddingProvider  │
                  │                    │
@@ -14,7 +15,15 @@ Chunks ─────────►│ embed_documents()  │
                            ▼
                      Vector[]
 """
+
+from abc import ABC, abstractmethod
+from typing import List
+from embedding.embedding_types import EmbeddingResult
+
+
 class EmbeddingProvider(ABC):
+    """向量化提供者抽象基类：查询用单条，文档用批量。"""
+
     @abstractmethod
     def embed_text(self, text: str) -> EmbeddingResult:
         """
@@ -28,6 +37,7 @@ class EmbeddingProvider(ABC):
         Query Vector
         """
         raise NotImplementedError
+
     @abstractmethod
     def embed_documents(self, documents: List[str]) -> List[EmbeddingResult]:
         """

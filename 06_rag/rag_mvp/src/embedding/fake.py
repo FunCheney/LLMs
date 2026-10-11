@@ -1,3 +1,10 @@
+"""
+假向量提供者：用于单元测试，避免加载真实模型（快且无外部依赖）。
+
+同一个文本永远得到同一个向量（由字符编码之和决定种子），
+不同文本也会得到不同向量，足以验证「读写索引、排序、融合」等逻辑。
+"""
+
 from typing import List
 
 from embedding.base import EmbeddingProvider
@@ -11,9 +18,11 @@ class FakeEmbeddingProvider(EmbeddingProvider):
         self.dimension = dimension
 
     def _vector_for_text(self, text: str) -> list[float]:
+        """根据文本内容确定性地生成一个固定维度的伪向量。"""
         if not text.strip():
             raise ValueError("text must not be empty")
 
+        # 用字符编码之和取模作为种子，保证同文本 → 同向量
         seed = sum(ord(char) for char in text) % 97
         return [
             float((seed + index) % self.dimension) / max(self.dimension, 1)

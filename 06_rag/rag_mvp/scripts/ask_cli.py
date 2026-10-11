@@ -1,3 +1,14 @@
+"""
+CLI：RAG 问答命令行（Phase 3 的可用产物）。
+
+用法：
+    uv run python scripts/ask_cli.py "MCP 是什么"            # 默认 hybrid，k=5
+    uv run python scripts/ask_cli.py "MCP 是什么" --dry-run  # 只检索，不调 LLM
+    uv run python scripts/ask_cli.py "MCP 是什么" --json out.json
+
+需要 .env 中配置 DEEPSEEK_API_KEY。完整链路见 generation.pipeline.answer_question。
+"""
+
 import argparse
 import json
 from pathlib import Path
@@ -66,6 +77,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
+    # 提前校验索引是否存在，给出可操作的修复提示
     if args.mode in {"dense", "hybrid"} and not args.dense_index.exists():
         raise SystemExit(
             f"Dense index not found: {args.dense_index}\n"
@@ -98,6 +110,7 @@ def main() -> None:
 
     print_rag_response(response)
 
+    # 可选：把完整结果（含引用）导出为 JSON，便于后续评估/存档
     if args.json:
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(

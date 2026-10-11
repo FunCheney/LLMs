@@ -1,7 +1,12 @@
+"""
+问答结果的控制台展示（ask_cli 使用）。
+"""
+
 from generation.shcame import Citation, RAGResponse
 
 
 def format_citation(citation: Citation) -> str:
+    """把一条引用格式化：编号、章节、页码、来源与摘录。"""
     path = " > ".join(citation.section_path) if citation.section_path else "-"
     return (
         f"[{citation.index}] {citation.section_title} "
@@ -14,6 +19,7 @@ def format_citation(citation: Citation) -> str:
 
 
 def print_rag_response(response: RAGResponse) -> None:
+    """打印完整问答结果：元信息、答案正文、引用列表。"""
     print(f"Query: {response.query}")
     print(f"Mode: {response.retrieval_mode}")
     print(f"Insufficient evidence: {response.insufficient_evidence}")

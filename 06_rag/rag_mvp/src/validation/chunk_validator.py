@@ -1,3 +1,14 @@
+"""
+Chunk 质量校验：分块完成后自动体检，尽早暴露解析/切分问题。
+
+校验分两级：
+- errors（致命）：chunk_id 缺失或重复、正文为空、页码非法 —— 只要有一条就判定不合格；
+- warnings（提示）：正文超长、页码跨度过大、未知章节占比过高、缺 source_uri。
+
+同时产出统计信息（长度分布、页码跨度、唯一章节数等），写入 ValidationReport.stats，
+供 build_chunks.py 打印，也用于人工抽检时快速判断整体质量。
+"""
+
 from dataclasses import dataclass, field
 
 from schemas import DocumentChunk
@@ -5,6 +16,7 @@ from schemas import DocumentChunk
 
 @dataclass
 class ValidationIssue:
+    """一条校验问题：level 为 error/warning，code 为机器可读标识。"""
     level: str
     code: str
     message: str
@@ -13,6 +25,7 @@ class ValidationIssue:
 
 @dataclass
 class ValidationReport:
+    """一次校验的汇总报告。"""
     chunk_count: int
     errors: list[ValidationIssue] = field(default_factory=list)
     warnings: list[ValidationIssue] = field(default_factory=list)
@@ -20,6 +33,7 @@ class ValidationReport:
 
     @property
     def ok(self) -> bool:
+        """是否存在致命错误（无 error 即视为通过）。"""
         return not self.errors
 
 
@@ -30,6 +44,15 @@ def validate_chunks(
     max_page_span: int = 8,
     max_unknown_ratio: float = 0.35,
 ) -> ValidationReport:
+    """
+    校验 Chunk 列表，返回 ValidationReport。
+
+    参数：
+    - chunks：DocumentChunk 列表或已完成 to_dict 的 dict 列表（两种都支持）；
+    - chunk_size：判定「超长」的阈值；
+    - max_page_span：允许的最大页码跨度，超过则告警；
+    - max_unknown_ratio：允许的「未知章节」占比上限，超过则告警。
+    """
     report = ValidationReport(chunk_count=len(chunks))
     if not chunks:
         report.errors.append(
@@ -37,6 +60,7 @@ def validate_chunks(
         )
         return report
 
+    # 统一转成 dict，兼容两种入参形式
     records = [
         chunk.to_dict() if hasattr(chunk, "to_dict") else chunk
         for chunk in chunks
@@ -56,6 +80,7 @@ def validate_chunks(
         page_end = int(record.get("page_end") or 0)
         section_title = record.get("section_title") or "Unknown"
 
+        # —— 致命错误：chunk_id ——
         if not chunk_id:
             report.errors.append(
                 ValidationIssue("error", "missing_chunk_id", "Chunk 缺少 chunk_id")
@@ -67,11 +92,13 @@ def validate_chunks(
         else:
             seen_ids.add(chunk_id)
 
+        # —— 致命错误：空正文 ——
         if not content:
             report.errors.append(
                 ValidationIssue("error", "empty_content", "Chunk 正文为空", chunk_id)
             )
 
+        # —— 致命错误：页码非法 ——
         if page_start <= 0 or page_end <= 0 or page_start > page_end:
             report.errors.append(
                 ValidationIssue(
@@ -87,6 +114,7 @@ def validate_chunks(
         span = page_end - page_start
         page_spans.append(span)
 
+        # —— 告警：正文超长 ——
         if length > chunk_size:
             oversized += 1
             report.warnings.append(
@@ -98,6 +126,7 @@ def validate_chunks(
                 )
             )
 
+        # —— 告警：页码跨度过大（可能把不相关内容合并了）——
         if span > max_page_span:
             report.warnings.append(
                 ValidationIssue(
@@ -108,12 +137,14 @@ def validate_chunks(
                 )
             )
 
+        # 统计未知章节与来源缺失
         if section_title in {"Unknown", "UNKNOW", ""}:
             unknown += 1
 
         if not record.get("source_uri"):
             missing_source += 1
 
+    # —— 告警：未知章节占比过高（说明标题识别效果差）——
     unknown_ratio = unknown / len(records)
     if unknown_ratio > max_unknown_ratio:
         report.warnings.append(
@@ -124,6 +155,7 @@ def validate_chunks(
             )
         )
 
+    # —— 告警：存在缺少来源的 Chunk ——
     if missing_source:
         report.warnings.append(
             ValidationIssue(
@@ -133,6 +165,7 @@ def validate_chunks(
             )
         )
 
+    # 汇总统计指标
     report.stats = {
         "chunk_count": len(records),
         "avg_length": round(sum(lengths) / len(lengths), 1),

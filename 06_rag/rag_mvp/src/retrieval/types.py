@@ -1,3 +1,13 @@
+"""
+检索层的数据结构。
+
+RetrievalResult 是「检索器的统一输出」。相比底层的 VectorRecord，
+它少了一个 embedding 字段（用户/上层不需要向量），
+并补充了 score、source、rank、以及还原好的 DocumentChunk：
+
+    VectorRecord --> RetrievalResult: 相当于对底层的数据做了一个抽象
+"""
+
 from dataclasses import dataclass
 from typing import Any
 
@@ -15,6 +25,6 @@ class RetrievalResult:
     text: str
     metadata: dict[str, Any]
     score: float
-    source: str
-    chunk: DocumentChunk
-    rank: int | None = None
+    source: str                 # 来源检索器：dense / sparse / hybrid
+    chunk: DocumentChunk        # 还原出的完整 Chunk（含章节、页码、来源）
+    rank: int | None = None     # 在结果列表中的名次（从 1 开始）

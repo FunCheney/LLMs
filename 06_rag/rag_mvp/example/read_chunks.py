@@ -1,3 +1,7 @@
+"""
+示例：读取 chunks.jsonl，打印总数并预览前 3 条（chunk_id / 页码 / 正文）。
+"""
+
 from ingestion.storage import load_chunks_jsonl
 
 

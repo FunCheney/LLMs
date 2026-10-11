@@ -1,3 +1,15 @@
+"""
+CLI：运行 smoke 检索评测（Phase 4 早期形式）。
+
+用法：
+    uv run python scripts/run_smoke_retrieval.py
+    uv run python scripts/run_smoke_retrieval.py --modes hybrid --k 5
+
+默认数据集：data/eval/smoke_queries.yaml；报告写入 data/eval/reports/smoke_latest.json。
+默认若存在未通过的用例会以退出码 1 结束（可用 --no-fail-on-miss 关闭），
+方便接入 CI 做检索质量回归。
+"""
+
 import argparse
 import sys
 from pathlib import Path
@@ -67,10 +79,12 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    # 解析逗号分隔的模式列表，忽略空项
     modes = None
     if args.modes:
         modes = [mode.strip() for mode in args.modes.split(",") if mode.strip()]
 
+    # 按所选模式检查依赖的索引是否就绪（只用 sparse 时无需向量索引）
     if args.dense_index.exists() is False and modes != ["sparse"]:
         if modes is None or "dense" in modes or "hybrid" in modes:
             raise SystemExit(
@@ -93,6 +107,7 @@ def main() -> None:
         device=args.device,
     )
 
+    # 先打印语料一致性等告警（如 chunk 数与数据集声明不符）
     for warning in warnings:
         print(f"WARNING: {warning}")
 
@@ -100,6 +115,7 @@ def main() -> None:
     save_report(report, args.report)
     print(f"\nReport saved to: {args.report}")
 
+    # 有失败用例时以非零退出码结束，便于 CI 拦截
     if args.fail_on_miss and not report.all_passed():
         sys.exit(1)
 

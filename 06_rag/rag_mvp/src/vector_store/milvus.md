@@ -32,7 +32,19 @@ uv run python example/test_milvus.py
 
 ### Milvus 实战
 
+#### 数据库
+
 #### 集合
+
+1. 集合的 schema
+
+2. 集合的字段
+
+   * 包含一个住建
+   * 最多包含四个向量字段 
+   * 多个标量字段  
+
+3. 
 
 
 #### 索引

@@ -1,28 +1,31 @@
+"""
+段落优先的切分策略（早期原型，现主要由 page_aware_splitter / chunker 使用）。
+
+为什么要「先段落、后字符」？
+直接按字符位置切分存在几个问题：
+1. 可能把一个段落从中间切开；
+2. 可能把一句话或一个代码示例拆成两半；
+3. 不能很好地保留文档原有的结构。
+
+即使设置了 overlap，也不一定能保证上下文完整，所以优先在段落边界处切分。
+"""
+
 import re
 from typing import List
 
 from ingestion.text_splitter import split_text
 
-'''
-接按照字符位置切分存在几个问题：
-
-1. 可能把一个段落从中间切开。
-2. 可能把一句话或一个代码示例拆成两半。
-3. 不能很好地保留文档原有的结构。
-
-即使设置了 overlap，也不一定能保证上下文完整。
-'''
 
 def split_paragraphs(text: str) -> List[str]:
-
     """
-    将文本按照多行拆分为段落
+    将文本按照空行拆分为段落列表。
     """
+    # 统一换行符，避免 \r\n / \r 干扰后续正则
     text = text.replace("\r\n", "\n")
     text = text.replace("\r", "\n")
 
     paragraphs = re.split(
-        r"\n\s*\n", # 两个换行符之间允许存在空格或其他空白字符。
+        r"\n\s*\n",  # 两个换行符之间允许存在空格或其他空白字符。
         text,
     )
     result = []
@@ -58,7 +61,7 @@ def split_text_by_paragraphs(text: str, chunk_size: int, overlap: int) -> List[s
     chunks = []
     current_chunk = ""
     for paragraph in paragraphs:
-        # 情况一：当前段落本省超过 chunk_size
+        # 情况一：当前段落本身超过 chunk_size
         if len(paragraph) > chunk_size:
             # 先保存之前累计的段落
             if current_chunk:
@@ -69,13 +72,13 @@ def split_text_by_paragraphs(text: str, chunk_size: int, overlap: int) -> List[s
             chunks.extend(long_chunk)
             continue
 
-        # 如果非超长段落
+        # 如果当前没有已累积的内容，直接以该段落作为新 Chunk
         if not current_chunk:
             current_chunk = paragraph
             continue
 
         # 尝试将当前段落合并到已有段落
-        candidate = (current_chunk +"\n\n"+ paragraph)
+        candidate = (current_chunk + "\n\n" + paragraph)
 
         if len(candidate) <= chunk_size:
             current_chunk = candidate

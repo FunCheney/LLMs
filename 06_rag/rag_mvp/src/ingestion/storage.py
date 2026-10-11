@@ -1,3 +1,14 @@
+"""
+Chunk 持久化：以 JSONL 格式读写 chunks.jsonl。
+
+JSONL（每行一个 JSON 对象）的好处：
+- 支持流式读写，内存占用低；
+- 逐行追加方便，出错能定位到具体行号；
+- 与下游的 BM25 / 向量索引构建脚本天然契合（逐行读取即可）。
+
+chunks.jsonl 是 ingestion 阶段的核心交付物，也是检索/索引阶段的输入。
+"""
+
 import json
 from pathlib import Path
 
@@ -5,7 +16,7 @@ from schemas import DocumentChunk
 
 
 def save_chunks_jsonl(chunks: list[DocumentChunk], out_path: str | Path):
-
+    """把 Chunk 列表写成 JSONL（自动创建父目录，中文不转义）。"""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -16,6 +27,7 @@ def save_chunks_jsonl(chunks: list[DocumentChunk], out_path: str | Path):
 
 
 def load_chunks_jsonl(in_path: str | Path) -> list[dict]:
+    """逐行读取 JSONL，返回 dict 列表（跳过空行）。"""
     in_path = Path(in_path)
     chunks = []
 

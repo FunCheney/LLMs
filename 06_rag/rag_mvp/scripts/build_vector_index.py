@@ -1,3 +1,13 @@
+"""
+CLI：构建本地稠密向量索引（data/index/local.pkl）。
+
+用法：
+    uv run python scripts/build_vector_index.py
+    uv run python scripts/build_vector_index.py --device cpu --batch-size 32
+
+首次运行会从 HuggingFace（已切到 hf-mirror 镜像）下载 BGE-M3，耗时较长。
+"""
+
 import argparse
 from pathlib import Path
 

@@ -1,3 +1,7 @@
+"""
+示例：抽检 chunks.jsonl，打印前 5 条的长度信息，用于判断分块长度是否合理。
+"""
+
 from ingestion.storage import load_chunks_jsonl
 
 

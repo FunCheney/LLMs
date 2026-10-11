@@ -1,3 +1,7 @@
+"""
+示例：挑出「跨页 Chunk」（page_start != page_end）并打印，用于检查跨页合并是否合理。
+"""
+
 from pathlib import Path
 
 from ingestion.storage import load_chunks_jsonl

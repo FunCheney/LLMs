@@ -1,3 +1,10 @@
+"""
+示例：最小化的本地向量检索演示（手工跑，非正式脚本）。
+
+用 3 条假文档构建索引，查询 "Python 如何读取 PDF？"，打印 Top-2 与分数，
+直观展示「语义相近的文档得分更高」。依赖真实 BGE-M3 模型。
+"""
+
 from embedding import BGEM3EmbeddingProvider
 from vector_store.local import LocalVectorIndex, VectorRecord
 

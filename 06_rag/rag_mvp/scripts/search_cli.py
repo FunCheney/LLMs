@@ -1,3 +1,13 @@
+"""
+CLI：检索调试工具，支持 dense / sparse / hybrid 三种模式。
+
+用法：
+    uv run python scripts/search_cli.py "MCP 是什么" --mode hybrid --k 5
+    uv run python scripts/search_cli.py "CLAUDE.md" --mode sparse --k 3
+
+只做「检索 + 打印命中」，不调用 LLM，是验证索引与召回质量最常用的手段。
+"""
+
 import argparse
 from pathlib import Path
 
@@ -57,6 +67,7 @@ def main() -> None:
         device=args.device,
     )
 
+    # 提前检查所需索引是否存在，给出「先跑哪个脚本」的提示，避免晦涩报错
     if args.mode in {"dense", "hybrid"} and not args.dense_index.exists():
         raise SystemExit(
             f"Dense index not found: {args.dense_index}\n"

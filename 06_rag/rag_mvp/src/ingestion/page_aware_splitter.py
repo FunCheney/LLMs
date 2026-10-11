@@ -1,3 +1,19 @@
+"""
+跨页段落感知的切分器（早期实现，chunker.py 是其结构化升级版）。
+
+目标：在合并跨页文本、切分 Chunk 的同时，尽量准确地记录每个 Chunk
+对应的起止页码，为后续引用与溯源服务。
+
+基本流程：
+1. combine_pages：把多页文本拼成一个大字符串，并记录每页的字符区间；
+2. split_paragraph_units：按空行切出段落，用字符区间反查段落所在页码；
+3. build_page_aware_chunks：把段落合并为不超过 chunk_size 的 Chunk，
+   过长的段落再走字符级切分。
+
+遗留说明：该模块依赖「空行 = 段落」的启发式假设，对排版复杂的 PDF 不一定准确，
+因此生产链路已切换到 structured_parser + chunker，本文件主要保留做对照与测试。
+"""
+
 import re
 from dataclasses import dataclass
 
@@ -6,6 +22,7 @@ from ingestion.text_splitter import split_text
 
 @dataclass
 class ParagraphUnit:
+    """一个段落及其跨越的页码范围。"""
     content: str
     page_start: int
     page_end: int
