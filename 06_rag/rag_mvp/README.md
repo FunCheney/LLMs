@@ -119,3 +119,27 @@ uv run python scripts/ask_cli.py "MCP 是什么" --dry-run   # 只检索，不�
 输出对比实验结果。
 
 交付物： 可重复运行的评估脚本和指标报告。
+
+---
+
+### 统一命令行入口：`rag-mvp`
+
+`pyproject.toml` 声明了 `rag-mvp = "rag_mvp:main"`，实现位于 `src/rag_mvp/cli.py`。
+执行 `uv sync` 安装后（editable 模式改源码即时生效），可在**项目根目录**直接用：
+
+```bash
+rag-mvp --help          # 查看所有子命令
+rag-mvp chunks          # = uv run python scripts/build_chunks.py
+rag-mvp vector-index    # = uv run python scripts/build_vector_index.py
+rag-mvp bm25-index      # = uv run python scripts/build_bm25_index.py
+rag-mvp search "MCP 是什么" -k 3
+rag-mvp ask "MCP 是什么" --dry-run
+rag-mvp smoke --modes hybrid
+```
+
+别名：`index` → `vector-index`，`bm25` → `bm25-index`，`build-chunks` → `chunks`。
+子命令的参数与对应脚本完全一致，用 `rag-mvp <command> --help` 查看。
+
+注意：子脚本内部使用 `data/...` 相对路径，所以必须在项目根目录执行；
+且 `embedding/__init__.py` 会提前加载 sentence-transformers/torch，
+导致子命令启动较慢（数十秒），这是模型依赖带来的固有开销。
