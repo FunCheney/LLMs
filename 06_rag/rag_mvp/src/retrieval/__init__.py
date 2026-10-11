@@ -1,11 +1,18 @@
-from retrieval.dense_retriever import DenseRetriever
+from retrieval.base import Retriever
+from retrieval.bm25_retriever import SparseRetriever
+from retrieval.factory import RetrieverConfig, create_retriever
+from retrieval.hybrid import HybridRetriever
+from retrieval.retriever import DenseRetriever
 from retrieval.rrf import reciprocal_rank_fusion
 from retrieval.types import RetrievalResult
-from retrieval.dense_retriever_example import MyRetriever
 
 __all__ = [
-    "MyRetriever",
+    "Retriever",
     "DenseRetriever",
+    "SparseRetriever",
+    "HybridRetriever",
     "RetrievalResult",
+    "RetrieverConfig",
+    "create_retriever",
     "reciprocal_rank_fusion",
 ]

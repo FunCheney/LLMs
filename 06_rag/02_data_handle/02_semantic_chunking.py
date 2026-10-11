@@ -1,11 +1,12 @@
 import os
+# 如果需要，可继续使用HuggingFace镜像加速
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 # 从新的包导入
 from langchain_experimental.text_splitter import SemanticChunker
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.document_loaders import TextLoader
 
-# 如果需要，可继续使用HuggingFace镜像加速
-# os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+
 
 # 使用新的HuggingFaceEmbeddings类（参数用法不变）
 embeddings = HuggingFaceEmbeddings(

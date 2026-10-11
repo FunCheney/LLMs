@@ -14,5 +14,5 @@ Phase 1 验收：抽检至少 20 个 Chunk，确认章节、页码和来源可�
 
 ```bash
 PYTHONPATH=src python scripts/build_chunks.py
-PYTHONPATH=src python scripts/review_chunks.py
+PYTHONPATH=src python example/review_chunks.py
 ```

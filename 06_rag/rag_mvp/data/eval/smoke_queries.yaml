@@ -1,0 +1,107 @@
+version: 1
+dataset_id: claude-code-design-guide-smoke
+description: >
+  Claude Code 设计指南单库检索冒烟集。改 chunk、索引或 Retriever 后运行。
+
+corpus:
+  chunks_path: data/processed/chunks.jsonl
+  expected_chunk_count: 444
+
+defaults:
+  top_k: 5
+  modes:
+    - dense
+    - sparse
+    - hybrid
+
+queries:
+  - id: smoke-001
+    question: "MCP 是什么？"
+    tags: [concept, english_abbr]
+    match:
+      any_section_title:
+        - "19.1 MCP 是什么"
+        - "9.1 工具系统的核心问题"
+    notes: "概念 + 英文缩写，hybrid 应稳定命中"
+
+  - id: smoke-002
+    question: "CLAUDE.md 配置文件是做什么的？"
+    tags: [keyword, exact_name]
+    match:
+      any_section_title:
+        - "2.7 CLAUDE.md 配置"
+        - "14.2 CLAUDE.md：显式项目记忆"
+        - "9.1 工具系统的核心问题"
+    notes: "专有名詞；书中 2.7 与 14.2 均讲 CLAUDE.md，命中任一节即通过"
+
+  - id: smoke-003
+    question: "query 执行循环是怎么工作的？"
+    tags: [semantic, paraphrase]
+    match:
+      any_section_title:
+        - "6.5 query()：真正的执行循环"
+        - "6.10 QueryEngine vs query()：职责分离"
+    notes: "语义改写，测 dense"
+
+  - id: smoke-004
+    question: "Auto-Compact 什么时候会触发？"
+    tags: [feature_name]
+    match:
+      any_section_title:
+        - "15.2 Auto-Compact 的触发机制"
+        - "15.13 小结"
+    notes: "功能名精确匹配"
+
+  - id: smoke-005
+    question: "对话历史压缩的核心思路是什么？"
+    tags: [semantic]
+    match:
+      any_section_title:
+        - "15.3 压缩的核心算法"
+        - "17.8 多代理的调试挑战"
+    notes: "与章节标题表述不完全一致"
+
+  - id: smoke-006
+    question: "Claude Code 的权限分几层？"
+    tags: [semantic, architecture]
+    match:
+      any_section_title:
+        - "22.2 五层权限架构"
+        - "12.6 上下文质量的四个维度"
+    notes: "架构类问题"
+
+  - id: smoke-007
+    question: "QueryEngine 的 submitMessage 做什么？"
+    tags: [keyword, section_number]
+    match:
+      any_section_title:
+        - "6.4 submitMessage：一次对话轮次的完整流程"
+        - "5.8 从工具调用到 Agent 系统"
+    notes: "API/方法名 + 编号小节"
+
+  - id: smoke-008
+    question: "流式响应是怎么解析的？"
+    tags: [semantic]
+    match:
+      any_section_title:
+        - "8.3 流式响应的解析"
+        - "8.1 为什么流式处理如此重要"
+    notes: "同义问法"
+
+  - id: smoke-009
+    question: "Claude Code 有哪几种代理模式？"
+    tags: [semantic]
+    match:
+      any_section_title:
+        - "17.3 代理类型系统"
+        - "17.8 多代理的调试挑战"
+    notes: "列举类问题"
+
+  - id: smoke-010
+    question: "Kafka 消费者如何提交 offset？"
+    tags: [negative, out_of_domain]
+    expect_hit: false
+    match:
+      any_section_title:
+        - "Kafka"
+    notes: "库外问题，期望 Top-K 不命中 Kafka 相关（若库内无 Kafka）"

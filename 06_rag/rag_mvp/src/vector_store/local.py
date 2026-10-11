@@ -2,13 +2,14 @@ from typing import List
 import pickle
 from pathlib import Path
 
+from vector_store.base import VectorOpt
 from vector_store.vector_store_types import VectorRecord
 
 def dot_product(a: List[float], b: List[float]) -> float:
     return sum(x * y for x, y in zip(a, b))
 
 
-class LocalVectorIndex:
+class LocalVectorIndex(VectorOpt):
     def __init__(self):
         self.records: List[VectorRecord] = []
 

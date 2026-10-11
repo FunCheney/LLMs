@@ -1,38 +1,35 @@
+from retrieval.base import Retriever
+from retrieval.rrf import reciprocal_rank_fusion
+from retrieval.types import RetrievalResult
 
-from retrieval import RetrievalResult
-from rrf import reciprocal_rank_fusion
-class HybridRetriever:
+
+class HybridRetriever(Retriever):
+    SOURCE = "hybrid"
 
     def __init__(
         self,
-        dense_retriever,
-        bm25_retriever,
-    ):
+        dense_retriever: Retriever,
+        sparse_retriever: Retriever,
+        candidate_multiplier: int = 2,
+    ) -> None:
         self.dense_retriever = dense_retriever
-        self.bm25_retriever = bm25_retriever
+        self.sparse_retriever = sparse_retriever
+        self.candidate_multiplier = candidate_multiplier
 
-    def search(
-        self,
-        query: str,
-        top_k: int = 5,
-        candidate_k: int = 20,
-    ) -> list[RetrievalResult]:
+    def retrieve(self, query: str, top_k: int = 5) -> list[RetrievalResult]:
+        if top_k <= 0:
+            raise ValueError("top_k must be greater than 0")
 
-        dense_results = self.dense_retriever.search(
-            query,
-            top_k=candidate_k,
+        query = query.strip()
+        if not query:
+            return []
+
+        candidate_k = max(top_k * self.candidate_multiplier, top_k)
+        dense_results = self.dense_retriever.retrieve(query, top_k=candidate_k)
+        sparse_results = self.sparse_retriever.retrieve(query, top_k=candidate_k)
+
+        return reciprocal_rank_fusion(
+            [dense_results, sparse_results],
+            top_k=top_k,
+            source=self.SOURCE,
         )
-
-        bm25_results = self.bm25_retriever.search(
-            query,
-            top_k=candidate_k,
-        )
-
-        fused_results = reciprocal_rank_fusion(
-            [
-                dense_results,
-                bm25_results,
-            ]
-        )
-
-        return fused_results[:top_k]

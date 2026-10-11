@@ -1,7 +1,7 @@
 from pathlib import Path
-from typing import Any
 
 from embedding.base import EmbeddingProvider
+from indexing.chunk_metadata import chunk_to_metadata
 from ingestion.storage import load_chunks_jsonl
 from vector_store.local import LocalVectorIndex
 from vector_store.vector_store_types import VectorRecord
@@ -15,20 +15,6 @@ LocalVectorIndex  →  data/index/local.pkl
 
 search_cli.py  →  search_local_index()  →  打印 Top-K + metadata
 """
-
-def chunk_to_metadata(chunk: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "chunk_id": chunk["chunk_id"],
-        "document_id": chunk["document_id"],
-        "document_title": chunk["document_title"],
-        "section_title": chunk.get("section_title", ""),
-        "section_path": chunk.get("section_path") or [],
-        "page_start": chunk.get("page_start"),
-        "page_end": chunk.get("page_end"),
-        "source_uri": chunk.get("source_uri", ""),
-        "source_type": chunk.get("source_type", ""),
-    }
-
 
 def build_local_index(
     chunks_path: str | Path,
@@ -82,17 +68,20 @@ def search_local_index(
     embedder: EmbeddingProvider,
     top_k: int = 5,
 ) -> list[tuple[VectorRecord, float]]:
-    """
-    LocalVectorIndex.load
-    embed_text(query)
-    点积排序（向量已 L2 归一化，等价 cosine）
-    """
-    if top_k <= 0:
-        raise ValueError("top_k must be greater than 0")
+    """兼容旧调用；新代码请使用 retrieval.DenseRetriever。"""
+    from retrieval.retriever import DenseRetriever
 
-    index = LocalVectorIndex.load(index_path)
-    if index.count() == 0:
-        return []
-
-    query_vector = embedder.embed_text(query).vector
-    return index.search(query_vector, top_k=top_k)
+    retriever = DenseRetriever(index_path=index_path, embedder=embedder)
+    hits = retriever.retrieve(query, top_k=top_k)
+    return [
+        (
+            VectorRecord(
+                id=hit.chunk_id,
+                text=hit.text,
+                metadata=hit.metadata,
+                embedding=[],
+            ),
+            hit.score,
+        )
+        for hit in hits
+    ]

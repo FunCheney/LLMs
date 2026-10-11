@@ -1,0 +1,939 @@
+{
+  "dataset_id": "claude-code-design-guide-smoke",
+  "timestamp": "2026-10-09T05:31:25.357116+00:00",
+  "modes": {
+    "dense": {
+      "mode": "dense",
+      "top_k": 5,
+      "total": 10,
+      "passed": 10,
+      "hit_rate": 1.0,
+      "results": [
+        {
+          "id": "smoke-001",
+          "question": "MCP 是什么？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 1,
+          "tags": [
+            "concept",
+            "english_abbr"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p152-p152-c330",
+            "claude-code-0001-p159-p160-c348",
+            "claude-code-0001-p152-p152-c329",
+            "claude-code-0001-p159-p159-c347",
+            "claude-code-0001-p157-p158-c344"
+          ],
+          "top_section_titles": [
+            "19.1 MCP 是什么",
+            "19.11 小结",
+            "第十九章 MCP 协议 —— 工具的互联网",
+            "19.10 MCP 的设计哲学",
+            "19.8 开发自己的 MCP 服务器"
+          ]
+        },
+        {
+          "id": "smoke-002",
+          "question": "CLAUDE.md 配置文件是做什么的？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 1,
+          "tags": [
+            "keyword",
+            "exact_name"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p109-p110-c230",
+            "claude-code-0001-p021-p021-c032",
+            "claude-code-0001-p110-p110-c232",
+            "claude-code-0001-p022-p022-c038",
+            "claude-code-0001-p110-p110-c231"
+          ],
+          "top_section_titles": [
+            "14.2 CLAUDE.md：显式项目记忆",
+            "2.7 CLAUDE.md：给 Claude 的说明书",
+            "14.3 CLAUDE.md 的最佳实践",
+            "查看当前权限配置",
+            "14.2 CLAUDE.md：显式项目记忆"
+          ]
+        },
+        {
+          "id": "smoke-003",
+          "question": "query 执行循环是怎么工作的？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 1,
+          "tags": [
+            "semantic",
+            "paraphrase"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p045-p045-c093",
+            "claude-code-0001-p049-p049-c104",
+            "claude-code-0001-p042-p042-c084",
+            "claude-code-0001-p034-p035-c068",
+            "claude-code-0001-p048-p048-c102"
+          ],
+          "top_section_titles": [
+            "6.5 query()：真正的执行循环",
+            "6.10 QueryEngine vs query()：职责分离",
+            "6.1 QueryEngine 的职责",
+            "4.9 Claude Code 的 REPL 设计",
+            "6.8 token 预算系统"
+          ]
+        },
+        {
+          "id": "smoke-004",
+          "question": "Auto-Compact 什么时候会触发？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 1,
+          "tags": [
+            "feature_name"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p124-p124-c270",
+            "claude-code-0001-p117-p118-c254",
+            "claude-code-0001-p126-p127-c273",
+            "claude-code-0001-p133-p133-c289",
+            "claude-code-0001-p121-p121-c263"
+          ],
+          "top_section_titles": [
+            "15.13 小结",
+            "15.2 Auto-Compact 的触发机制",
+            "15.2 Auto-Compact 的触发机制",
+            "15.13 小结",
+            "15.6 Reactive Compact：响应式压缩"
+          ]
+        },
+        {
+          "id": "smoke-005",
+          "question": "对话历史压缩的核心思路是什么？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 1,
+          "tags": [
+            "semantic"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p118-p119-c256",
+            "claude-code-0001-p127-p128-c275",
+            "claude-code-0001-p122-p123-c266",
+            "claude-code-0001-p131-p132-c285",
+            "claude-code-0001-p120-p120-c260"
+          ],
+          "top_section_titles": [
+            "15.3 压缩的核心算法",
+            "15.3 压缩的核心算法",
+            "15.9 压缩的 UI 反馈",
+            "15.9 压缩的 UI 反馈",
+            "15.3 压缩的核心算法"
+          ]
+        },
+        {
+          "id": "smoke-006",
+          "question": "Claude Code 的权限分几层？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 1,
+          "tags": [
+            "semantic",
+            "architecture"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p172-p173-c376",
+            "claude-code-0001-p177-p177-c390",
+            "claude-code-0001-p093-p093-c194",
+            "claude-code-0001-p041-p041-c082",
+            "claude-code-0001-p074-p074-c157"
+          ],
+          "top_section_titles": [
+            "22.2 五层权限架构",
+            "22.11 小结",
+            "11.9 权限模型的设计权衡",
+            "Part III",
+            "9.6 工具的分层设计"
+          ]
+        },
+        {
+          "id": "smoke-007",
+          "question": "QueryEngine 的 submitMessage 做什么？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 1,
+          "tags": [
+            "keyword",
+            "section_number"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p044-p044-c089",
+            "claude-code-0001-p042-p042-c084",
+            "claude-code-0001-p043-p043-c086",
+            "claude-code-0001-p049-p049-c103",
+            "claude-code-0001-p043-p044-c088"
+          ],
+          "top_section_titles": [
+            "6.4 submitMessage：一次对话轮次的完整流程",
+            "6.1 QueryEngine 的职责",
+            "6.2 QueryEngine 的配置",
+            "6.9 会话持久化",
+            "6.3 QueryEngine 的内部状态"
+          ]
+        },
+        {
+          "id": "smoke-008",
+          "question": "流式响应是怎么解析的？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 1,
+          "tags": [
+            "semantic"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p059-p059-c128",
+            "claude-code-0001-p061-p062-c134",
+            "claude-code-0001-p059-p059-c127",
+            "claude-code-0001-p066-p066-c145",
+            "claude-code-0001-p059-p060-c129"
+          ],
+          "top_section_titles": [
+            "8.1 为什么流式处理如此重要",
+            "8.3 流式响应的解析",
+            "Chapter 8",
+            "8.10 流式处理的错误边界",
+            "8.2 消息的类型系统"
+          ]
+        },
+        {
+          "id": "smoke-009",
+          "question": "Claude Code 有哪几种代理模式？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 2,
+          "tags": [
+            "semantic"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p146-p146-c319",
+            "claude-code-0001-p143-p143-c312",
+            "claude-code-0001-p199-p199-c437",
+            "claude-code-0001-p167-p167-c366",
+            "claude-code-0001-p088-p089-c184"
+          ],
+          "top_section_titles": [
+            "17.10 小结",
+            "17.3 代理类型系统",
+            "26.4 架构趋势：更复杂的多代理系统",
+            "21.2 插件的类型",
+            "11.2 权限模式（PermissionMode）"
+          ]
+        },
+        {
+          "id": "smoke-010",
+          "question": "Kafka 消费者如何提交 offset？",
+          "expect_hit": false,
+          "passed": true,
+          "hit": false,
+          "rank_first_hit": null,
+          "tags": [
+            "negative",
+            "out_of_domain"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p023-p023-c040",
+            "claude-code-0001-p097-p097-c202",
+            "claude-code-0001-p163-p163-c358",
+            "claude-code-0001-p055-p055-c118",
+            "claude-code-0001-p111-p111-c236"
+          ],
+          "top_section_titles": [
+            "2.9 多文件项目的最佳实践",
+            "没有上下文",
+            "否则，分析 git diff 生成 message",
+            "7.5 Store 模式：函数式更新",
+            "代码规范"
+          ]
+        }
+      ],
+      "by_tag": {
+        "concept": {
+          "passed": 1,
+          "total": 1
+        },
+        "english_abbr": {
+          "passed": 1,
+          "total": 1
+        },
+        "keyword": {
+          "passed": 2,
+          "total": 2
+        },
+        "exact_name": {
+          "passed": 1,
+          "total": 1
+        },
+        "semantic": {
+          "passed": 5,
+          "total": 5
+        },
+        "paraphrase": {
+          "passed": 1,
+          "total": 1
+        },
+        "feature_name": {
+          "passed": 1,
+          "total": 1
+        },
+        "architecture": {
+          "passed": 1,
+          "total": 1
+        },
+        "section_number": {
+          "passed": 1,
+          "total": 1
+        },
+        "negative": {
+          "passed": 1,
+          "total": 1
+        },
+        "out_of_domain": {
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    "sparse": {
+      "mode": "sparse",
+      "top_k": 5,
+      "total": 10,
+      "passed": 10,
+      "hit_rate": 1.0,
+      "results": [
+        {
+          "id": "smoke-001",
+          "question": "MCP 是什么？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 1,
+          "tags": [
+            "concept",
+            "english_abbr"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p069-p069-c149",
+            "claude-code-0001-p010-p010-c002",
+            "claude-code-0001-p145-p145-c317",
+            "claude-code-0001-p096-p097-c200",
+            "claude-code-0001-p016-p016-c015"
+          ],
+          "top_section_titles": [
+            "9.1 工具系统的核心问题",
+            "前言：为什么要读这本书",
+            "17.8 多代理的调试挑战",
+            "12.2 什么是 Context Engineering",
+            "1.5 它和其他工具的区别"
+          ]
+        },
+        {
+          "id": "smoke-002",
+          "question": "CLAUDE.md 配置文件是做什么的？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 1,
+          "tags": [
+            "keyword",
+            "exact_name"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p069-p069-c149",
+            "claude-code-0001-p010-p010-c002",
+            "claude-code-0001-p039-p040-c080",
+            "claude-code-0001-p112-p112-c244",
+            "claude-code-0001-p102-p102-c214"
+          ],
+          "top_section_titles": [
+            "9.1 工具系统的核心问题",
+            "前言：为什么要读这本书",
+            "5.8 从工具调用到 Agent 系统",
+            "14.5 Memory 系统：自动记忆",
+            "13.1 系统提示的作用"
+          ]
+        },
+        {
+          "id": "smoke-003",
+          "question": "query 执行循环是怎么工作的？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 3,
+          "tags": [
+            "semantic",
+            "paraphrase"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p069-p069-c149",
+            "claude-code-0001-p145-p145-c317",
+            "claude-code-0001-p049-p049-c104",
+            "claude-code-0001-p037-p037-c073",
+            "claude-code-0001-p040-p040-c081"
+          ],
+          "top_section_titles": [
+            "9.1 工具系统的核心问题",
+            "17.8 多代理的调试挑战",
+            "6.10 QueryEngine vs query()：职责分离",
+            "5.3 Agent 的定义",
+            "5.9 小结"
+          ]
+        },
+        {
+          "id": "smoke-004",
+          "question": "Auto-Compact 什么时候会触发？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 1,
+          "tags": [
+            "feature_name"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p133-p133-c289",
+            "claude-code-0001-p117-p117-c252",
+            "claude-code-0001-p124-p124-c270",
+            "claude-code-0001-p096-p097-c200",
+            "claude-code-0001-p198-p199-c435"
+          ],
+          "top_section_titles": [
+            "15.13 小结",
+            "Chapter 15",
+            "15.13 小结",
+            "12.2 什么是 Context Engineering",
+            "26.2 技术趋势：更大的上下文窗口"
+          ]
+        },
+        {
+          "id": "smoke-005",
+          "question": "对话历史压缩的核心思路是什么？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 1,
+          "tags": [
+            "semantic"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p145-p145-c317",
+            "claude-code-0001-p096-p097-c200",
+            "claude-code-0001-p117-p117-c252",
+            "claude-code-0001-p122-p123-c266",
+            "claude-code-0001-p131-p132-c285"
+          ],
+          "top_section_titles": [
+            "17.8 多代理的调试挑战",
+            "12.2 什么是 Context Engineering",
+            "Chapter 15",
+            "15.9 压缩的 UI 反馈",
+            "15.9 压缩的 UI 反馈"
+          ]
+        },
+        {
+          "id": "smoke-006",
+          "question": "Claude Code 的权限分几层？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 2,
+          "tags": [
+            "semantic",
+            "architecture"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p069-p069-c149",
+            "claude-code-0001-p099-p099-c208",
+            "claude-code-0001-p010-p010-c002",
+            "claude-code-0001-p108-p108-c226",
+            "claude-code-0001-p093-p093-c194"
+          ],
+          "top_section_titles": [
+            "9.1 工具系统的核心问题",
+            "12.6 上下文质量的四个维度",
+            "前言：为什么要读这本书",
+            "13.9 系统提示的测试",
+            "11.9 权限模型的设计权衡"
+          ]
+        },
+        {
+          "id": "smoke-007",
+          "question": "QueryEngine 的 submitMessage 做什么？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 3,
+          "tags": [
+            "keyword",
+            "section_number"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p069-p069-c149",
+            "claude-code-0001-p010-p010-c002",
+            "claude-code-0001-p039-p040-c080",
+            "claude-code-0001-p145-p145-c317",
+            "claude-code-0001-p078-p078-c165"
+          ],
+          "top_section_titles": [
+            "9.1 工具系统的核心问题",
+            "前言：为什么要读这本书",
+            "5.8 从工具调用到 Agent 系统",
+            "17.8 多代理的调试挑战",
+            "Chapter 10"
+          ]
+        },
+        {
+          "id": "smoke-008",
+          "question": "流式响应是怎么解析的？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 3,
+          "tags": [
+            "semantic"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p069-p069-c149",
+            "claude-code-0001-p034-p035-c068",
+            "claude-code-0001-p059-p059-c128",
+            "claude-code-0001-p067-p067-c146",
+            "claude-code-0001-p038-p038-c076"
+          ],
+          "top_section_titles": [
+            "9.1 工具系统的核心问题",
+            "4.9 Claude Code 的 REPL 设计",
+            "8.1 为什么流式处理如此重要",
+            "8.11 小结",
+            "5.5 Claude Code 的 Agent 循环"
+          ]
+        },
+        {
+          "id": "smoke-009",
+          "question": "Claude Code 有哪几种代理模式？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 1,
+          "tags": [
+            "semantic"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p145-p145-c317",
+            "claude-code-0001-p069-p069-c149",
+            "claude-code-0001-p144-p144-c314",
+            "claude-code-0001-p146-p146-c319",
+            "claude-code-0001-p150-p150-c328"
+          ],
+          "top_section_titles": [
+            "17.8 多代理的调试挑战",
+            "9.1 工具系统的核心问题",
+            "17.5 代理间的上下文共享",
+            "17.10 小结",
+            "18.8 小结"
+          ]
+        },
+        {
+          "id": "smoke-010",
+          "question": "Kafka 消费者如何提交 offset？",
+          "expect_hit": false,
+          "passed": true,
+          "hit": false,
+          "rank_first_hit": null,
+          "tags": [
+            "negative",
+            "out_of_domain"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p069-p069-c149",
+            "claude-code-0001-p096-p097-c200",
+            "claude-code-0001-p108-p108-c226",
+            "claude-code-0001-p198-p199-c435",
+            "claude-code-0001-p144-p144-c314"
+          ],
+          "top_section_titles": [
+            "9.1 工具系统的核心问题",
+            "12.2 什么是 Context Engineering",
+            "13.9 系统提示的测试",
+            "26.2 技术趋势：更大的上下文窗口",
+            "17.5 代理间的上下文共享"
+          ]
+        }
+      ],
+      "by_tag": {
+        "concept": {
+          "passed": 1,
+          "total": 1
+        },
+        "english_abbr": {
+          "passed": 1,
+          "total": 1
+        },
+        "keyword": {
+          "passed": 2,
+          "total": 2
+        },
+        "exact_name": {
+          "passed": 1,
+          "total": 1
+        },
+        "semantic": {
+          "passed": 5,
+          "total": 5
+        },
+        "paraphrase": {
+          "passed": 1,
+          "total": 1
+        },
+        "feature_name": {
+          "passed": 1,
+          "total": 1
+        },
+        "architecture": {
+          "passed": 1,
+          "total": 1
+        },
+        "section_number": {
+          "passed": 1,
+          "total": 1
+        },
+        "negative": {
+          "passed": 1,
+          "total": 1
+        },
+        "out_of_domain": {
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    "hybrid": {
+      "mode": "hybrid",
+      "top_k": 5,
+      "total": 10,
+      "passed": 10,
+      "hit_rate": 1.0,
+      "results": [
+        {
+          "id": "smoke-001",
+          "question": "MCP 是什么？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 2,
+          "tags": [
+            "concept",
+            "english_abbr"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p085-p085-c177",
+            "claude-code-0001-p152-p152-c330",
+            "claude-code-0001-p069-p069-c149",
+            "claude-code-0001-p159-p160-c348",
+            "claude-code-0001-p010-p010-c002"
+          ],
+          "top_section_titles": [
+            "10.8 MCP 集成工具",
+            "19.1 MCP 是什么",
+            "9.1 工具系统的核心问题",
+            "19.11 小结",
+            "前言：为什么要读这本书"
+          ]
+        },
+        {
+          "id": "smoke-002",
+          "question": "CLAUDE.md 配置文件是做什么的？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 2,
+          "tags": [
+            "keyword",
+            "exact_name"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p112-p112-c244",
+            "claude-code-0001-p109-p110-c230",
+            "claude-code-0001-p069-p069-c149",
+            "claude-code-0001-p021-p021-c032",
+            "claude-code-0001-p010-p010-c002"
+          ],
+          "top_section_titles": [
+            "14.5 Memory 系统：自动记忆",
+            "14.2 CLAUDE.md：显式项目记忆",
+            "9.1 工具系统的核心问题",
+            "2.7 CLAUDE.md：给 Claude 的说明书",
+            "前言：为什么要读这本书"
+          ]
+        },
+        {
+          "id": "smoke-003",
+          "question": "query 执行循环是怎么工作的？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 1,
+          "tags": [
+            "semantic",
+            "paraphrase"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p049-p049-c104",
+            "claude-code-0001-p038-p038-c075",
+            "claude-code-0001-p045-p045-c093",
+            "claude-code-0001-p069-p069-c149",
+            "claude-code-0001-p145-p145-c317"
+          ],
+          "top_section_titles": [
+            "6.10 QueryEngine vs query()：职责分离",
+            "5.5 Claude Code 的 Agent 循环",
+            "6.5 query()：真正的执行循环",
+            "9.1 工具系统的核心问题",
+            "17.8 多代理的调试挑战"
+          ]
+        },
+        {
+          "id": "smoke-004",
+          "question": "Auto-Compact 什么时候会触发？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 1,
+          "tags": [
+            "feature_name"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p124-p124-c270",
+            "claude-code-0001-p133-p133-c289",
+            "claude-code-0001-p124-p124-c269",
+            "claude-code-0001-p133-p133-c288",
+            "claude-code-0001-p117-p118-c254"
+          ],
+          "top_section_titles": [
+            "15.13 小结",
+            "15.13 小结",
+            "15.12 设计启示：遗忘的艺术",
+            "15.12 设计启示：遗忘的艺术",
+            "15.2 Auto-Compact 的触发机制"
+          ]
+        },
+        {
+          "id": "smoke-005",
+          "question": "对话历史压缩的核心思路是什么？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 3,
+          "tags": [
+            "semantic"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p122-p123-c266",
+            "claude-code-0001-p131-p132-c285",
+            "claude-code-0001-p118-p119-c256",
+            "claude-code-0001-p145-p145-c317",
+            "claude-code-0001-p127-p128-c275"
+          ],
+          "top_section_titles": [
+            "15.9 压缩的 UI 反馈",
+            "15.9 压缩的 UI 反馈",
+            "15.3 压缩的核心算法",
+            "17.8 多代理的调试挑战",
+            "15.3 压缩的核心算法"
+          ]
+        },
+        {
+          "id": "smoke-006",
+          "question": "Claude Code 的权限分几层？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 3,
+          "tags": [
+            "semantic",
+            "architecture"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p093-p093-c194",
+            "claude-code-0001-p177-p177-c390",
+            "claude-code-0001-p172-p173-c376",
+            "claude-code-0001-p069-p069-c149",
+            "claude-code-0001-p099-p099-c208"
+          ],
+          "top_section_titles": [
+            "11.9 权限模型的设计权衡",
+            "22.11 小结",
+            "22.2 五层权限架构",
+            "9.1 工具系统的核心问题",
+            "12.6 上下文质量的四个维度"
+          ]
+        },
+        {
+          "id": "smoke-007",
+          "question": "QueryEngine 的 submitMessage 做什么？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 1,
+          "tags": [
+            "keyword",
+            "section_number"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p044-p044-c089",
+            "claude-code-0001-p069-p069-c149",
+            "claude-code-0001-p042-p042-c084",
+            "claude-code-0001-p010-p010-c002",
+            "claude-code-0001-p043-p043-c086"
+          ],
+          "top_section_titles": [
+            "6.4 submitMessage：一次对话轮次的完整流程",
+            "9.1 工具系统的核心问题",
+            "6.1 QueryEngine 的职责",
+            "前言：为什么要读这本书",
+            "6.2 QueryEngine 的配置"
+          ]
+        },
+        {
+          "id": "smoke-008",
+          "question": "流式响应是怎么解析的？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 1,
+          "tags": [
+            "semantic"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p059-p059-c128",
+            "claude-code-0001-p061-p062-c134",
+            "claude-code-0001-p067-p067-c146",
+            "claude-code-0001-p059-p059-c127",
+            "claude-code-0001-p046-p046-c097"
+          ],
+          "top_section_titles": [
+            "8.1 为什么流式处理如此重要",
+            "8.3 流式响应的解析",
+            "8.11 小结",
+            "Chapter 8",
+            "6.5 query()：真正的执行循环"
+          ]
+        },
+        {
+          "id": "smoke-009",
+          "question": "Claude Code 有哪几种代理模式？",
+          "expect_hit": true,
+          "passed": true,
+          "hit": true,
+          "rank_first_hit": 3,
+          "tags": [
+            "semantic"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p146-p146-c319",
+            "claude-code-0001-p144-p144-c314",
+            "claude-code-0001-p145-p145-c317",
+            "claude-code-0001-p143-p143-c312",
+            "claude-code-0001-p069-p069-c149"
+          ],
+          "top_section_titles": [
+            "17.10 小结",
+            "17.5 代理间的上下文共享",
+            "17.8 多代理的调试挑战",
+            "17.3 代理类型系统",
+            "9.1 工具系统的核心问题"
+          ]
+        },
+        {
+          "id": "smoke-010",
+          "question": "Kafka 消费者如何提交 offset？",
+          "expect_hit": false,
+          "passed": true,
+          "hit": false,
+          "rank_first_hit": null,
+          "tags": [
+            "negative",
+            "out_of_domain"
+          ],
+          "top_chunk_ids": [
+            "claude-code-0001-p023-p023-c040",
+            "claude-code-0001-p069-p069-c149",
+            "claude-code-0001-p097-p097-c202",
+            "claude-code-0001-p096-p097-c200",
+            "claude-code-0001-p163-p163-c358"
+          ],
+          "top_section_titles": [
+            "2.9 多文件项目的最佳实践",
+            "9.1 工具系统的核心问题",
+            "没有上下文",
+            "12.2 什么是 Context Engineering",
+            "否则，分析 git diff 生成 message"
+          ]
+        }
+      ],
+      "by_tag": {
+        "concept": {
+          "passed": 1,
+          "total": 1
+        },
+        "english_abbr": {
+          "passed": 1,
+          "total": 1
+        },
+        "keyword": {
+          "passed": 2,
+          "total": 2
+        },
+        "exact_name": {
+          "passed": 1,
+          "total": 1
+        },
+        "semantic": {
+          "passed": 5,
+          "total": 5
+        },
+        "paraphrase": {
+          "passed": 1,
+          "total": 1
+        },
+        "feature_name": {
+          "passed": 1,
+          "total": 1
+        },
+        "architecture": {
+          "passed": 1,
+          "total": 1
+        },
+        "section_number": {
+          "passed": 1,
+          "total": 1
+        },
+        "negative": {
+          "passed": 1,
+          "total": 1
+        },
+        "out_of_domain": {
+          "passed": 1,
+          "total": 1
+        }
+      }
+    }
+  }
+}

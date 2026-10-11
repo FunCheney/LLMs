@@ -38,9 +38,9 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     """
     读 data/processed/chunks.jsonl
-    → BGEM3EmbeddingProvider.embed_documents（分批，如 batch=32）
-    → 每条 VectorRecord(id=chunk_id, text=content, metadata=章节/页码/source_uri, embedding=...)
-    → LocalVectorIndex.save("data/index/local.pkl")
+        → BGEM3EmbeddingProvider.embed_documents（分批，如 batch=32）
+        → 每条 VectorRecord(id=chunk_id, text=content, metadata=章节/页码/source_uri, embedding=...)
+        → LocalVectorIndex.save("data/index/local.pkl")
     """
     args = parse_args()
     embedder = BGEM3EmbeddingProvider(device=args.device)

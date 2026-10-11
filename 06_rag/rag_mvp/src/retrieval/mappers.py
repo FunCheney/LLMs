@@ -25,14 +25,14 @@ def vector_record_to_hit(
     score: float,
     source: str,
 ) -> RetrievalResult:
-
-
     metadata = dict(record.metadata)
     chunk_id = metadata.get("chunk_id") or record.id
     chunk = metadata_to_document_chunk(metadata, record.text)
 
     return RetrievalResult(
         chunk_id=chunk_id,
+        text=record.text,
+        metadata=metadata,
         score=score,
         source=source,
         chunk=chunk,

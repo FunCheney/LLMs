@@ -15,10 +15,10 @@
 
 能力栈：
 
-解析：PDF（PyMuPDF）、HTML
-分块：结构化章节、ingest_document() → build_chunks()
-质量：validation/chunk_validator.py，scripts/review_chunks.py 抽检
-常用入口： scripts/build_chunks.py 里的 main()（读 PDF → 写 jsonl）。
+* 解析：PDF（PyMuPDF）、HTML 
+* 分块：结构化章节、ingest_document() → build_chunks()
+* 质量：validation/chunk_validator.py，example/review_chunks.py 抽检 
+* 常用入口： scripts/build_chunks.py 里的 main()（读 PDF → 写 jsonl）。
 
 ### Phase 2：检索系统
 阶段 2 · 混合检索
@@ -54,8 +54,20 @@
 
 ```bash
 uv run python scripts/build_vector_index.py
-uv run python scripts/search_cli.py "MCP 是什么" --k 5
+uv run python scripts/build_bm25_index.py
+uv run python scripts/search_cli.py "MCP 是什么" --mode hybrid --k 5
 ```
+
+当前进度：Dense / Sparse / Hybrid Retriever 已统一为 `retrieve()` + `RetrievalResult`，CLI 通过 `create_retriever()` 切换模式。
+
+#### Smoke 检索评测（section 匹配）
+
+```bash
+uv run python scripts/run_smoke_retrieval.py
+uv run python scripts/run_smoke_retrieval.py --modes hybrid --k 5
+```
+
+问题集：`data/eval/smoke_queries.yaml`；报告：`data/eval/reports/smoke_latest.json`。
 
 #### 如何使用
 
@@ -88,6 +100,14 @@ uv run python scripts/search_cli.py "CLAUDE.md 做什么" --k 3 --snippet 300
 测试 10 条真实问题。
 
 交付物： 一个可用的单知识库问答命令行程序。
+
+```bash
+# 需配置 .env：DEEPSEEK_API_KEY=...
+uv run python scripts/ask_cli.py "MCP 是什么"
+uv run python scripts/ask_cli.py "MCP 是什么" --dry-run   # 只检索，不调 LLM
+```
+
+默认：`--mode hybrid --k 5`。
 
 ### Phase 4：Golden Dataset 与评估
 阶段 4 · Evaluation

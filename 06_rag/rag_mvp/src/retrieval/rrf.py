@@ -1,49 +1,47 @@
 from collections import defaultdict
-from retrieval import RetrievalResult
+
+from retrieval.types import RetrievalResult
 
 
 def reciprocal_rank_fusion(
-    ranked_lists: dict[str, list[str]],
+    ranked_lists: list[list[RetrievalResult]],
     top_k: int = 5,
     rrf_k: int = 60,
+    source: str = "hybrid",
 ) -> list[RetrievalResult]:
-    """
-    将多路检索结果按排名融合。
-
-    ranked_lists: {"dense": [chunk_id, ...], "sparse": [chunk_id, ...]}
-    返回: [(chunk_id, rrf_score), ...] 按分数降序
-    """
     if top_k <= 0:
         raise ValueError("top_k must be greater than 0")
     if rrf_k <= 0:
         raise ValueError("rrf_k must be greater than 0")
+    if not ranked_lists:
+        return []
 
-    scores: dict[str, float] = {}
+    scores: dict[str, float] = defaultdict(float)
     results_by_id: dict[str, RetrievalResult] = {}
 
     for results in ranked_lists:
-        for rank, result in enumerate(results, start=1):
-            result_id = result.id
-
-            scores[result_id] = (
-                    scores.get(result_id, 0.0)
-                    + 1.0 / (rrf_k + rank)
-            )
-
-            results_by_id[result_id] = result
+        for rank, hit in enumerate(results, start=1):
+            scores[hit.chunk_id] += 1.0 / (rrf_k + rank)
+            results_by_id[hit.chunk_id] = hit
 
     ranked_ids = sorted(
-        scores,
-        key=lambda result_id: scores[result_id],
+        scores.keys(),
+        key=lambda chunk_id: scores[chunk_id],
         reverse=True,
-    )
+    )[:top_k]
 
-    return [
-        RetrievalResult(
-            id=result_id,
-            text=results_by_id[result_id].text,
-            metadata=results_by_id[result_id].metadata,
-            score=scores[result_id],
+    fused: list[RetrievalResult] = []
+    for rank, chunk_id in enumerate(ranked_ids, start=1):
+        base = results_by_id[chunk_id]
+        fused.append(
+            RetrievalResult(
+                chunk_id=chunk_id,
+                text=base.text,
+                metadata=base.metadata,
+                score=scores[chunk_id],
+                source=source,
+                chunk=base.chunk,
+                rank=rank,
+            )
         )
-        for result_id in ranked_ids
-    ]
+    return fused
