@@ -7,4 +7,9 @@ client = MilvusClient(
 
 print("Milvus connected:", client.list_collections())
 
+# 创建数据库
+client.create_database(db_name="test_database_1")
+
+
+
 client.close()

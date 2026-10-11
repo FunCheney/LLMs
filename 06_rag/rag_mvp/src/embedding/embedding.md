@@ -53,3 +53,6 @@ for chunk in chunks:
 * 内存 
 * 缓存 
 * 重复计算
+
+
+#### 问题 4: 多模态 embedding？
