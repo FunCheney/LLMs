@@ -21,6 +21,11 @@ class BGEM3EmbeddingProvider(EmbeddingProvider):
         self.model = SentenceTransformer(self.model_name, device=self.device)
 
     def embed_text(self, text: str) -> EmbeddingResult:
+        """
+        Embed text.
+        :param text:
+        :return:
+        """
         # normalize_embeddings=True， Sentence Transformers 官方的 encode() 支持对输出进行归一化，使向量长度变成 1。
         vector = self.model.encode(text, normalize_embeddings=True).tolist()
 
@@ -31,6 +36,11 @@ class BGEM3EmbeddingProvider(EmbeddingProvider):
         )
 
     def embed_documents(self, documents: List[str]) -> List[EmbeddingResult]:
+        """
+        Embed documents.
+        :param documents:
+        :return:
+        """
         vectors = self.model.encode(documents, normalize_embeddings=True).tolist()
         return [
             EmbeddingResult(
