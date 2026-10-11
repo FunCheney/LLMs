@@ -1,5 +1,5 @@
 from retrieval.base import Retriever
-from retrieval.bm25_retriever import SparseRetriever
+from retrieval.spare_retriever import SparseRetriever
 from retrieval.factory import RetrieverConfig, create_retriever
 from retrieval.hybrid import HybridRetriever
 from retrieval.retriever import DenseRetriever

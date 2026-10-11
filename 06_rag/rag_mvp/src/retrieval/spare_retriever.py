@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from indexing.bm25_index import BM25Index
+from embedding.bm25 import BM25Index
 from retrieval.base import Retriever
 from retrieval.mappers import vector_record_to_hit
 from retrieval.types import RetrievalResult

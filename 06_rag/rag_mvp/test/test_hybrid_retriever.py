@@ -1,7 +1,7 @@
 from pathlib import Path
 
+from embedding import build_bm25_index
 from embedding.fake import FakeEmbeddingProvider
-from indexing.bm25_index import build_bm25_index
 from indexing.vector_index import build_local_index
 from ingestion.storage import save_chunks_jsonl
 from retrieval.factory import RetrieverConfig, create_retriever

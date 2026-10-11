@@ -1,11 +1,9 @@
 import pickle
 from pathlib import Path
 from typing import List
-
 from rank_bm25 import BM25Okapi
-
+from embedding.tokenizer import tokenize
 from indexing.chunk_metadata import chunk_to_metadata
-from indexing.tokenizer import tokenize
 from ingestion.storage import load_chunks_jsonl
 from vector_store.vector_store_types import VectorRecord
 

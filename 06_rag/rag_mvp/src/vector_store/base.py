@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List
 
-from vector_store import VectorRecord
+from vector_store.vector_store_types import VectorRecord
 
 
 class VectorOpt(ABC):

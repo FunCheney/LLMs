@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from indexing.bm25_index import build_bm25_index
+from embedding import build_bm25_index
 
 
 def parse_args() -> argparse.Namespace:

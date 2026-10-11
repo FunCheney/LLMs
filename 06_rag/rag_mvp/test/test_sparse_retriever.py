@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from indexing.bm25_index import build_bm25_index
+from embedding import build_bm25_index
 from ingestion.storage import save_chunks_jsonl
-from retrieval.bm25_retriever import SparseRetriever
+from retrieval.spare_retriever import SparseRetriever
 from schemas import DocumentChunk
 
 

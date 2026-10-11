@@ -3,7 +3,7 @@ from pathlib import Path
 
 from embedding import BGEM3EmbeddingProvider
 from retrieval.base import Retriever
-from retrieval.bm25_retriever import SparseRetriever
+from retrieval.spare_retriever import SparseRetriever
 from retrieval.hybrid import HybridRetriever
 from retrieval.retriever import DenseRetriever
 
