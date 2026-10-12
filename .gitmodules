@@ -1,0 +1,3 @@
+[submodule "06_rag/rag_mvp/third_party/FlagEmbedding"]
+	path = 06_rag/rag_mvp/third_party/FlagEmbedding
+	url = https://github.com/FlagOpen/FlagEmbedding.git
