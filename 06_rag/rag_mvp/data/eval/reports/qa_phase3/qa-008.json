@@ -1,0 +1,60 @@
+{
+  "answer": "流式响应的解析方式如下：\n\n- 在 `query()` 执行循环中调用 Claude API 获取流式响应，然后用 `for await` 逐块遍历流 [5]。\n- 按块类型分别处理：文本块通过 `yield` 流式输出给用户；思考块只在内部处理，不输出给用户；工具调用块则收集到 `toolCalls` 数组中 [5]。\n- `query.ts` 中的 `parseStream` 是一个异步生成器，它遍历 API 流事件，根据 `event.type` 分支处理，并维护当前文本块、思考块以及工具调用块集合 [2]。\n- 当收到 `message_stop` 事件后，执行已收集的工具调用 [2]。\n- 如果本轮没有工具调用，对话就结束；如果有工具调用，就继续执行工具，然后进入下一轮循环 [5]。\n\n整体上，解析过程是端到端流式的：从 API 响应到 UI 渲染全程保持流式 [3]。",
+  "citations": [
+    {
+      "index": 2,
+      "chunk_id": "claude-code-0001-p061-p062-c134",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "8.3 流式响应的解析",
+      "section_path": [
+        "Part III",
+        "Chapter 8",
+        "8.3 流式响应的解析"
+      ],
+      "page_start": 61,
+      "page_end": 62,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "│ 解析完整  │ │                   │ 工具调用  │ │                   └──────────┘ │                           │ └───────────┬───────────────┘ ▼ ┌──────────────┐ │ message_stop │ └──────────────┘ │ ▼ ┌──────────────┐ │ 执行工具调用  │ └──────────────┘ quer..."
+    },
+    {
+      "index": 3,
+      "chunk_id": "claude-code-0001-p067-p067-c146",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "8.11 小结",
+      "section_path": [
+        "Part III",
+        "Chapter 8",
+        "8.11 小结"
+      ],
+      "page_start": 67,
+      "page_end": 67,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "Claude Code 的消息循环和流式处理设计： 端到端流式：从 API 响应到 UI 渲染，全程流式 类型安全的消息系统：清晰的消息类型层次 并行工具执行：多个工具调用并行处理 消息规范化：处理 API 的各种约束 消息队列：处理并发输入 自然背压：异步生成器天然提供背压 分层错误处理：中断、重试、错误各有对应处理 这套流式架构是 Claude Code 能够流畅处理长任务的基础。 下一章：[工具系统的设计哲学](../part4/09-tool-design.md)"
+    },
+    {
+      "index": 5,
+      "chunk_id": "claude-code-0001-p046-p046-c097",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "6.5 query()：真正的执行循环",
+      "section_path": [
+        "Part III",
+        "Chapter 6",
+        "6.5 query()：真正的执行循环"
+      ],
+      "page_start": 46,
+      "page_end": 46,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "ile (true) { turnCount++ // 检查轮次限制 if (turnCount > maxTurns) break // 调用 Claude API（流式） const stream = await callClaudeAPI({ messages, systemPrompt, tools, model, }) // 解析流式响应 const toolCalls = [] for await (const chunk of stream) { if (chu..."
+    }
+  ],
+  "insufficient_evidence": false,
+  "retrieved_chunk_ids": [
+    "claude-code-0001-p059-p059-c128",
+    "claude-code-0001-p061-p062-c134",
+    "claude-code-0001-p067-p067-c146",
+    "claude-code-0001-p059-p059-c127",
+    "claude-code-0001-p046-p046-c097"
+  ],
+  "query": "流式响应是怎么解析的？",
+  "retrieval_mode": "hybrid"
+}

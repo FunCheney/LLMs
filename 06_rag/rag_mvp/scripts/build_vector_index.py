@@ -45,7 +45,7 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument(
         "--index-type",
-        default="vector",
+        default="milvus",
         help="give index type (milvus or local)",
     )
     return parser.parse_args()

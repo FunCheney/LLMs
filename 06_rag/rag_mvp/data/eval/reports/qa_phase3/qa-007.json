@@ -1,0 +1,45 @@
+{
+  "answer": "**submitMessage 是 QueryEngine 处理一次用户输入（一个对话轮次）的核心方法** [1]。它在流程起始处先完成用户输入的预处理，具体包括三项：\n\n1. **解析斜杠命令** [1]\n2. **处理附件**（例如图片和文件）[1]\n3. **注入 Memory 附件** [1]\n\n从整体职责来看，QueryEngine 负责编排对话全生命周期：维护消息历史、调用 Claude API、执行工具调用、管理 token 预算、处理错误和重试、触发上下文压缩；用户的每一次输入到最终输出都由 QueryEngine 编排 [3]。因此，submitMessage 就是这条编排链路的入口。\n\n需要说明的是：参考资料中给出的流程图只展示到“预处理用户输入”这一步，后续环节（如调用模型、执行工具等）在资料中被截断，**当前资料中没有足够依据**完整描述 submitMessage 的后续步骤 [1]。",
+  "citations": [
+    {
+      "index": 1,
+      "chunk_id": "claude-code-0001-p044-p044-c089",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "6.4 submitMessage：一次对话轮次的完整流程",
+      "section_path": [
+        "Part III",
+        "Chapter 6",
+        "6.4 submitMessage：一次对话轮次的完整流程"
+      ],
+      "page_start": 44,
+      "page_end": 44,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "submitMessage 是 QueryEngine 的核心方法，处理一次用户输入： ┌─────────────────────────────────────────────────────────────┐ │                    submitMessage(userInput)                  │ └─────────────────────────────────────────────────────────────┘ │ ▼..."
+    },
+    {
+      "index": 3,
+      "chunk_id": "claude-code-0001-p042-p042-c084",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "6.1 QueryEngine 的职责",
+      "section_path": [
+        "Part III",
+        "Chapter 6",
+        "6.1 QueryEngine 的职责"
+      ],
+      "page_start": 42,
+      "page_end": 42,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "QueryEngine （src/QueryEngine.ts ，1295 行）是 Claude Code 中最核心的类。它管理一次完整对话的全生命周期： 维护消息历史 调用 Claude API 执行工具调用 管理 token 预算 处理错误和重试 触发上下文压缩 一句话：用户的每一次输入，到最终输出，都经过 QueryEngine 的编 排。"
+    }
+  ],
+  "insufficient_evidence": true,
+  "retrieved_chunk_ids": [
+    "claude-code-0001-p044-p044-c089",
+    "claude-code-0001-p069-p069-c149",
+    "claude-code-0001-p042-p042-c084",
+    "claude-code-0001-p010-p010-c002",
+    "claude-code-0001-p043-p043-c086"
+  ],
+  "query": "QueryEngine 的 submitMessage 做什么？",
+  "retrieval_mode": "hybrid"
+}

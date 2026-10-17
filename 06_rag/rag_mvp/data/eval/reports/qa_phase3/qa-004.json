@@ -1,0 +1,60 @@
+{
+  "answer": "Auto-Compact 的触发基于 token 使用率是否超过阈值 [1][2]：\n\n- **使用率超过 85%**：进入 `warning` 状态，此时只是建议执行压缩 [5]。\n- **使用率超过 95%**：进入 `critical` 状态，此时必须立即压缩 [5]。\n- 未超过 85% 时，状态为 `normal`，不触发压缩 [5]。\n\n此外，是否启用自动压缩还会检查用户配置和环境变量；资料中的代码显示，可以通过 `CLAUDE_CODE_DISABLE_AU…` 这类环境变量将其关闭 [5]。另外，执行压缩时存在边界保护：不会在工具调用中间执行压缩，并会保留最近的消息 [1][2]。",
+  "citations": [
+    {
+      "index": 1,
+      "chunk_id": "claude-code-0001-p124-p124-c270",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "15.13 小结",
+      "section_path": [
+        "项目配置",
+        "Chapter 15",
+        "15.13 小结"
+      ],
+      "page_start": 124,
+      "page_end": 124,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "Auto-Compact 是 Claude Code Context Engineering 的关键 组件： 触发机制：基于 token 使用率（85% 警告，95% 强制） 压缩算法：用 Claude 生成摘要，替换详细历史 边界保护：不在工具调用中间压缩，保留最近消息 多种策略：Auto-Compact 、Reactive Compact 、Snip Compact、Context Collapse 用户可见：压缩过程和结果对用户透明 下一章：[任务系统设计](../pa..."
+    },
+    {
+      "index": 2,
+      "chunk_id": "claude-code-0001-p133-p133-c289",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "15.13 小结",
+      "section_path": [
+        "第六部分 多智能体协作",
+        "第十五章 上下文压缩（Auto-",
+        "15.13 小结"
+      ],
+      "page_start": 133,
+      "page_end": 133,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "Auto-Compact 是 Claude Code Context Engineering 的关键 组件： 触发机制：基于 token 使用率（85% 警告，95% 强制） 压缩算法：用 Claude 生成摘要，替换详细历史 边界保护：不在工具调用中间压缩，保留最近消息 多种策略：Auto-Compact 、Reactive Compact 、Snip Compact、Context Collapse 用户可见：压缩过程和结果对用户透明"
+    },
+    {
+      "index": 5,
+      "chunk_id": "claude-code-0001-p117-p118-c254",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "15.2 Auto-Compact 的触发机制",
+      "section_path": [
+        "项目配置",
+        "Chapter 15",
+        "15.2 Auto-Compact 的触发机制"
+      ],
+      "page_start": 117,
+      "page_end": 118,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "src/services/compact/autoCompact.ts 实现了自动压缩的触发逻辑： export function calculateTokenWarningState( messages: Message[], maxTokens: number ): TokenWarningState { const currentTokens = estimateTokenCount(messages) const ratio = currentTokens / max..."
+    }
+  ],
+  "insufficient_evidence": false,
+  "retrieved_chunk_ids": [
+    "claude-code-0001-p124-p124-c270",
+    "claude-code-0001-p133-p133-c289",
+    "claude-code-0001-p124-p124-c269",
+    "claude-code-0001-p133-p133-c288",
+    "claude-code-0001-p117-p118-c254"
+  ],
+  "query": "Auto-Compact 什么时候会触发？",
+  "retrieval_mode": "hybrid"
+}

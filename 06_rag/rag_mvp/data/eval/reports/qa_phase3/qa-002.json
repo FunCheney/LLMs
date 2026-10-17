@@ -1,0 +1,59 @@
+{
+  "answer": "**CLAUDE.md 是给 Claude 的项目“说明书”，也是显式的项目记忆。**\n\n- 它是一个 Markdown 文件，放在项目根目录或任意子目录中，Claude Code 每次启动时都会自动读取，作为项目上下文使用 [2][4]。\n- 它属于“手动维护”的记忆机制，与自动 Memory 系统相对应 [1]。\n- 发现机制上，它从当前目录逐级向上查找各级 CLAUDE.md，同时还会检查全局配置文件 `~/.claude/CLAUDE.md` [2]。",
+  "citations": [
+    {
+      "index": 1,
+      "chunk_id": "claude-code-0001-p112-p112-c244",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "14.5 Memory 系统：自动记忆",
+      "section_path": [
+        "项目配置",
+        "环境变量说明",
+        "14.5 Memory 系统：自动记忆"
+      ],
+      "page_start": 112,
+      "page_end": 112,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "除了手动维护的 CLAUDE.md ，Claude Code 还有一个自动 Memory 系统（src/memdir/ ）。 Memory 文件的存储位置： ~/.claude/projects/<project-hash>/memory/ ├── user_role.md          # 用户角色信息 ├── feedback_testing.md   # 测试相关反馈 ├── project_context.md    # 项目上下文 └── MEMORY.md  ..."
+    },
+    {
+      "index": 2,
+      "chunk_id": "claude-code-0001-p109-p110-c230",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "14.2 CLAUDE.md：显式项目记忆",
+      "section_path": [
+        "有上下文",
+        "Chapter 14",
+        "14.2 CLAUDE.md：显式项目记忆"
+      ],
+      "page_start": 109,
+      "page_end": 110,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "CLAUDE.md 是一个 Markdown 文件，放在项目根目录（或任何子 目录），Claude Code 每次启动时自动读取。 发现机制（src/utils/claudemd.ts ）： // 从当前目录向上查找 CLAUDE.md async function getMemoryFiles(): Promise<string[]> { const files = [] let dir = cwd while (dir !== path.dirname(dir)) {  ..."
+    },
+    {
+      "index": 4,
+      "chunk_id": "claude-code-0001-p021-p021-c032",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "2.7 CLAUDE.md：给 Claude 的说明书",
+      "section_path": [
+        "分析日志",
+        "2.7 CLAUDE.md：给 Claude 的说明书"
+      ],
+      "page_start": 21,
+      "page_end": 21,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "在项目根目录创建 CLAUDE.md 文件，Claude Code 每次启动都会读 取它，作为项目上下文："
+    }
+  ],
+  "insufficient_evidence": false,
+  "retrieved_chunk_ids": [
+    "claude-code-0001-p112-p112-c244",
+    "claude-code-0001-p109-p110-c230",
+    "claude-code-0001-p069-p069-c149",
+    "claude-code-0001-p021-p021-c032",
+    "claude-code-0001-p010-p010-c002"
+  ],
+  "query": "CLAUDE.md 配置文件是做什么的？",
+  "retrieval_mode": "hybrid"
+}

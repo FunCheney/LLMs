@@ -1,0 +1,363 @@
+{
+  "dataset_id": "claude-code-design-guide-qa-smoke",
+  "timestamp": "2026-10-17T04:31:14.774738+00:00",
+  "mode": "hybrid",
+  "top_k": 5,
+  "rounds": {
+    "retrieval_precheck": true,
+    "llm": true
+  },
+  "total": 10,
+  "passed": 8,
+  "results": [
+    {
+      "id": "qa-001",
+      "question": "MCP 是什么？",
+      "tags": [
+        "concept",
+        "english_abbr"
+      ],
+      "expect_insufficient": false,
+      "passed": true,
+      "failures": [],
+      "notes": "概念 + 英文缩写题",
+      "recall": {
+        "hit": true,
+        "first_rank": 2,
+        "top_sections": [
+          "10.8 MCP 集成工具",
+          "19.1 MCP 是什么",
+          "9.1 工具系统的核心问题",
+          "19.11 小结",
+          "前言：为什么要读这本书"
+        ]
+      },
+      "generation": {
+        "insufficient": false,
+        "refusal_ok": true,
+        "markers": [
+          1,
+          2,
+          4
+        ],
+        "out_of_range": [],
+        "no_marker_positive": false,
+        "json_path": "data/eval/reports/qa_phase3/qa-001.json"
+      }
+    },
+    {
+      "id": "qa-002",
+      "question": "CLAUDE.md 配置文件是做什么的？",
+      "tags": [
+        "keyword",
+        "exact_name"
+      ],
+      "expect_insufficient": false,
+      "passed": true,
+      "failures": [],
+      "notes": "专有名词配置题",
+      "recall": {
+        "hit": true,
+        "first_rank": 2,
+        "top_sections": [
+          "14.5 Memory 系统：自动记忆",
+          "14.2 CLAUDE.md：显式项目记忆",
+          "9.1 工具系统的核心问题",
+          "2.7 CLAUDE.md：给 Claude 的说明书",
+          "前言：为什么要读这本书"
+        ]
+      },
+      "generation": {
+        "insufficient": false,
+        "refusal_ok": true,
+        "markers": [
+          1,
+          2,
+          4
+        ],
+        "out_of_range": [],
+        "no_marker_positive": false,
+        "json_path": "data/eval/reports/qa_phase3/qa-002.json"
+      }
+    },
+    {
+      "id": "qa-003",
+      "question": "query 执行循环是怎么工作的？",
+      "tags": [
+        "semantic",
+        "paraphrase"
+      ],
+      "expect_insufficient": false,
+      "passed": false,
+      "failures": [
+        "拒答不符期望：insufficient_evidence=True，期望 False"
+      ],
+      "notes": "核心循环流程题",
+      "recall": {
+        "hit": true,
+        "first_rank": 1,
+        "top_sections": [
+          "6.10 QueryEngine vs query()：职责分离",
+          "5.5 Claude Code 的 Agent 循环",
+          "6.5 query()：真正的执行循环",
+          "9.1 工具系统的核心问题",
+          "17.8 多代理的调试挑战"
+        ]
+      },
+      "generation": {
+        "insufficient": true,
+        "refusal_ok": false,
+        "markers": [
+          1,
+          2,
+          3,
+          5
+        ],
+        "out_of_range": [],
+        "no_marker_positive": false,
+        "json_path": "data/eval/reports/qa_phase3/qa-003.json"
+      }
+    },
+    {
+      "id": "qa-004",
+      "question": "Auto-Compact 什么时候会触发？",
+      "tags": [
+        "feature_name"
+      ],
+      "expect_insufficient": false,
+      "passed": true,
+      "failures": [],
+      "notes": "精确阈值题，重点核对 85% 和 95% 有无幻觉",
+      "recall": {
+        "hit": true,
+        "first_rank": 1,
+        "top_sections": [
+          "15.13 小结",
+          "15.13 小结",
+          "15.12 设计启示：遗忘的艺术",
+          "15.12 设计启示：遗忘的艺术",
+          "15.2 Auto-Compact 的触发机制"
+        ]
+      },
+      "generation": {
+        "insufficient": false,
+        "refusal_ok": true,
+        "markers": [
+          1,
+          2,
+          5
+        ],
+        "out_of_range": [],
+        "no_marker_positive": false,
+        "json_path": "data/eval/reports/qa_phase3/qa-004.json"
+      }
+    },
+    {
+      "id": "qa-005",
+      "question": "对话历史压缩的核心思路是什么？",
+      "tags": [
+        "semantic"
+      ],
+      "expect_insufficient": false,
+      "passed": true,
+      "failures": [],
+      "notes": "算法原理题",
+      "recall": {
+        "hit": true,
+        "first_rank": 3,
+        "top_sections": [
+          "15.9 压缩的 UI 反馈",
+          "15.9 压缩的 UI 反馈",
+          "15.3 压缩的核心算法",
+          "17.8 多代理的调试挑战",
+          "15.3 压缩的核心算法"
+        ]
+      },
+      "generation": {
+        "insufficient": false,
+        "refusal_ok": true,
+        "markers": [
+          1,
+          2,
+          3,
+          5
+        ],
+        "out_of_range": [],
+        "no_marker_positive": false,
+        "json_path": "data/eval/reports/qa_phase3/qa-005.json"
+      }
+    },
+    {
+      "id": "qa-006",
+      "question": "Claude Code 的权限分几层？",
+      "tags": [
+        "semantic",
+        "architecture"
+      ],
+      "expect_insufficient": false,
+      "passed": true,
+      "failures": [],
+      "notes": "架构分层列举题",
+      "recall": {
+        "hit": true,
+        "first_rank": 3,
+        "top_sections": [
+          "11.9 权限模型的设计权衡",
+          "22.11 小结",
+          "22.2 五层权限架构",
+          "9.1 工具系统的核心问题",
+          "12.6 上下文质量的四个维度"
+        ]
+      },
+      "generation": {
+        "insufficient": false,
+        "refusal_ok": true,
+        "markers": [
+          1,
+          2,
+          3
+        ],
+        "out_of_range": [],
+        "no_marker_positive": false,
+        "json_path": "data/eval/reports/qa_phase3/qa-006.json"
+      }
+    },
+    {
+      "id": "qa-007",
+      "question": "QueryEngine 的 submitMessage 做什么？",
+      "tags": [
+        "keyword",
+        "section_number"
+      ],
+      "expect_insufficient": false,
+      "passed": false,
+      "failures": [
+        "拒答不符期望：insufficient_evidence=True，期望 False"
+      ],
+      "notes": "API/方法流程题",
+      "recall": {
+        "hit": true,
+        "first_rank": 1,
+        "top_sections": [
+          "6.4 submitMessage：一次对话轮次的完整流程",
+          "9.1 工具系统的核心问题",
+          "6.1 QueryEngine 的职责",
+          "前言：为什么要读这本书",
+          "6.2 QueryEngine 的配置"
+        ]
+      },
+      "generation": {
+        "insufficient": true,
+        "refusal_ok": false,
+        "markers": [
+          1,
+          3
+        ],
+        "out_of_range": [],
+        "no_marker_positive": false,
+        "json_path": "data/eval/reports/qa_phase3/qa-007.json"
+      }
+    },
+    {
+      "id": "qa-008",
+      "question": "流式响应是怎么解析的？",
+      "tags": [
+        "semantic"
+      ],
+      "expect_insufficient": false,
+      "passed": true,
+      "failures": [],
+      "notes": "流式处理机制题",
+      "recall": {
+        "hit": true,
+        "first_rank": 1,
+        "top_sections": [
+          "8.1 为什么流式处理如此重要",
+          "8.3 流式响应的解析",
+          "8.11 小结",
+          "Chapter 8",
+          "6.5 query()：真正的执行循环"
+        ]
+      },
+      "generation": {
+        "insufficient": false,
+        "refusal_ok": true,
+        "markers": [
+          2,
+          3,
+          5
+        ],
+        "out_of_range": [],
+        "no_marker_positive": false,
+        "json_path": "data/eval/reports/qa_phase3/qa-008.json"
+      }
+    },
+    {
+      "id": "qa-009",
+      "question": "Claude Code 有哪几种代理模式？",
+      "tags": [
+        "semantic"
+      ],
+      "expect_insufficient": false,
+      "passed": true,
+      "failures": [],
+      "notes": "已知检索难点：k=5 时可能落入 17.3/17.5，验收时区分检索召回与生成忠实度",
+      "recall": {
+        "hit": true,
+        "first_rank": 4,
+        "top_sections": [
+          "17.10 小结",
+          "17.5 代理间的上下文共享",
+          "17.8 多代理的调试挑战",
+          "17.3 代理类型系统",
+          "9.1 工具系统的核心问题"
+        ]
+      },
+      "generation": {
+        "insufficient": false,
+        "refusal_ok": true,
+        "markers": [
+          1
+        ],
+        "out_of_range": [],
+        "no_marker_positive": false,
+        "json_path": "data/eval/reports/qa_phase3/qa-009.json"
+      }
+    },
+    {
+      "id": "qa-010",
+      "question": "Kafka 消费者如何提交 offset？",
+      "tags": [
+        "negative",
+        "out_of_domain"
+      ],
+      "expect_insufficient": true,
+      "passed": true,
+      "failures": [],
+      "notes": "库外负例题，必须触发 insufficient_evidence=true",
+      "recall": {
+        "hit": null,
+        "first_rank": null,
+        "top_sections": [
+          "2.9 多文件项目的最佳实践",
+          "9.1 工具系统的核心问题",
+          "没有上下文",
+          "12.2 什么是 Context Engineering",
+          "否则，分析 git diff 生成 message"
+        ]
+      },
+      "generation": {
+        "insufficient": true,
+        "refusal_ok": true,
+        "markers": [
+          1,
+          2,
+          4
+        ],
+        "out_of_range": [],
+        "no_marker_positive": false,
+        "json_path": "data/eval/reports/qa_phase3/qa-010.json"
+      }
+    }
+  ]
+}

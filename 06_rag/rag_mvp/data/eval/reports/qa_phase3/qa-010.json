@@ -1,0 +1,59 @@
+{
+  "answer": "当前资料中没有足够依据回答「Kafka 消费者如何提交 offset」这一问题。\n\n参考资料的内容集中在 Claude Code 的上下文管理、工具系统设计与 Context Engineering（上下文工程）等主题，例如多文件项目最佳实践、工具系统需要回答的六个问题，以及内容、结构、管理三个维度 [1][2][4]，并没有涉及 Kafka 消费者的 offset 提交机制。因此，我无法基于现有资料给出可靠答案。",
+  "citations": [
+    {
+      "index": 1,
+      "chunk_id": "claude-code-0001-p023-p023-c040",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "2.9 多文件项目的最佳实践",
+      "section_path": [
+        "允许自动执行 bash 命令（谨慎使用）",
+        "2.9 多文件项目的最佳实践"
+      ],
+      "page_start": 23,
+      "page_end": 23,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "给 Claude 足够的上下文： > 我要修改用户认证流程。相关文件在 src/auth/ 目录， 数据库 schema 在 prisma/schema.prisma， 请先读取这些文件再开始修改 分步骤执行复杂任务： > 第一步：先帮我分析现有的认证流程，不要修改任何文件 > （确认分析正确后） > 第二步：现在按照我们讨论的方案修改 利用 /compact 管理上下文： 长对话后，用 /compact 压缩历史，保 留关键信息，释放 token 空间。"
+    },
+    {
+      "index": 2,
+      "chunk_id": "claude-code-0001-p069-p069-c149",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "9.1 工具系统的核心问题",
+      "section_path": [
+        "Part IV",
+        "Chapter 9",
+        "9.1 工具系统的核心问题"
+      ],
+      "page_start": 69,
+      "page_end": 69,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "设计一个工具系统，需要回答几个根本问题： 1. 工具的接口是什么？ 输入输出如何定义？ 2. 工具如何被发现？ Claude 怎么知道有哪些工具可用？ 3. 工具如何被选择？ Claude 怎么决定用哪个工具？ 4. 工具如何被执行？ 执行时需要什么上下文？ 5. 工具的权限如何控制？ 哪些工具需要用户确认？ 6. 工具如何扩展？ 如何添加新工具？ Claude Code 的工具系统对这六个问题都有清晰的答案。"
+    },
+    {
+      "index": 4,
+      "chunk_id": "claude-code-0001-p096-p097-c200",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "12.2 什么是 Context Engineering",
+      "section_path": [
+        "Part V",
+        "Chapter 12",
+        "12.2 什么是 Context Engineering"
+      ],
+      "page_start": 96,
+      "page_end": 97,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "Context Engineering 是指系统性地设计、构建和管理 AI 模型的输 入上下文，以最大化模型的输出质量。 它包含三个维度： 内容维度：给 AI 什么信息？ 项目背景（CLAUDE.md） 当前状态（git status、文件内容） 历史记录（对话历史） 外部知识（文档、搜索结果） 结构维度：如何组织这些信息？ 系统提示 vs 用户消息 信息的顺序和优先级 格式（纯文本、Markdown、XML） 管理维度：如何在有限的 token 窗口内管理信息？ 压缩历史（..."
+    }
+  ],
+  "insufficient_evidence": true,
+  "retrieved_chunk_ids": [
+    "claude-code-0001-p023-p023-c040",
+    "claude-code-0001-p069-p069-c149",
+    "claude-code-0001-p097-p097-c202",
+    "claude-code-0001-p096-p097-c200",
+    "claude-code-0001-p163-p163-c358"
+  ],
+  "query": "Kafka 消费者如何提交 offset？",
+  "retrieval_mode": "hybrid"
+}

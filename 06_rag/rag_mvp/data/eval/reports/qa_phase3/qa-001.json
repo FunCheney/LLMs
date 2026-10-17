@@ -1,0 +1,60 @@
+{
+  "answer": "MCP（Model Context Protocol）是 Anthropic 在 2024 年提出的开放协议，它定义了 AI 模型与外部工具、资源之间的标准通信方式 [2]。它允许外部服务器向 Claude 提供工具和资源 [1]。\n\nMCP 的目标是让任何工具都能被任何支持 MCP 的 AI 使用，从而解决此前各个 AI 工具集成方式碎片化的问题 [2]。MCP 是 Claude Code 扩展能力的核心机制：任何服务都可以成为 MCP 服务器；MCP 工具会自动注册到 Claude Code 的工具系统中；MCP 支持 Tools（可调用）、Resources（可读取）、Prompts（模板）三种资源，并提供内置 OAuth 认证流程 [4]。",
+  "citations": [
+    {
+      "index": 1,
+      "chunk_id": "claude-code-0001-p085-p085-c177",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "10.8 MCP 集成工具",
+      "section_path": [
+        "Part IV",
+        "Chapter 10",
+        "10.8 MCP 集成工具"
+      ],
+      "page_start": 85,
+      "page_end": 85,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "工具 职责 MCPTool 调用 MCP 服务器提供的工具 McpAuthTool MCP 服务器认证 ListMcpResourcesTool 列出 MCP 资源 ReadMcpResourceTool 读取 MCP 资源 MCP（Model Context Protocol）是 Anthropic 提出的开放协 议，允许外部服务器向 Claude 提供工具和资源。详见第 19 章。"
+    },
+    {
+      "index": 2,
+      "chunk_id": "claude-code-0001-p152-p152-c330",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "19.1 MCP 是什么",
+      "section_path": [
+        "第七部分 扩展系统",
+        "第十九章 MCP 协议 —— 工具的互联网",
+        "19.1 MCP 是什么"
+      ],
+      "page_start": 152,
+      "page_end": 152,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "MCP（Model Context Protocol）是 Anthropic 在 2024 年提出 的开放协议，定义了 AI 模型与外部工具/资源之间的标准通信方式。 在 MCP 之前，每个 AI 工具都有自己的集成方式： GitHub Copilot 有自己的 API Cursor 有自己的插件系统 Claude Code 有自己的工具定义 这导致了碎片化：为一个 AI 工具开发的集成，无法直接用于另一个 AI 工具。 MCP 的目标是：让任何工具都能被任何支持 MCP 的..."
+    },
+    {
+      "index": 4,
+      "chunk_id": "claude-code-0001-p159-p160-c348",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "19.11 小结",
+      "section_path": [
+        "第七部分 扩展系统",
+        "第十九章 MCP 协议 —— 工具的互联网",
+        "19.11 小结"
+      ],
+      "page_start": 159,
+      "page_end": 160,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "MCP 是 Claude Code 扩展能力的核心机制： 开放协议：任何服务都可以成为 MCP 服务器 动态注册：MCP 工具自动注册到 Claude Code 的工具系统 三种资源：Tools（可调用）、Resources（可读取）、Prompts （模板） 认证支持：内置 OAuth 认证流程 生态系统：已有大量现成的 MCP 服务器 MCP 让 Claude Code 的能力边界从\"内置工具\"扩展到了\"整个互联 网上的服务\"。"
+    }
+  ],
+  "insufficient_evidence": false,
+  "retrieved_chunk_ids": [
+    "claude-code-0001-p085-p085-c177",
+    "claude-code-0001-p152-p152-c330",
+    "claude-code-0001-p069-p069-c149",
+    "claude-code-0001-p159-p160-c348",
+    "claude-code-0001-p010-p010-c002"
+  ],
+  "query": "MCP 是什么？",
+  "retrieval_mode": "hybrid"
+}

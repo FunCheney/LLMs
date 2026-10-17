@@ -1,0 +1,75 @@
+{
+  "answer": "`query()` 是实际的 Agent 执行循环，位于 `src/query.ts`（1729 行）[3]。\n\n**循环骨架：**\n1. 轮次计数 `turnCount++`，然后检查轮次限制[3]；\n2. 调用 Claude API（流式）[3]；\n3. 循环的输入来自用户输入后构建的、包含历史的消息列表[2]。\n\n**职责分工：**\n- `query()` 负责 API 调用循环、工具执行、流式输出和思考块处理[1]；\n- 消息历史管理、会话状态、token 累计统计和会话持久化由 QueryEngine 负责[1]。\n\n**终止机制：** 存在轮次限制（如 `maxTurns`）以防止无限循环，超出时自动终止[5]。\n\n需要注意：资料 [3] 中的循环流程图在「调用 Claude API（流式）」之后被截断，因此工具调用结果如何回到循环、轮次限制的具体判断位置等后续步骤，当前资料中没有足够依据。",
+  "citations": [
+    {
+      "index": 1,
+      "chunk_id": "claude-code-0001-p049-p049-c104",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "6.10 QueryEngine vs query()：职责分离",
+      "section_path": [
+        "Part III",
+        "Chapter 6",
+        "6.10 QueryEngine vs query()：职责分离"
+      ],
+      "page_start": 49,
+      "page_end": 49,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "职责 QueryEngine query() 消息历史管理 ✓ ✗ 会话状态 ✓ ✗ token 累计统计 ✓ ✗ 会话持久化 ✓ ✗ API 调用循环 ✗ ✓ 工具执行 ✗ ✓ 流式输出 ✗ ✓ 思考块处理 ✗ ✓ QueryEngine 是会话管理者，query() 是执行引擎。这种分离让两者 都可以独立测试和演化。"
+    },
+    {
+      "index": 2,
+      "chunk_id": "claude-code-0001-p038-p038-c075",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "5.5 Claude Code 的 Agent 循环",
+      "section_path": [
+        "立刻显示图表",
+        "Chapter 5",
+        "5.5 Claude Code 的 Agent 循环"
+      ],
+      "page_start": 38,
+      "page_end": 38,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "Claude Code 的核心是一个 Agent 循环，在 src/query.ts 中实 现： ┌─────────────────────────────────────────────┐ │                Agent 循环                    │ │                                             │ │  用户输入                                    │ │  ..."
+    },
+    {
+      "index": 3,
+      "chunk_id": "claude-code-0001-p045-p045-c093",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "6.5 query()：真正的执行循环",
+      "section_path": [
+        "Part III",
+        "Chapter 6",
+        "6.5 query()：真正的执行循环"
+      ],
+      "page_start": 45,
+      "page_end": 45,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "query() 函数（src/query.ts ，1729 行）是实际的 Agent 循环： ┌──────────────────────────────────────────────────────────────┐ │                    query() 执行循环                           │ └──────────────────────────────────────────────────────────────┘ │..."
+    },
+    {
+      "index": 5,
+      "chunk_id": "claude-code-0001-p145-p145-c317",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "17.8 多代理的调试挑战",
+      "section_path": [
+        "第六部分 多智能体协作",
+        "第十七章 多代理架构",
+        "17.8 多代理的调试挑战"
+      ],
+      "page_start": 145,
+      "page_end": 145,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "多代理系统的调试比单代理复杂得多： 问题 1：哪个代理出了问题？ 解决：每个代理有唯一 ID 和颜色，日志中标注代理来源。 问题 2：代理间的通信是否正确？ 解决：SendMessageTool 的调用记录在对话历史中，可以追溯。 问题 3：子代理的上下文是什么？ 解决：子代理的完整对话历史保存在任务输出文件中。 问题 4：代理是否在循环？ 解决：maxTurns 限制防止无限循环，超出时自动终止。"
+    }
+  ],
+  "insufficient_evidence": true,
+  "retrieved_chunk_ids": [
+    "claude-code-0001-p049-p049-c104",
+    "claude-code-0001-p038-p038-c075",
+    "claude-code-0001-p045-p045-c093",
+    "claude-code-0001-p069-p069-c149",
+    "claude-code-0001-p145-p145-c317"
+  ],
+  "query": "query 执行循环是怎么工作的？",
+  "retrieval_mode": "hybrid"
+}

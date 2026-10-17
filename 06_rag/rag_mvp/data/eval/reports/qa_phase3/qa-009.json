@@ -1,0 +1,30 @@
+{
+  "answer": "Claude Code 的多代理架构提供三种协作模式：\n\n1. **子代理**：子代理拥有独立上下文，并把结果汇报给父代理 [1]。\n2. **后台代理**：后台代理异步执行，不会阻塞父代理 [1]。\n3. **团队协作**：多个代理通过消息传递进行协作 [1]。",
+  "citations": [
+    {
+      "index": 1,
+      "chunk_id": "claude-code-0001-p146-p146-c319",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "17.10 小结",
+      "section_path": [
+        "第六部分 多智能体协作",
+        "第十七章 多代理架构",
+        "17.10 小结"
+      ],
+      "page_start": 146,
+      "page_end": 146,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "Claude Code 的多代理架构提供了三种协作模式： 子代理：独立上下文，结果汇报给父代理 后台代理：异步执行，不阻塞父代理 团队协作：多代理通过消息传递协作 关键设计：颜色系统（可观察性）、资源限制（安全性）、多种共享机制 （灵活性）。"
+    }
+  ],
+  "insufficient_evidence": false,
+  "retrieved_chunk_ids": [
+    "claude-code-0001-p146-p146-c319",
+    "claude-code-0001-p144-p144-c314",
+    "claude-code-0001-p145-p145-c317",
+    "claude-code-0001-p143-p143-c312",
+    "claude-code-0001-p069-p069-c149"
+  ],
+  "query": "Claude Code 有哪几种代理模式？",
+  "retrieval_mode": "hybrid"
+}

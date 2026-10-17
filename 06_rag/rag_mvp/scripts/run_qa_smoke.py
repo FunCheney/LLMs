@@ -532,8 +532,8 @@ def main() -> None:
         sys.exit(run_review_only(dataset, report_dir, top_k, args.fail_on_miss))
 
     _check_indexes(mode, args.dense_index, args.bm25_index)
-    if args.with_llm:
-        _ensure_llm_ready()
+    # if args.with_llm:
+    #     _ensure_llm_ready()
 
     retriever = create_retriever(
         RetrieverConfig(

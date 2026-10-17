@@ -1,0 +1,59 @@
+{
+  "answer": "Claude Code 的权限模型采用**五层**精细化控制 [1][2][3]。\n\n从粗到细，这五层分别是：模式级别、工具级别、操作级别、路径级别和命令级别 [1]；也可概括为会话模式、工具白名单/黑名单、工具级权限、操作级权限，以及路径/命令级权限 [2]。其设计原则是：安全默认、便利可选、控制权在用户手中 [2]。",
+  "citations": [
+    {
+      "index": 1,
+      "chunk_id": "claude-code-0001-p093-p093-c194",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "11.9 权限模型的设计权衡",
+      "section_path": [
+        "Part IV",
+        "Chapter 11",
+        "11.9 权限模型的设计权衡"
+      ],
+      "page_start": 93,
+      "page_end": 93,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "权限模型面临一个根本的权衡：安全性 vs 便利性。 过于严格的权限会让 Claude Code 变得难用——每次操作都需要确 认，用户会感到烦躁。 过于宽松的权限会带来安全风险——Claude 可能执行意外的破坏性操 作。 Claude Code 的解决方案是分层权限： 层次 1：模式级别（bypassPermissions / default / plan） ↓ 层次 2：工具级别（某些工具默认允许，某些默认询问） ↓ 层次 3：操作级别（同一工具的不同操作有不同权限） ↓..."
+    },
+    {
+      "index": 2,
+      "chunk_id": "claude-code-0001-p177-p177-c390",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "22.11 小结",
+      "section_path": [
+        "工具限制",
+        "22.11 小结"
+      ],
+      "page_start": 177,
+      "page_end": 177,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "Claude Code 的权限模型是一个五层的精细化控制系统： 1. 会话模式：整体权限基调 2. 工具白名单/黑名单：工具级别的开关 3. 工具级权限：每个工具的默认行为 4. 操作级权限：同一工具不同操作的风险分级 5. 路径/命令级权限：最细粒度的控制 设计原则：安全是默认，便利是可选，控制在用户手中。"
+    },
+    {
+      "index": 3,
+      "chunk_id": "claude-code-0001-p172-p173-c376",
+      "document_title": "Claude Code 设计指南",
+      "section_title": "22.2 五层权限架构",
+      "section_path": [
+        "第八部分 安全与性能",
+        "第二十二章 权限模型的分层设计",
+        "22.2 五层权限架构"
+      ],
+      "page_start": 172,
+      "page_end": 173,
+      "source_uri": "data/raw/Claude Code设计指南.pdf",
+      "quote": "Claude Code 的权限系统分为五层，从粗到细： ┌─────────────────────────────────────────────────────────────┐ │                    五层权限架构                              │ └─────────────────────────────────────────────────────────────┘ 层次 1：会话模式 (Session Mode) ..."
+    }
+  ],
+  "insufficient_evidence": false,
+  "retrieved_chunk_ids": [
+    "claude-code-0001-p093-p093-c194",
+    "claude-code-0001-p177-p177-c390",
+    "claude-code-0001-p172-p173-c376",
+    "claude-code-0001-p069-p069-c149",
+    "claude-code-0001-p099-p099-c208"
+  ],
+  "query": "Claude Code 的权限分几层？",
+  "retrieval_mode": "hybrid"
+}
