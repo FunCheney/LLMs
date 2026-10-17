@@ -1,0 +1,175 @@
+version: 1
+dataset_id: claude-code-design-guide-golden
+description: 'Phase 4 Golden Dataset：单知识库 Claude Code 设计指南的检索评测集。
+
+  gold 标注精确到 chunk_id（由 qa_smoke 的 expected_sections 映射生成）。
+
+  用于计算 Recall@K / MRR / nDCG，对比 dense/sparse/hybrid 检索质量。'
+corpus:
+  chunks_path: data/processed/chunks.jsonl
+  expected_chunk_count: 444
+defaults:
+  top_k: 10
+  modes:
+  - dense
+  - sparse
+  - hybrid
+queries:
+- id: golden-001
+  question: MCP 是什么？
+  tags:
+  - concept
+  - english_abbr
+  expect_insufficient: false
+  expected_points:
+  - Model Context Protocol（开放协议）
+  - 定义 AI 模型与外部工具/资源之间的标准通信方式（或提及 Tools/Resources/Prompts）
+  notes: 概念 + 英文缩写题
+  gold_chunk_ids:
+  - claude-code-0001-p152-p152-c330
+  - claude-code-0001-p159-p160-c348
+- id: golden-002
+  question: CLAUDE.md 配置文件是做什么的？
+  tags:
+  - keyword
+  - exact_name
+  expect_insufficient: false
+  expected_points:
+  - 作为项目的显式记忆/上下文说明文件，启动时自动读取
+  - 支持全局（~/.claude/CLAUDE.md）、项目根目录、子目录多级合并
+  notes: 专有名词配置题
+  gold_chunk_ids:
+  - claude-code-0001-p021-p021-c032
+  - claude-code-0001-p109-p110-c230
+  - claude-code-0001-p110-p110-c231
+- id: golden-003
+  question: query 执行循环是怎么工作的？
+  tags:
+  - semantic
+  - paraphrase
+  expect_insufficient: false
+  expected_points:
+  - 检查轮次限制并流式调用 Claude API，解析 text / thinking / tool_use
+  - 若有工具调用则（并行）执行工具并将结果追加回 messages，检查 token 预算后继续循环直到无工具调用
+  notes: 核心循环流程题
+  gold_chunk_ids:
+  - claude-code-0001-p045-p045-c093
+  - claude-code-0001-p045-p045-c094
+  - claude-code-0001-p045-p045-c095
+  - claude-code-0001-p045-p046-c096
+  - claude-code-0001-p046-p046-c097
+  - claude-code-0001-p046-p047-c098
+  - claude-code-0001-p049-p049-c104
+- id: golden-004
+  question: Auto-Compact 什么时候会触发？
+  tags:
+  - feature_name
+  expect_insufficient: false
+  expected_points:
+  - token 使用量超过 85% 时进入 warning（建议压缩/显示警告）
+  - token 使用量超过 95% 时进入 critical（必须立即/强制压缩）
+  notes: 精确阈值题，重点核对 85% 和 95% 有无幻觉
+  gold_chunk_ids:
+  - claude-code-0001-p117-p118-c254
+  - claude-code-0001-p118-p118-c255
+  - claude-code-0001-p124-p124-c270
+  - claude-code-0001-p126-p127-c273
+  - claude-code-0001-p127-p127-c274
+  - claude-code-0001-p133-p133-c289
+- id: golden-005
+  question: 对话历史压缩的核心思路是什么？
+  tags:
+  - semantic
+  expect_insufficient: false
+  expected_points:
+  - 用 Claude 自己总结较早的对话历史生成摘要
+  - 找到压缩边界，保留最近 N 条（如最近 10 条）完整消息不压缩，将摘要与保留消息拼接
+  notes: 算法原理题
+  gold_chunk_ids:
+  - claude-code-0001-p118-p119-c256
+  - claude-code-0001-p119-p119-c257
+  - claude-code-0001-p119-p119-c258
+  - claude-code-0001-p119-p120-c259
+  - claude-code-0001-p120-p120-c260
+  - claude-code-0001-p127-p128-c275
+  - claude-code-0001-p128-p128-c276
+  - claude-code-0001-p128-p128-c277
+  - claude-code-0001-p128-p129-c278
+  - claude-code-0001-p129-p129-c279
+- id: golden-006
+  question: Claude Code 的权限分几层？
+  tags:
+  - semantic
+  - architecture
+  expect_insufficient: false
+  expected_points:
+  - 分为五层（从粗到细）
+  - 会话模式、工具白名单/黑名单、工具级权限、操作级权限、路径/命令级权限
+  notes: 架构分层列举题
+  gold_chunk_ids:
+  - claude-code-0001-p172-p173-c376
+  - claude-code-0001-p173-p173-c377
+  - claude-code-0001-p173-p173-c378
+  - claude-code-0001-p173-p173-c379
+- id: golden-007
+  question: QueryEngine 的 submitMessage 做什么？
+  tags:
+  - keyword
+  - section_number
+  expect_insufficient: false
+  expected_points:
+  - 预处理用户输入（斜杠命令、附件、Memory）并构建消息列表
+  - 调用 query() 执行核心循环，随后做后处理（记录 token、保存历史、触发 hooks、检查压缩）并流式返回结果
+  notes: API/方法流程题
+  gold_chunk_ids:
+  - claude-code-0001-p044-p044-c089
+  - claude-code-0001-p044-p044-c090
+  - claude-code-0001-p044-p044-c091
+  - claude-code-0001-p044-p044-c092
+- id: golden-008
+  question: 流式响应是怎么解析的？
+  tags:
+  - semantic
+  expect_insufficient: false
+  expected_points:
+  - 基于 SSE 事件流（content_block_start / content_block_delta / content_block_stop / message_stop）解析
+  - 文本块（text_delta）实时输出给用户，思考块内部处理，工具调用块（input_json_delta）累积完整 JSON 后再执行
+  notes: 流式处理机制题
+  gold_chunk_ids:
+  - claude-code-0001-p059-p059-c128
+  - claude-code-0001-p060-p061-c131
+  - claude-code-0001-p061-p061-c132
+  - claude-code-0001-p061-p061-c133
+  - claude-code-0001-p061-p062-c134
+  - claude-code-0001-p062-p062-c135
+  - claude-code-0001-p062-p062-c136
+  - claude-code-0001-p062-p063-c137
+- id: golden-009
+  question: Claude Code 有哪几种代理模式？
+  tags:
+  - semantic
+  expect_insufficient: false
+  expected_points:
+  - 三种代理模式：子代理（AgentTool）、后台代理（run_in_background）、Worktree 隔离代理
+  - （或若检索落在 17.3）内置专业化代理类型：general-purpose、Explore、Plan
+  notes: 已知检索难点：k=5 时可能落入 17.3/17.5，验收时区分检索召回与生成忠实度
+  gold_chunk_ids:
+  - claude-code-0001-p141-p141-c304
+  - claude-code-0001-p141-p141-c305
+  - claude-code-0001-p141-p141-c306
+  - claude-code-0001-p141-p141-c307
+  - claude-code-0001-p141-p141-c308
+  - claude-code-0001-p141-p141-c309
+  - claude-code-0001-p141-p142-c310
+  - claude-code-0001-p142-p142-c311
+  - claude-code-0001-p143-p143-c312
+- id: golden-010
+  question: Kafka 消费者如何提交 offset？
+  tags:
+  - negative
+  - out_of_domain
+  expect_insufficient: true
+  expected_points:
+  - 明确说明当前参考资料中没有足够依据，不利用模型自身知识回答 Kafka 机制
+  notes: 库外负例题，必须触发 insufficient_evidence=true
+  gold_chunk_ids: []

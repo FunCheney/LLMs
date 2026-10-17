@@ -19,7 +19,6 @@ from pathlib import Path
 
 from eval.matchers import find_first_matching_rank, hit_matches_rules
 from eval.smoke_schema import SmokeDataset, SmokeQuery, load_smoke_dataset
-from retrieval.factory import RetrieverConfig, create_retriever
 from retrieval.types import RetrievalResult
 
 
@@ -145,6 +144,10 @@ def run_smoke_evaluation(
     """
     dataset = load_smoke_dataset(dataset_path)
     warnings = _validate_corpus(dataset)
+
+    # 惰性导入：create_retriever 会连带加载 sentence-transformers/torch（很重），
+    # 仅在真正执行检索时引入，避免「仅加载 schema」也拖慢几十秒。
+    from retrieval.factory import RetrieverConfig, create_retriever
 
     selected_modes = modes or dataset.defaults.modes
     selected_top_k = top_k or dataset.defaults.top_k
