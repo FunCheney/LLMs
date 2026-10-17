@@ -54,6 +54,7 @@ COMMANDS: dict[str, str] = {
     "search": "search_cli.py",
     "ask": "ask_cli.py",
     "smoke": "run_smoke_retrieval.py",
+    "qa-smoke": "run_qa_smoke.py",
 }
 
 # --help 里展示的规范命令与说明（别名不单独列出）
@@ -64,6 +65,7 @@ _HELP_ROWS: list[tuple[str, str]] = [
     ("search", "检索 Top-K 并打印 chunk 与元数据（--mode dense|sparse|hybrid）"),
     ("ask", "RAG 问答并输出引用（需 DEEPSEEK_API_KEY，--dry-run 仅检索）"),
     ("smoke", "运行 smoke 检索评测并写出报告"),
+    ("qa-smoke", "Phase 3 生成链路冒烟：检索预检 / 问答落盘与自动检查"),
 ]
 
 # 别名 → 规范命令，仅用于提示
