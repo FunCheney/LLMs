@@ -11,6 +11,7 @@ CLI：检索调试工具，支持 dense / sparse / hybrid 三种模式。
 import argparse
 from pathlib import Path
 
+from pre_query import QueryPreProcessor
 from retrieval.display import print_hits
 from retrieval.factory import RetrieverConfig, create_retriever
 
@@ -79,10 +80,14 @@ def main() -> None:
             "Run: uv run python scripts/build_bm25_index.py"
         )
 
+    preprocessor = QueryPreProcessor(max_length=3000)
+    processed = preprocessor.process(args.query, retrieval_mode=args.mode)
+
     retriever = create_retriever(config)
-    hits = retriever.retrieve(args.query, top_k=args.k)
+    hits = retriever.retrieve(processed.rewritten_query, top_k=args.k)
 
     print(f"Query: {args.query}")
+    print(f"rewritten_query: {processed.rewritten_query}\n")
     print(f"Mode: {args.mode}")
     print(f"Results: {len(hits)}\n")
     print_hits(hits, snippet=args.snippet)

@@ -30,7 +30,8 @@ overlap_spit(text, 100, 50)
 
 print('=========================')
 # 递归
-from langchain_classic.text_splitter import RecursiveCharacterTextSplitter
+# uv add langchain-text-splitters 导入包
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 splitter = RecursiveCharacterTextSplitter(
     chunk_size=40,
     chunk_overlap=10,

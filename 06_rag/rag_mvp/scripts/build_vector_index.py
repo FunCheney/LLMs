@@ -12,7 +12,7 @@ import argparse
 from pathlib import Path
 
 from embedding import BGEM3EmbeddingProvider
-from indexing.vector_index import build_local_index
+from indexing.vector_index import build_local_index, build_vector_db_index
 
 
 def parse_args() -> argparse.Namespace:
@@ -42,6 +42,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Torch device for SentenceTransformer, e.g. cpu or mps",
     )
+
+    parser.add_argument(
+        "--index-type",
+        default="vector",
+        help="give index type (milvus or local)",
+    )
     return parser.parse_args()
 
 
@@ -55,12 +61,20 @@ def main() -> None:
     args = parse_args()
     embedder = BGEM3EmbeddingProvider(device=args.device)
 
-    index = build_local_index(
-        chunks_path=args.chunks,
-        index_path=args.output,
-        embedder=embedder,
-        batch_size=args.batch_size,
-    )
+    if args.index_type == "milvus":
+        index = build_vector_db_index(
+            chunks_path=args.chunks,
+            embedder=embedder,
+            dimension=1024,
+            batch_size=args.batch_size,
+        )
+    else:
+        index = build_local_index(
+            chunks_path=args.chunks,
+            index_path=args.output,
+            embedder=embedder,
+            batch_size=args.batch_size,
+        )
 
     print(f"Chunks file: {args.chunks}")
     print(f"Index file: {args.output}")

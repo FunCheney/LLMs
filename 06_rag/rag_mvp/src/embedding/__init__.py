@@ -9,6 +9,7 @@ from embedding.bge_m3 import BGEM3EmbeddingProvider
 from embedding.embedding_types import EmbeddingResult
 from embedding.bm25 import BM25Index
 from embedding.bm25 import build_bm25_index
+from embedding.visual_bge import VisualBGEEmbeddingProvider
 
 
 
@@ -17,5 +18,6 @@ __all__ = [
     "BGEM3EmbeddingProvider",
     "EmbeddingResult",
     "BM25Index",
-    "build_bm25_index"
+    "build_bm25_index",
+    "VisualBGEEmbeddingProvider"
 ]

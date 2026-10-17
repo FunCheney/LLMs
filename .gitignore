@@ -319,3 +319,4 @@ cython_debug/
 /00_basic_tools/05_pytorch/05_save_load_model/model_weight.pth
 /00_basic_tools/05_pytorch/04_optimizing_model_parameters/data/
 06_rag/rag_mvp/.workbuddy
+/06_rag/rag_mvp/src/embedding/visual_bge/Visualized_base_en_v1.5.pth

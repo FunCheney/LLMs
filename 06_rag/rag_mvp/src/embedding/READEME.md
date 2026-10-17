@@ -78,6 +78,50 @@ Transformer 能利用双向上下文学习表示。Sentence-BERT 等方法进一
 ![img_5.png](image/img_5.png)
 
 
+#### 多模态嵌入模型的使用
+
+```shell
+# 安装库
+# 克隆 FlagEmbedding 仓库并进入 visual_bge 目录
+git clone https://github.com/FlagOpen/FlagEmbedding.git
+
+# 进入 visual_bge 目录后，使用 uv 的 pip 接口进行可编辑安装
+cd /你的路径/FlagEmbedding/research/visual_bge
+uv pip install -e .
+
+
+# 安装其他依赖
+pip install torchvision timm einops ftfy
+
+# 验证是否安装成功
+uv pip list | grep visual_bge
+
+# 在当前环境中添加依赖
+uv add --editable /Users/mico/AI/FlagEmbedding/research/visual_bge
+
+# 执行
+uv run python -c \                                                            
+  "from visual_bge.modeling import Visualized_BGE; print(Visualized_BGE)"
+  
+# 如果输出 ModuleNotFoundError: No module named 'visual_bge'
+
+touch /你的路径/FlagEmbedding/research/visual_bge/visual_bge/__init__.py
+
+uv sync --reinstall-package visual-bge
+
+# 执行
+uv run python -c \                                                            
+  "from visual_bge.modeling import Visualized_BGE; print(Visualized_BGE)"
+```
+
+```shell
+# 下载权重 下载 Visualized_base_en_v1.5.pth
+
+https://huggingface.co/BAAI/bge-visualized/resolve/main/Visualized_base_en_v1.5.pth
+
+```
+
+
 ## 嵌入类型
 
 ### 稀疏嵌入

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from embedding.fake import FakeEmbeddingProvider
+from indexing import build_vector_db_index
 from indexing.vector_index import build_local_index, search_local_index
 from ingestion.storage import save_chunks_jsonl
 from schemas import DocumentChunk
@@ -36,6 +37,7 @@ def _sample_chunks() -> list[DocumentChunk]:
 
 
 def test_build_and_search_local_index(tmp_path: Path):
+    print("tmp_path =", tmp_path)
     chunks_path = tmp_path / "chunks.jsonl"
     index_path = tmp_path / "index.pkl"
     save_chunks_jsonl(_sample_chunks(), chunks_path)
@@ -60,3 +62,28 @@ def test_build_and_search_local_index(tmp_path: Path):
 
     assert len(results) == 1
     assert results[0][0].id == "doc-p001-p001-c000"
+
+
+"""
+运行本例需启动 milvus 数据库
+"""
+def test_build_milvus_index(tmp_path: Path):
+    print("tmp_path =", tmp_path)
+    chunks_path = tmp_path / "chunks_vector.jsonl"
+    save_chunks_jsonl(_sample_chunks(), chunks_path)
+    provider = FakeEmbeddingProvider(dimension=4)
+    index = build_vector_db_index(
+        chunks_path=chunks_path,
+        embedder=provider,
+        dimension=4,
+        batch_size=2,
+    )
+
+    assert index.count() == 2
+
+    text = provider.embed_text("Python PDF")
+    results = index.search(
+       text.vector,
+        top_k=1
+    )
+    assert len(results) == 1

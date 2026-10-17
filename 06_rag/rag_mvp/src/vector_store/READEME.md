@@ -118,3 +118,6 @@ Facebook 开元的高效下向量近邻库；支持 cpu/gpu 算法。
 
 #### PGVector(PostgreSQL 插件)
 
+
+## 索引优化
+

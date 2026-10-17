@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "asyncmy>=0.2.14",
+    "chromadb>=1.5.9",
     "cryptography>=50.0.1",
     "elasticsearch[async]>=8,<9",
     "fastapi[standard]>=0.141.1",
@@ -17,8 +18,13 @@ dependencies = [
     "jieba>=0.42.1",
     "langchain>=1.4.2",
     "langchain-deepseek>=1.1.0",
+    "langchain-experimental>=0.4.2",
     "langchain-huggingface>=1.2.2",
+    "langchain-text-splitters>=1.1.3",
     "langgraph>=1.2.11",
+    "llama-index-core>=0.14.25",
+    "llama-index-embeddings-huggingface>=0.8.0",
+    "llama-index-llms-deepseek>=0.4.1",
     "loguru>=0.7.3",
     "omegaconf>=2.3.1",
     "pymilvus>=3.0.2",
@@ -30,6 +36,8 @@ dependencies = [
     "rank-bm25>=0.2.2",
     "sentence-transformers>=6.1.0",
     "sqlalchemy>=2.0.54",
+    "unstructured[pdf]>=0.27.25",
+    "visual-bge",
 ]
 
 [project.scripts]
@@ -47,3 +55,6 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["test"]
+
+[tool.uv.sources]
+visual-bge = { path = "third_party/FlagEmbedding/research/visual_bge", editable = true }

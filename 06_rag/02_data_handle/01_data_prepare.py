@@ -4,7 +4,7 @@
 from unstructured.partition.auto import partition
 
 # pdf 路径
-path = "/Users/mico/Desktop/book/Agent/_OceanofPDF.com_Building_Applications_with_AI_Agents_-_Michael_Albada.pdf"
+path = "data/《证券分析》本杰明•格雷厄姆.pdf"
 # 使用Unstructured加载并解析PDF文档
 elements = partition(
     filename=path,

@@ -21,6 +21,7 @@ from embedding.base import EmbeddingProvider
 from indexing.chunk_metadata import chunk_to_metadata
 from ingestion.storage import load_chunks_jsonl
 from vector_store.local import LocalVectorIndex
+from vector_store.milvus import MilvusVectorOpt
 from vector_store.vector_store_types import VectorRecord
 
 
@@ -95,3 +96,58 @@ def search_local_index(
         )
         for hit in hits
     ]
+
+
+def build_vector_db_index(
+    chunks_path: str | Path,
+    embedder: EmbeddingProvider,
+    dimension: int,
+    batch_size: int = 32,
+) -> MilvusVectorOpt:
+    """
+        1. 读 jsonl
+        2. 按 batch_size 调用 embed_documents
+        3. 每条写成 VectorRecord(id=chunk_id, text=content, metadata=..., embedding=...)
+        4. index.save()， 写入到 vector_db
+    """
+    if batch_size <= 0:
+        raise ValueError("batch_size must be greater than 0")
+
+    chunks = load_chunks_jsonl(chunks_path)
+    if not chunks:
+        raise ValueError(f"No chunks found in {chunks_path}")
+
+    vector_opt = MilvusVectorOpt(
+        milvus_uri="http://localhost:19530",
+        token="root:Milvus",
+        collection_name="vector_collection",
+        embedding_dim=dimension,
+    )
+
+
+    # 分批向量化：控制显存/内存占用，也便于观察进度
+    for start in range(0, len(chunks), batch_size):
+        batch = chunks[start : start + batch_size]
+        texts = [item["content"] for item in batch]
+        embeddings = embedder.embed_documents(texts)
+
+        # 防御性校验：向量数量必须与文本数量一致，否则记录会错位
+        if len(embeddings) != len(batch):
+            raise RuntimeError(
+                f"Embedding count mismatch: got {len(embeddings)}, expected {len(batch)}"
+            )
+
+        for chunk, embedding in zip(batch, embeddings):
+            print(f"insert: {chunk['chunk_id']}: {chunk['content']}")
+            vector_opt.add(
+                VectorRecord(
+                    id=chunk["chunk_id"],
+                    text=chunk["content"],
+                    metadata=chunk_to_metadata(chunk),
+                    embedding=embedding.vector,
+                )
+            )
+
+    vector_opt.save(path='')
+
+    return vector_opt

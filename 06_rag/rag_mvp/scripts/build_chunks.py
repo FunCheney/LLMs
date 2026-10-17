@@ -15,14 +15,14 @@ from ingestion.storage import save_chunks_jsonl
 
 
 def main():
-    pdf_path = Path("data/raw/Claude Code设计指南.pdf")
-    output_path = Path("data/processed/chunks.jsonl")
+    pdf_path = Path("data/raw/《证券分析》本杰明•格雷厄姆.pdf")
+    output_path = Path("data/processed/chunks_test.jsonl")
 
     # 解析 + 分块 + 校验（一条龙）
     chunks, report = ingest_document(
         path=pdf_path,
-        document_id="claude-code-0001",
-        document_title="Claude Code 设计指南",
+        document_id="证券分析-0001",
+        document_title="证券分析",
         chunk_size=500,
         overlap=50,
     )
