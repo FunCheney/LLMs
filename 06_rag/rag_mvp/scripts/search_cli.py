@@ -56,6 +56,11 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Torch device for SentenceTransformer, e.g. cpu or mps",
     )
+    parser.add_argument(
+        "--rerank",
+        action="store_true",
+        help="Rerank candidates with bge-reranker-v2-m3 (召回放大后精排)",
+    )
     return parser.parse_args()
 
 
@@ -66,6 +71,7 @@ def main() -> None:
         dense_index_path=args.dense_index,
         bm25_index_path=args.bm25_index,
         device=args.device,
+        reranker="bge" if args.rerank else None,
     )
 
     # 提前检查所需索引是否存在，给出「先跑哪个脚本」的提示，避免晦涩报错

@@ -66,6 +66,11 @@ def parse_args() -> argparse.Namespace:
         help="Only retrieve and print context, do not call the LLM",
     )
     parser.add_argument(
+        "--rerank",
+        action="store_true",
+        help="Rerank candidates with bge-reranker-v2-m3 before answering",
+    )
+    parser.add_argument(
         "--json",
         type=Path,
         default=None,
@@ -95,6 +100,7 @@ def main() -> None:
             dense_index_path=args.dense_index,
             bm25_index_path=args.bm25_index,
             device=args.device,
+            reranker="bge" if args.rerank else None,
         )
     )
 

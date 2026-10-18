@@ -120,6 +120,19 @@ uv run python scripts/ask_cli.py "MCP 是什么" --dry-run   # 只检索，不�
 
 交付物： 可重复运行的评估脚本和指标报告。
 
+当前进度：Golden 数据集 v2（30 题，gold 精确到 chunk_id）；检索侧指标
+Recall@1/3/5/10、MRR、nDCG@10 已实现并跑通；生成侧指标（正确率/Groundedness/Citation）待做。
+
+```bash
+# 检索评测（默认 dense/sparse/hybrid 三模式）
+rag-mvp golden --modes dense --k 10
+# 重排对比实验：每种模式额外跑一组「召回放大 + BGE Reranker 精排」
+rag-mvp golden --modes dense --rerank
+# 检索/问答时启用重排（BAAI/bge-reranker-v2-m3，首次会下载模型）
+rag-mvp search "MCP 是什么" --mode hybrid --rerank
+rag-mvp ask "MCP 是什么" --rerank
+```
+
 ---
 
 ### 统一命令行入口：`rag-mvp`
@@ -140,6 +153,6 @@ rag-mvp smoke --modes hybrid
 别名：`index` → `vector-index`，`bm25` → `bm25-index`，`build-chunks` → `chunks`。
 子命令的参数与对应脚本完全一致，用 `rag-mvp <command> --help` 查看。
 
-注意：子脚本内部使用 `data/...` 相对路径，所以必须在项目根目录执行；
-且 `embedding/__init__.py` 会提前加载 sentence-transformers/torch，
-导致子命令启动较慢（数十秒），这是模型依赖带来的固有开销。
+注意：子脚本内部使用 `data/...` 相对路径，所以必须在项目根目录执行。
+retrieval / reranker 等重依赖（torch、sentence-transformers）已做惰性导入，
+只有真正执行检索/问答/评测时才加载模型。

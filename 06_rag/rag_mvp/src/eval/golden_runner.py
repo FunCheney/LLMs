@@ -168,12 +168,16 @@ def run_golden_evaluation(
     dense_index_path: Path = Path("data/index/local.pkl"),
     bm25_index_path: Path = Path("data/index/bm25.pkl"),
     device: str | None = None,
+    use_reranker: bool = False,
+    rerank_model: str | None = None,
 ) -> tuple[GoldenEvaluationReport, list[str]]:
     """
     执行完整 Golden 检索评测，返回 (报告, 告警列表)。
 
     modes / top_k 为 None 时使用数据集 defaults 中的配置。
     实际检索条数取 max(top_k, 10)，保证 Recall@10 / nDCG@10 有足够样本。
+    use_reranker=True 时，每种模式额外跑一组「召回放大 + BGE 重排」的对比
+    （报告键为 "<mode>+rerank"），用于量化重排对排序质量的收益。
     """
     dataset = load_golden_dataset(dataset_path)
     warnings = _validate_corpus(dataset)
@@ -190,15 +194,22 @@ def run_golden_evaluation(
     positive = dataset.positive_queries
     negative_count = len(dataset.queries) - len(positive)
 
+    # (报告键, 检索模式, 是否重排)；重排模式下报告键加后缀，指标独立汇总
+    eval_plans: list[tuple[str, str, bool]] = [(m, m, False) for m in selected_modes]
+    if use_reranker:
+        eval_plans += [(f"{m}+rerank", m, True) for m in selected_modes]
+
     mode_reports: dict[str, GoldenModeReport] = {}
 
-    for mode in selected_modes:
+    for report_key, mode, with_rerank in eval_plans:
         retriever = create_retriever(
             RetrieverConfig(
                 mode=mode,
                 dense_index_path=dense_index_path,
                 bm25_index_path=bm25_index_path,
                 device=device,
+                reranker="bge" if with_rerank else None,
+                rerank_model=rerank_model,
             )
         )
 
@@ -208,8 +219,8 @@ def run_golden_evaluation(
             hits = retriever.retrieve(query.question, top_k=retrieve_top_k)
             query_results.append(_evaluate_query(query, hits, retrieve_top_k))
 
-        mode_reports[mode] = GoldenModeReport(
-            mode=mode,
+        mode_reports[report_key] = GoldenModeReport(
+            mode=report_key,
             top_k=retrieve_top_k,
             total=len(query_results),
             negative_count=negative_count,

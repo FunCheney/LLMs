@@ -47,6 +47,7 @@ SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 COMMANDS: dict[str, str] = {
     "chunks": "build_chunks.py",
     "build-chunks": "build_chunks.py",
+    "clean-chunks": "clean_chunks.py",
     "vector-index": "build_vector_index.py",
     "index": "build_vector_index.py",
     "bm25-index": "build_bm25_index.py",
@@ -61,13 +62,14 @@ COMMANDS: dict[str, str] = {
 # --help 里展示的规范命令与说明（别名不单独列出）
 _HELP_ROWS: list[tuple[str, str]] = [
     ("chunks", "解析文档 → data/processed/chunks.jsonl"),
+    ("clean-chunks", "清洗 chunks 脏数据（重复印刷/脏标题，先备份 .bak）"),
     ("vector-index", "构建稠密向量索引 → data/index/local.pkl（首次会拉 BGE-M3）"),
     ("bm25-index", "构建 BM25 稀疏索引 → data/index/bm25.pkl"),
-    ("search", "检索 Top-K 并打印 chunk 与元数据（--mode dense|sparse|hybrid）"),
-    ("ask", "RAG 问答并输出引用（需 DEEPSEEK_API_KEY，--dry-run 仅检索）"),
+    ("search", "检索 Top-K 并打印 chunk 与元数据（--mode dense|sparse|hybrid，--rerank 精排）"),
+    ("ask", "RAG 问答并输出引用（需 DEEPSEEK_API_KEY，--dry-run 仅检索，--rerank 精排）"),
     ("smoke", "运行 smoke 检索评测并写出报告"),
     ("qa-smoke", "Phase 3 生成链路冒烟：检索预检 / 问答落盘与自动检查"),
-    ("golden", "Phase 4 Golden 评测：Recall@K / MRR / nDCG（chunk_id 级）"),
+    ("golden", "Phase 4 Golden 评测：Recall@K / MRR / nDCG（--rerank 跑重排对比）"),
 ]
 
 # 别名 → 规范命令，仅用于提示

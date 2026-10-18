@@ -57,6 +57,16 @@ def parse_args() -> argparse.Namespace:
         default=None,
     )
     parser.add_argument(
+        "--rerank",
+        action="store_true",
+        help="Additionally evaluate each mode with bge-reranker (报告键 <mode>+rerank)",
+    )
+    parser.add_argument(
+        "--rerank-model",
+        default=None,
+        help="Custom reranker model (default: BAAI/bge-reranker-v2-m3)",
+    )
+    parser.add_argument(
         "--report",
         type=Path,
         default=Path("data/eval/reports/golden_latest.json"),
@@ -104,6 +114,8 @@ def main() -> None:
         dense_index_path=args.dense_index,
         bm25_index_path=args.bm25_index,
         device=args.device,
+        use_reranker=args.rerank,
+        rerank_model=args.rerank_model,
     )
 
     for warning in warnings:

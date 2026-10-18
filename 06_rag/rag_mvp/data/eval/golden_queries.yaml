@@ -1,13 +1,15 @@
-version: 1
+version: 2
 dataset_id: claude-code-design-guide-golden
 description: 'Phase 4 Golden Dataset：单知识库 Claude Code 设计指南的检索评测集。
 
-  gold 标注精确到 chunk_id（由 qa_smoke 的 expected_sections 映射生成）。
+  gold 标注精确到 chunk_id。v1 由 qa_smoke 的 expected_sections 映射生成（10 条）；
+  v2 在 chunks.jsonl 清洗（删重复印刷第十五章、修脏标题）后重映射，并扩充到 30 条，
+  覆盖概念/机制/配置/对比/口语化/列举/安全/场景/负例等类型。
 
-  用于计算 Recall@K / MRR / nDCG，对比 dense/sparse/hybrid 检索质量。'
+  用于计算 Recall@K / MRR / nDCG，对比 dense/sparse/hybrid/rerank 检索质量。'
 corpus:
   chunks_path: data/processed/chunks.jsonl
-  expected_chunk_count: 444
+  expected_chunk_count: 425
 defaults:
   top_k: 10
   modes:
@@ -70,9 +72,6 @@ queries:
   - token 使用量超过 95% 时进入 critical（必须立即/强制压缩）
   notes: 精确阈值题，重点核对 85% 和 95% 有无幻觉
   gold_chunk_ids:
-  - claude-code-0001-p117-p118-c254
-  - claude-code-0001-p118-p118-c255
-  - claude-code-0001-p124-p124-c270
   - claude-code-0001-p126-p127-c273
   - claude-code-0001-p127-p127-c274
   - claude-code-0001-p133-p133-c289
@@ -86,11 +85,6 @@ queries:
   - 找到压缩边界，保留最近 N 条（如最近 10 条）完整消息不压缩，将摘要与保留消息拼接
   notes: 算法原理题
   gold_chunk_ids:
-  - claude-code-0001-p118-p119-c256
-  - claude-code-0001-p119-p119-c257
-  - claude-code-0001-p119-p119-c258
-  - claude-code-0001-p119-p120-c259
-  - claude-code-0001-p120-p120-c260
   - claude-code-0001-p127-p128-c275
   - claude-code-0001-p128-p128-c276
   - claude-code-0001-p128-p128-c277
@@ -172,4 +166,237 @@ queries:
   expected_points:
   - 明确说明当前参考资料中没有足够依据，不利用模型自身知识回答 Kafka 机制
   notes: 库外负例题，必须触发 insufficient_evidence=true
+  gold_chunk_ids: []
+- id: golden-011
+  question: 什么是 Context Engineering？
+  tags:
+  - concept
+  expect_insufficient: false
+  expected_points:
+  - 系统性设计、构建和管理 AI 模型的输入上下文，以最大化输出质量
+  - 三个维度：内容（给什么信息）、结构（如何组织）、管理（有限 token 窗口内管理）
+  notes: 概念定义题
+  gold_chunk_ids:
+  - claude-code-0001-p096-p097-c200
+- id: golden-012
+  question: 什么是协调器模式？
+  tags:
+  - concept
+  - architecture
+  expect_insufficient: false
+  expected_points:
+  - 多代理系统中的架构模式
+  - 协调器负责任务分解、代理调度和结果整合，本身不执行具体工作
+  notes: 概念定义题
+  gold_chunk_ids:
+  - claude-code-0001-p147-p147-c321
+- id: golden-013
+  question: Skills 是什么？
+  tags:
+  - concept
+  expect_insufficient: false
+  expected_points:
+  - 预定义的提示模板，通过 /skill-name 命令调用
+  - 封装常用工作流（如 /commit），可加可选参数
+  notes: 概念定义题
+  gold_chunk_ids:
+  - claude-code-0001-p161-p161-c350
+- id: golden-014
+  question: 系统提示的缓存策略是怎么设计的？
+  tags:
+  - mechanism
+  expect_insufficient: false
+  expected_points:
+  - 利用 Claude API 的 Prompt Caching，系统提示不变时减少 token 消耗和延迟
+  - 稳定部分（核心指令、工具定义）放前面可缓存；动态部分（git status、CLAUDE.md）放后面不缓存
+  notes: 机制题，验收「稳定在前动态在后」
+  gold_chunk_ids:
+  - claude-code-0001-p106-p106-c222
+- id: golden-015
+  question: Memory 是怎么自动提取的？
+  tags:
+  - mechanism
+  expect_insufficient: false
+  expected_points:
+  - 触发条件：用户明确说「记住/记录」、纠正 Claude 行为、确认非显而易见的选择
+  - 自动生成带 name/type 的 Memory 文件（存于 ~/.claude/projects/.../memory/）
+  notes: 机制题
+  gold_chunk_ids:
+  - claude-code-0001-p112-p113-c245
+- id: golden-016
+  question: 任务系统的状态机有哪些状态？
+  tags:
+  - mechanism
+  - exact_name
+  expect_insufficient: false
+  expected_points:
+  - pending → running → completed / failed / killed
+  - 终态（completed/failed/killed）不可逆
+  notes: 状态机列举题
+  gold_chunk_ids:
+  - claude-code-0001-p135-p135-c293
+- id: golden-017
+  question: 流式处理中如何防止内存溢出？
+  tags:
+  - mechanism
+  - paraphrase
+  expect_insufficient: false
+  expected_points:
+  - 通过背压（Backpressure）机制
+  - 异步生成器的自然背压：消费方不 await，生产方就不会继续执行
+  notes: 口语化改写题（不直接说「背压」）
+  gold_chunk_ids:
+  - claude-code-0001-p066-p066-c144
+- id: golden-018
+  question: 如何配置 MCP 服务器？
+  tags:
+  - config
+  - exact_name
+  expect_insufficient: false
+  expected_points:
+  - 在 ~/.claude/settings.json 的 mcpServers 字段中添加
+  - 每个服务器配置 type/command/args/env 等字段
+  notes: 配置操作题
+  gold_chunk_ids:
+  - claude-code-0001-p157-p157-c343
+- id: golden-019
+  question: Claude Code 有哪几种权限模式？
+  tags:
+  - exact_name
+  - list
+  expect_insufficient: false
+  expected_points:
+  - 四种：default、acceptEdits、bypassPermissions、plan
+  - default 危险操作前询问；plan 只能生成计划不能执行
+  notes: 枚举题，与 golden-006（五层权限架构）区分
+  gold_chunk_ids:
+  - claude-code-0001-p088-p089-c184
+- id: golden-020
+  question: Snip Compact 是什么？
+  tags:
+  - feature_name
+  expect_insufficient: false
+  expected_points:
+  - HISTORY_SNIP feature flag 启用的精细化压缩策略
+  - 剪切特定片段（如已完成子任务的详细过程）而非压缩整个历史，保留更多有用上下文
+  notes: 专有功能题
+  gold_chunk_ids:
+  - claude-code-0001-p131-p131-c283
+- id: golden-021
+  question: CLAUDE.md 的 @ 引用语法有什么用？
+  tags:
+  - keyword
+  expect_insufficient: false
+  expected_points:
+  - 用 @ 语法引用项目中其他文件（如 @docs/api-spec.md、@prisma/schema.prisma）
+  - 避免重复维护已有文档
+  notes: 多 gold 题（语法说明 + 三个示例子块）
+  gold_chunk_ids:
+  - claude-code-0001-p111-p111-c240
+  - claude-code-0001-p112-p112-c241
+  - claude-code-0001-p112-p112-c242
+  - claude-code-0001-p112-p112-c243
+- id: golden-022
+  question: CLAUDE.md 和 Memory 该如何选择？
+  tags:
+  - compare
+  expect_insufficient: false
+  expected_points:
+  - 技术栈/代码规范/常用命令/外部文档引用 → CLAUDE.md
+  - 个人工作偏好/项目决策记录/行为反馈 → Memory（user/project/feedback 类型）
+  notes: 对比选择题
+  gold_chunk_ids:
+  - claude-code-0001-p115-p115-c249
+- id: golden-023
+  question: 插件、MCP 和 Skills 三种扩展机制有什么区别？
+  tags:
+  - compare
+  - cross_chapter
+  expect_insufficient: false
+  expected_points:
+  - 实现语言：插件 TypeScript / MCP 任意语言 / Skills Markdown
+  - 集成深度与适用场景：插件核心功能扩展、MCP 外部服务集成、Skills 工作流封装
+  notes: 三向对比题
+  gold_chunk_ids:
+  - claude-code-0001-p170-p170-c372
+- id: golden-024
+  question: Context Engineering 和 Prompt Engineering 有什么区别？
+  tags:
+  - compare
+  expect_insufficient: false
+  expected_points:
+  - Prompt Engineering 关注单个提示、单次交互、静态；Context Engineering 管理整个上下文、会话生命周期、动态构建
+  - Prompt Engineering 是 Context Engineering 的子集
+  notes: 对比题
+  gold_chunk_ids:
+  - claude-code-0001-p100-p100-c211
+- id: golden-025
+  question: 聊天机器人和 Agent 有什么关键差异？
+  tags:
+  - compare
+  expect_insufficient: false
+  expected_points:
+  - 输出：文本 vs 文本+动作；循环：单轮 vs 多轮（感知→决策→行动→观察）
+  - 状态：无状态 vs 有状态（文件系统、任务状态）；目标：回答问题 vs 完成任务
+  notes: 对比题
+  gold_chunk_ids:
+  - claude-code-0001-p039-p039-c078
+- id: golden-026
+  question: 怎么让 Claude Code 执行命令时不用每次都问我确认？
+  tags:
+  - colloquial
+  - config
+  expect_insufficient: false
+  expected_points:
+  - 用 claude /config 查看和调整权限配置
+  - 或用 claude --dangerously-skip-permissions 跳过权限（仅限受信任场景）
+  notes: 口语化提问，不直接说「权限模式」
+  gold_chunk_ids:
+  - claude-code-0001-p022-p022-c037
+  - claude-code-0001-p022-p022-c038
+  - claude-code-0001-p022-p022-c039
+- id: golden-027
+  question: Claude Code 的内置工具分为几大类？
+  tags:
+  - list
+  - exact_number
+  expect_insufficient: false
+  expected_points:
+  - 43 个内置工具，8 大类
+  - 文件操作、Shell 执行、代码智能、任务管理、多代理协作、计划模式、MCP 集成、扩展与其他
+  notes: 精确数字题，核对 43 和 8 有无幻觉
+  gold_chunk_ids:
+  - claude-code-0001-p078-p078-c166
+- id: golden-028
+  question: Claude Code 如何防御提示注入攻击？
+  tags:
+  - security
+  - mechanism
+  expect_insufficient: false
+  expected_points:
+  - 系统提示优先级：系统指令优先于用户内容中的「指令」
+  - 内容标记：工具结果被明确标记为 tool_result，与系统指令区分
+  notes: 安全机制题
+  gold_chunk_ids:
+  - claude-code-0001-p178-p179-c394
+- id: golden-029
+  question: 什么场景适合用协调器模式？
+  tags:
+  - scenario
+  expect_insufficient: false
+  expected_points:
+  - 适合：任务可分解为独立子任务、可并行、规模超出单代理上下文窗口、需要不同专业知识
+  - 不适合：任务简单、子任务高度耦合、对实时性要求高
+  notes: 场景判断题
+  gold_chunk_ids:
+  - claude-code-0001-p149-p149-c327
+- id: golden-030
+  question: 如何用 Claude Code 微调训练自己的大模型？
+  tags:
+  - negative
+  - out_of_domain
+  expect_insufficient: true
+  expected_points:
+  - 明确说明当前参考资料中没有足够依据，不利用模型自身知识编造训练方法
+  notes: 库外负例题（本书讲设计而非模型训练），必须触发 insufficient_evidence=true
   gold_chunk_ids: []
