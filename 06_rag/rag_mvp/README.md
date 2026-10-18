@@ -85,9 +85,19 @@ uv run python scripts/build_vector_index.py \
   --batch-size 32 \
   --device cpu
 
+# 2b. 向量库后端切换（--store-type local|milvus，默认 local）
+#   Milvus 服务：
+uv run python scripts/build_vector_index.py --store-type milvus --drop
+#   Milvus Lite（无需起服务，uri 传本地 .db 文件）：
+uv run python scripts/build_vector_index.py --store-type milvus \
+  --milvus-uri data/index/milvus.db --drop
+#   连接参数优先级：CLI > env（MILVUS_URI / MILVUS_TOKEN / MILVUS_COLLECTION）
+#   检索/问答/评测同样支持：--store-type milvus [--milvus-uri ... --collection ...]
+
 # 3. 检索
 uv run python scripts/search_cli.py "MCP 是什么" --k 5
 uv run python scripts/search_cli.py "CLAUDE.md 做什么" --k 3 --snippet 300
+uv run python scripts/search_cli.py "MCP 是什么" --store-type milvus  # 走 Milvus 后端
 ```
 
 ### Phase 3：问答与引用

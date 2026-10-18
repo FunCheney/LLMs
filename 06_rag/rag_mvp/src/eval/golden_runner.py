@@ -170,6 +170,10 @@ def run_golden_evaluation(
     device: str | None = None,
     use_reranker: bool = False,
     rerank_model: str | None = None,
+    store_type: str = "local",
+    milvus_uri: str | None = None,
+    milvus_token: str | None = None,
+    milvus_collection: str | None = None,
 ) -> tuple[GoldenEvaluationReport, list[str]]:
     """
     执行完整 Golden 检索评测，返回 (报告, 告警列表)。
@@ -178,6 +182,7 @@ def run_golden_evaluation(
     实际检索条数取 max(top_k, 10)，保证 Recall@10 / nDCG@10 有足够样本。
     use_reranker=True 时，每种模式额外跑一组「召回放大 + BGE 重排」的对比
     （报告键为 "<mode>+rerank"），用于量化重排对排序质量的收益。
+    store_type=milvus 时 dense/hybrid 走 Milvus 后端（可与 local 基线做双后端对齐验证）。
     """
     dataset = load_golden_dataset(dataset_path)
     warnings = _validate_corpus(dataset)
@@ -208,6 +213,10 @@ def run_golden_evaluation(
                 dense_index_path=dense_index_path,
                 bm25_index_path=bm25_index_path,
                 device=device,
+                store_type=store_type,
+                milvus_uri=milvus_uri,
+                milvus_token=milvus_token,
+                milvus_collection=milvus_collection,
                 reranker="bge" if with_rerank else None,
                 rerank_model=rerank_model,
             )

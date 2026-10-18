@@ -71,6 +71,15 @@ def parse_args() -> argparse.Namespace:
         help="Rerank candidates with bge-reranker-v2-m3 before answering",
     )
     parser.add_argument(
+        "--store-type",
+        choices=["local", "milvus"],
+        default="local",
+        help="Dense vector store backend (default: local)",
+    )
+    parser.add_argument("--milvus-uri", default=None, help="Milvus URI（Lite 传 .db 文件路径）")
+    parser.add_argument("--milvus-token", default=None, help="Milvus token")
+    parser.add_argument("--collection", default=None, help="Milvus collection 名")
+    parser.add_argument(
         "--json",
         type=Path,
         default=None,
@@ -82,8 +91,8 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    # 提前校验索引是否存在，给出可操作的修复提示
-    if args.mode in {"dense", "hybrid"} and not args.dense_index.exists():
+    # 提前校验索引是否存在，给出可操作的修复提示（milvus 后端跳过本地文件检查）
+    if args.store_type == "local" and args.mode in {"dense", "hybrid"} and not args.dense_index.exists():
         raise SystemExit(
             f"Dense index not found: {args.dense_index}\n"
             "Run: uv run python scripts/build_vector_index.py"
@@ -100,6 +109,10 @@ def main() -> None:
             dense_index_path=args.dense_index,
             bm25_index_path=args.bm25_index,
             device=args.device,
+            store_type=args.store_type,
+            milvus_uri=args.milvus_uri,
+            milvus_token=args.milvus_token,
+            milvus_collection=args.collection,
             reranker="bge" if args.rerank else None,
         )
     )

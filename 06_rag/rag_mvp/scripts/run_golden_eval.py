@@ -67,6 +67,15 @@ def parse_args() -> argparse.Namespace:
         help="Custom reranker model (default: BAAI/bge-reranker-v2-m3)",
     )
     parser.add_argument(
+        "--store-type",
+        choices=["local", "milvus"],
+        default="local",
+        help="Dense vector store backend (default: local；milvus 用于双后端对齐验证)",
+    )
+    parser.add_argument("--milvus-uri", default=None, help="Milvus URI（Lite 传 .db 文件路径）")
+    parser.add_argument("--milvus-token", default=None, help="Milvus token")
+    parser.add_argument("--collection", default=None, help="Milvus collection 名")
+    parser.add_argument(
         "--report",
         type=Path,
         default=Path("data/eval/reports/golden_latest.json"),
@@ -93,8 +102,8 @@ def main() -> None:
     if args.modes:
         modes = [mode.strip() for mode in args.modes.split(",") if mode.strip()]
 
-    # 按所选模式检查依赖的索引是否就绪
-    if args.dense_index.exists() is False and modes != ["sparse"]:
+    # 按所选模式检查依赖的索引是否就绪（milvus 后端跳过本地文件检查）
+    if args.store_type == "local" and args.dense_index.exists() is False and modes != ["sparse"]:
         if modes is None or "dense" in modes or "hybrid" in modes:
             raise SystemExit(
                 f"Dense index not found: {args.dense_index}\n"
@@ -116,6 +125,10 @@ def main() -> None:
         device=args.device,
         use_reranker=args.rerank,
         rerank_model=args.rerank_model,
+        store_type=args.store_type,
+        milvus_uri=args.milvus_uri,
+        milvus_token=args.milvus_token,
+        milvus_collection=args.collection,
     )
 
     for warning in warnings:

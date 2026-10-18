@@ -19,43 +19,69 @@ from retrieval.retriever import DenseRetriever
 
 @dataclass
 class RetrieverConfig:
-    """检索器配置：模式、索引路径、设备与候选放大倍数。"""
+    """检索器配置：模式、索引路径、向量库后端、设备与候选放大倍数。"""
     mode: str = "dense"
     dense_index_path: Path = Path("data/index/local.pkl")
     bm25_index_path: Path = Path("data/index/bm25.pkl")
     device: str | None = None
     candidate_multiplier: int = 2
+    # 向量库后端：local（本地 pickle，默认）| milvus（Milvus / Milvus Lite）
+    store_type: str = "local"
+    milvus_uri: str | None = None        # None 时用 VectorStoreConfig 的 env 默认值
+    milvus_token: str | None = None
+    milvus_collection: str | None = None
     # 重排序：None 表示不重排；目前支持 "bge"（BAAI/bge-reranker-v2-m3）
     reranker: str | None = None
     rerank_model: str | None = None       # 自定义 reranker 模型名（默认 bge-reranker-v2-m3）
     rerank_candidate_multiplier: int = 10  # 召回放大倍数（top_k * N，至少 20 条进精排）
 
 
+def _vector_store_config(config: RetrieverConfig) -> "VectorStoreConfig":
+    """把检索配置中的后端字段收敛为 VectorStoreConfig（未传字段走 env 默认值）。"""
+    from vector_store.config import VectorStoreConfig
+
+    kwargs: dict = {
+        "store_type": config.store_type,
+        "index_path": config.dense_index_path,
+    }
+    if config.milvus_uri is not None:
+        kwargs["uri"] = config.milvus_uri
+    if config.milvus_token is not None:
+        kwargs["token"] = config.milvus_token
+    if config.milvus_collection is not None:
+        kwargs["collection"] = config.milvus_collection
+    return VectorStoreConfig(**kwargs)
+
+
 def create_retriever(config: RetrieverConfig) -> Retriever:
     """
     按 config.mode 返回对应检索器；config.reranker 非空时再包一层重排。
 
-    注意：这里会无条件构建 BGE-M3（用于给查询编码），
-    即使 sparse 模式其实用不到 embedding，仍会加载模型，
-    属于已知的轻微浪费，后续可按 mode 做懒加载优化。
+    dense/hybrid 模式通过 vector_store.factory.open_reader 打开后端
+    （store_type=local 读本地 pickle；store_type=milvus 连 Milvus），
+    DenseRetriever 本身不感知后端差异。
+    sparse 模式不需要 embedding 与向量库，完全不加载模型/不连接 Milvus。
     """
     mode = config.mode.lower()
-    embedder = BGEM3EmbeddingProvider(device=config.device)
-    dense = DenseRetriever(
-        index_path=config.dense_index_path,
-        embedder=embedder,
-    )
 
-    if mode == "dense":
-        retriever: Retriever = dense
-    elif mode == "sparse":
-        retriever = SparseRetriever(index_path=config.bm25_index_path)
-    elif mode == "hybrid":
-        retriever = HybridRetriever(
-            dense_retriever=dense,
-            sparse_retriever=SparseRetriever(index_path=config.bm25_index_path),
-            candidate_multiplier=config.candidate_multiplier,
+    if mode == "sparse":
+        retriever: Retriever = SparseRetriever(index_path=config.bm25_index_path)
+    elif mode in {"dense", "hybrid"}:
+        from vector_store.factory import open_reader
+
+        embedder = BGEM3EmbeddingProvider(device=config.device)
+        dense = DenseRetriever(
+            store=open_reader(_vector_store_config(config)),
+            embedder=embedder,
         )
+        if mode == "dense":
+            retriever = dense
+        else:
+            retriever = HybridRetriever(
+                dense_retriever=dense,
+                sparse_retriever=SparseRetriever(index_path=config.bm25_index_path),
+                candidate_multiplier=config.candidate_multiplier,
+            )
     else:
         raise ValueError(f"Unsupported retriever mode: {config.mode}")
 
