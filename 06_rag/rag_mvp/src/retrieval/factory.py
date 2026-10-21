@@ -10,7 +10,6 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from embedding import BGEM3EmbeddingProvider
 from retrieval.base import Retriever
 from retrieval.spare_retriever import SparseRetriever
 from retrieval.hybrid import HybridRetriever
@@ -67,6 +66,9 @@ def create_retriever(config: RetrieverConfig) -> Retriever:
     if mode == "sparse":
         retriever: Retriever = SparseRetriever(index_path=config.bm25_index_path)
     elif mode in {"dense", "hybrid"}:
+        # 惰性导入：embedding 会连带加载 sentence-transformers/torch（很重），
+        # 只有真正构建 dense 检索器时才引入
+        from embedding import BGEM3EmbeddingProvider
         from vector_store.factory import open_reader
 
         embedder = BGEM3EmbeddingProvider(device=config.device)
