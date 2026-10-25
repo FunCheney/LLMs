@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+dist/
+build/
+
+# 工具缓存
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# 密钥与环境（绝不入库）
+.env
+.env.*
+!.env.example
+
+# 评测产物：只保留 history 汇总，不存原始大响应
+evals/**/tmp/

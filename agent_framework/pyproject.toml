@@ -1,29 +1,35 @@
-[project]
-name = "agent-framework"
-version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
-authors = [
-    { name = "XuLin", email = "Fchen" }
-]
-requires-python = ">=3.12"
-dependencies = [
-    "fastapi[standard]>=0.156.4",
-    "pydantic>=2.14.1",
-    "temporalio>=1.34.0",
-    "uvicorn[standard]>=0.54.0",
-]
+# workspace 根 —— 只做编排与工具配置，本身不产出包
+# 成员：packages/*（框架库）、apps/*（产品应用）
 
-[project.scripts]
-agent-server = "agent_framework.server:main"
-agent-worker = "agent_framework.worker:run_worker"
-
-[build-system]
-requires = ["uv_build>=0.12.0,<0.13.0"]
-build-backend = "uv_build"
+[tool.uv.workspace]
+members = ["packages/*", "apps/*"]
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
     "pytest>=9.1.1",
+    "pytest-asyncio>=1.0.0",
+    "httpx>=0.28.1",
+    "ruff>=0.9.0",
+    "mypy>=1.13.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["packages/agent_framework/tests", "apps/growth_agent/tests"]
+addopts = "-q --strict-markers"
+markers = [
+    "live: 需要真实 API 凭证的用例，默认跳过；显式执行 `uv run pytest -m live`",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["legacy"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["packages/agent_framework/src", "apps/growth_agent/src"]
+ignore_missing_imports = true
+warn_unused_ignores = true
