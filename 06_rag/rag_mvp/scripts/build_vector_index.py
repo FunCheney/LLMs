@@ -87,6 +87,8 @@ def main() -> None:
         kwargs["token"] = args.milvus_token
     if args.collection is not None:
         kwargs["collection"] = args.collection
+
+    # 根据参数初始化向量存储配置
     config = VectorStoreConfig(**kwargs)
 
     index = build_index(

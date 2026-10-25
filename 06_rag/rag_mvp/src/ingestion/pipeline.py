@@ -41,5 +41,6 @@ def ingest_document(
         source_uri=str(path),
         source_type=source_type,
     )
+    # 校验文本
     report = validate_chunks(chunks, chunk_size=chunk_size)
     return chunks, report

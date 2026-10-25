@@ -5126,7 +5126,6 @@ dependencies = [
     { name = "llama-index-llms-deepseek" },
     { name = "loguru" },
     { name = "omegaconf" },
-    { name = "pymilvus" },
     { name = "pymupdf" },
     { name = "pymysql" },
     { name = "python-dotenv" },
@@ -5137,6 +5136,11 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "unstructured", extra = ["pdf"] },
     { name = "visual-bge" },
+]
+
+[package.optional-dependencies]
+milvus = [
+    { name = "pymilvus" },
 ]
 
 [package.dev-dependencies]
@@ -5165,7 +5169,7 @@ requires-dist = [
     { name = "llama-index-llms-deepseek", specifier = ">=0.4.1" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "omegaconf", specifier = ">=2.3.1" },
-    { name = "pymilvus", specifier = ">=3.0.2" },
+    { name = "pymilvus", marker = "extra == 'milvus'", specifier = ">=3.0.2" },
     { name = "pymupdf", specifier = ">=1.28.2" },
     { name = "pymysql" },
     { name = "python-dotenv", specifier = ">=1.2.3" },
@@ -5177,6 +5181,7 @@ requires-dist = [
     { name = "unstructured", extras = ["pdf"], specifier = ">=0.27.25" },
     { name = "visual-bge", editable = "third_party/FlagEmbedding/research/visual_bge" },
 ]
+provides-extras = ["milvus"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=9.1.1" }]

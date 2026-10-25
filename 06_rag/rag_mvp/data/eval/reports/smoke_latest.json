@@ -1,6 +1,6 @@
 {
   "dataset_id": "claude-code-design-guide-smoke",
-  "timestamp": "2026-10-09T05:31:25.357116+00:00",
+  "timestamp": "2026-10-19T07:24:52.881789+00:00",
   "modes": {
     "dense": {
       "mode": "dense",
@@ -98,18 +98,18 @@
             "feature_name"
           ],
           "top_chunk_ids": [
-            "claude-code-0001-p124-p124-c270",
-            "claude-code-0001-p117-p118-c254",
             "claude-code-0001-p126-p127-c273",
             "claude-code-0001-p133-p133-c289",
-            "claude-code-0001-p121-p121-c263"
+            "claude-code-0001-p130-p130-c282",
+            "claude-code-0001-p133-p133-c288",
+            "claude-code-0001-p132-p132-c286"
           ],
           "top_section_titles": [
-            "15.13 小结",
-            "15.2 Auto-Compact 的触发机制",
             "15.2 Auto-Compact 的触发机制",
             "15.13 小结",
-            "15.6 Reactive Compact：响应式压缩"
+            "15.6 Reactive Compact：响应式压缩",
+            "15.12 设计启示：遗忘的艺术",
+            "15.10 手动压缩：/compact 命令"
           ]
         },
         {
@@ -123,18 +123,18 @@
             "semantic"
           ],
           "top_chunk_ids": [
-            "claude-code-0001-p118-p119-c256",
             "claude-code-0001-p127-p128-c275",
-            "claude-code-0001-p122-p123-c266",
             "claude-code-0001-p131-p132-c285",
-            "claude-code-0001-p120-p120-c260"
+            "claude-code-0001-p129-p129-c279",
+            "claude-code-0001-p131-p131-c283",
+            "claude-code-0001-p133-p133-c289"
           ],
           "top_section_titles": [
             "15.3 压缩的核心算法",
+            "15.9 压缩的 UI 反馈",
             "15.3 压缩的核心算法",
-            "15.9 压缩的 UI 反馈",
-            "15.9 压缩的 UI 反馈",
-            "15.3 压缩的核心算法"
+            "15.7 Snip Compact：精细化压缩",
+            "15.13 小结"
           ]
         },
         {
@@ -259,8 +259,8 @@
           ],
           "top_section_titles": [
             "2.9 多文件项目的最佳实践",
-            "没有上下文",
-            "否则，分析 git diff 生成 message",
+            "12.3 为什么 Context Engineering 如此重要",
+            "20.5 Skills 的参数传递",
             "7.5 Store 模式：函数式更新",
             "代码规范"
           ]
@@ -410,17 +410,17 @@
           ],
           "top_chunk_ids": [
             "claude-code-0001-p133-p133-c289",
-            "claude-code-0001-p117-p117-c252",
-            "claude-code-0001-p124-p124-c270",
             "claude-code-0001-p096-p097-c200",
-            "claude-code-0001-p198-p199-c435"
+            "claude-code-0001-p133-p133-c288",
+            "claude-code-0001-p198-p199-c435",
+            "claude-code-0001-p115-p116-c251"
           ],
           "top_section_titles": [
             "15.13 小结",
-            "Chapter 15",
-            "15.13 小结",
             "12.2 什么是 Context Engineering",
-            "26.2 技术趋势：更大的上下文窗口"
+            "15.12 设计启示：遗忘的艺术",
+            "26.2 技术趋势：更大的上下文窗口",
+            "14.12 小结"
           ]
         },
         {
@@ -429,23 +429,23 @@
           "expect_hit": true,
           "passed": true,
           "hit": true,
-          "rank_first_hit": 1,
+          "rank_first_hit": 2,
           "tags": [
             "semantic"
           ],
           "top_chunk_ids": [
-            "claude-code-0001-p145-p145-c317",
             "claude-code-0001-p096-p097-c200",
-            "claude-code-0001-p117-p117-c252",
-            "claude-code-0001-p122-p123-c266",
-            "claude-code-0001-p131-p132-c285"
+            "claude-code-0001-p145-p145-c317",
+            "claude-code-0001-p131-p132-c285",
+            "claude-code-0001-p042-p042-c084",
+            "claude-code-0001-p010-p010-c002"
           ],
           "top_section_titles": [
-            "17.8 多代理的调试挑战",
             "12.2 什么是 Context Engineering",
-            "Chapter 15",
+            "17.8 多代理的调试挑战",
             "15.9 压缩的 UI 反馈",
-            "15.9 压缩的 UI 反馈"
+            "6.1 QueryEngine 的职责",
+            "前言：为什么要读这本书"
           ]
         },
         {
@@ -489,15 +489,15 @@
             "claude-code-0001-p069-p069-c149",
             "claude-code-0001-p010-p010-c002",
             "claude-code-0001-p039-p040-c080",
-            "claude-code-0001-p145-p145-c317",
-            "claude-code-0001-p078-p078-c165"
+            "claude-code-0001-p078-p078-c165",
+            "claude-code-0001-p145-p145-c317"
           ],
           "top_section_titles": [
             "9.1 工具系统的核心问题",
             "前言：为什么要读这本书",
             "5.8 从工具调用到 Agent 系统",
-            "17.8 多代理的调试挑战",
-            "Chapter 10"
+            "Chapter 10",
+            "17.8 多代理的调试挑战"
           ]
         },
         {
@@ -720,17 +720,17 @@
             "feature_name"
           ],
           "top_chunk_ids": [
-            "claude-code-0001-p124-p124-c270",
             "claude-code-0001-p133-p133-c289",
-            "claude-code-0001-p124-p124-c269",
             "claude-code-0001-p133-p133-c288",
-            "claude-code-0001-p117-p118-c254"
+            "claude-code-0001-p198-p199-c435",
+            "claude-code-0001-p130-p130-c282",
+            "claude-code-0001-p126-p127-c273"
           ],
           "top_section_titles": [
             "15.13 小结",
-            "15.13 小结",
             "15.12 设计启示：遗忘的艺术",
-            "15.12 设计启示：遗忘的艺术",
+            "26.2 技术趋势：更大的上下文窗口",
+            "15.6 Reactive Compact：响应式压缩",
             "15.2 Auto-Compact 的触发机制"
           ]
         },
@@ -740,21 +740,21 @@
           "expect_hit": true,
           "passed": true,
           "hit": true,
-          "rank_first_hit": 3,
+          "rank_first_hit": 2,
           "tags": [
             "semantic"
           ],
           "top_chunk_ids": [
-            "claude-code-0001-p122-p123-c266",
             "claude-code-0001-p131-p132-c285",
-            "claude-code-0001-p118-p119-c256",
+            "claude-code-0001-p127-p128-c275",
+            "claude-code-0001-p096-p097-c200",
             "claude-code-0001-p145-p145-c317",
-            "claude-code-0001-p127-p128-c275"
+            "claude-code-0001-p129-p129-c279"
           ],
           "top_section_titles": [
             "15.9 压缩的 UI 反馈",
-            "15.9 压缩的 UI 反馈",
             "15.3 压缩的核心算法",
+            "12.2 什么是 Context Engineering",
             "17.8 多代理的调试挑战",
             "15.3 压缩的核心算法"
           ]
@@ -882,9 +882,9 @@
           "top_section_titles": [
             "2.9 多文件项目的最佳实践",
             "9.1 工具系统的核心问题",
-            "没有上下文",
+            "12.3 为什么 Context Engineering 如此重要",
             "12.2 什么是 Context Engineering",
-            "否则，分析 git diff 生成 message"
+            "20.5 Skills 的参数传递"
           ]
         }
       ],
