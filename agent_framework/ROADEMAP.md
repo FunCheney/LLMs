@@ -88,9 +88,9 @@ growth-agent/
 
 ### Week 1：LLM 适配层 + 首个纵向切片（P0）
 
-> 已展开为可执行清单：架构与契约见 `docs/architecture.md`，逐日任务与验收见 `docs/w1-tasks.md`。
+> 已展开为可执行清单：架构与契约见 `docs/architecture.md`，逐日任务与验收见 `docs/w1/w1-tasks.md`。
 
-- D1：调研 4 家 API 差异（鉴权/消息结构/tool call 格式/流式协议/usage/错误码）→ `docs/llm-api-matrix.md`；**同一天完成 capstone 立项**（仓库骨架 + README 目标 + DoD 抄进 README）
+- D1：调研 4 家 API 差异（鉴权/消息结构/tool call 格式/流式协议/usage/错误码）→ `docs/w1/` 下按厂商分文件（Anthropic.md / OpenAi.md / Deepseek.md / Qwen.md），总览与回填表在 `docs/w1/llm-api-matrix.md`；**同一天完成 capstone 立项**（仓库骨架 + README 目标 + DoD 抄进 README）
 - D2：内部类型与 `LLMClient` 抽象（chat / stream / capabilities / 统一 `StreamEvent`）
 - D3：`openai_compat.py`（覆盖 OpenAI/Qwen/DeepSeek/Ollama）+ `anthropic.py` + `mock.py`
 - D4：tool calling 双向归一化；`POST /v1/chat` 支持 stream / 非 stream

@@ -21,7 +21,7 @@
 **这天的价值不在代码，在于"先把差异看清"——它决定 Week 4 的归一化写到什么粒度。**
 仓库骨架已于 2026-10-25 搭好并实测通过，今天只剩调研 + 提交两件事。
 
-### T1.1 产出 `docs/llm-api-matrix.md`（60–80 分钟）
+### T1.1 产出 `docs/w1/llm-api-matrix.md`（60–80 分钟）
 
 对 OpenAI / Anthropic / DeepSeek / Qwen 四家，逐项填表（**必须打开官方文档核对，不许凭记忆**）：
 
@@ -66,7 +66,7 @@
 
 ### 🔍 Gate 1（交给我 review）
 我会看：矩阵表的完整度与结论质量（**有没有"结论"，还是只抄了文档**）、四家是否真的都核对了流式 tool_call 拼装方式。
-**你要给我**：`docs/llm-api-matrix.md` 全文 + 父仓库里这次提交的 `git show --stat`。
+**你要给我**：`docs/w1/llm-api-matrix.md` 全文 + 父仓库里这次提交的 `git show --stat`。
 
 ---
 
@@ -76,7 +76,8 @@
 
 ### T2.1 `llm/types.py`
 - [ ] Message / ContentBlock（占位即可）/ ToolSpec / ToolCall / ToolResult（占位）/ Usage / LLMResponse / StreamEvent
-- [ ] `finish_reason` 用枚举，含 `unknown` 兜底 + `raw_finish_reason` 字段
+- [ ] `finish_reason` 用枚举，含 `unknown` 兜底 + `raw_finish_reason` 字段；**枚举值按 `llm-api-matrix.md` §5 扩展为** `stop / length / tool_calls / content_filter / aborted / upstream_error`（DeepSeek 的 `insufficient_system_resource` 绝不能落进 `stop`）
+- [ ] **`Message.provider_meta: dict | None`（ADR-007）**——承载 `reasoning_content` / Anthropic `thinking.signature` 这类"框架不解释、必须原样还给上游"的字段；文档字符串写清"业务层只整体传递，禁止构造与解读"
 - [ ] 校验规则落地：`tool` 消息必须有 `tool_call_id`；`assistant` 有 tool_calls 时 content 可为空；`system` 只能在首条
 - [ ] ToolCall 的 `arguments` 恒为 dict，`arguments_error` 记录解析失败
 - [ ] **不 import 任何 provider / httpx**
@@ -88,7 +89,7 @@
 ### T2.3 `llm/base.py`
 - [ ] `Capability` 枚举：stream / tools / parallel_tools / json_mode / vision / prompt_caching
 - [ ] `LLMClient` 抽象：`name`、`capabilities`、`chat()`、`stream()`
-- [ ] 定义"能力不足时怎么办"：**由 client 在调用前校验并抛 `CapabilityError`**，不是 adapter 内部静默降级
+- [ ] 定义"能力不足时怎么办"：**硬需求（如要求 tools 而模型不支持）由 client 抛 `CapabilityError`**；**软策略（`tool_choice: required`、并行）则由 adapter 降级 + 记 `*_downgraded` 日志**，不抛异常——两者不要混为一谈
 
 ### T2.4 单测（先写再实现，允许红）
 - [ ] 每条校验规则 1 条用例（正/反各一）
@@ -107,6 +108,8 @@
 - [ ] 差异开关用**配置里的 capability / feature flag** 表达，不许 `if "deepseek" in base_url` 这种硬编码分支（review 会卡这条）
 - [ ] 双向翻译：Message↔messages、ToolSpec↔tools、响应→LLMResponse、SSE→StreamEvent
 - [ ] tool_call 增量按 `index` 累加拼装（ADR-002）
+- [ ] **四处三家里不一致的点必须数据驱动**（详见 `llm-api-matrix.md` §0 结论表）：① usage 一律"任何 chunk `usage` 非空就覆盖式记录"，不看 `choices`；② `parallel_tool_calls` **永远显式发送**（Qwen 默认 false、DeepSeek 无此参数）；③ `tool_choice` 按能力降级；④ 错误映射按 `code` 字符串白名单（`insufficient_quota` / `Arrearage` / `402` / `422`）
+- [ ] SSE 解析要跳过三种行：空行、`:` 开头的心跳注释（**DeepSeek 会发**）、`event:` 行
 
 ### T3.2 `providers/anthropic.py`
 - [ ] system 提到顶层参数；tool 结果转 user 消息内的 block；`input_schema` 映射
@@ -194,7 +197,7 @@
 
 | 产出 | 位置 |
 |---|---|
-| 差异矩阵 | `docs/llm-api-matrix.md` |
+| 差异矩阵 | `docs/w1/llm-api-matrix.md` |
 | 契约与抽象 | `packages/agent_framework/src/agent_framework/llm/{types,errors,base}.py` |
 | 3 适配器 | `.../llm/providers/{openai_compat,anthropic,mock}.py` |
 | 客户端/路由/配置 | `.../llm/{client,registry,router}.py` + `config.py` + `models.yaml` |

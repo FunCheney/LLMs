@@ -1,7 +1,7 @@
 # growth-agent
 
 > 12 周产出的**一个**生产级 Agent 项目：从「主题」到「深度调研 → SEO 文章 → 多平台文案」，全链路可评测、可观测、可降级。
-> 学习计划见 [`ROADEMAP.md`](./ROADEMAP.md)，架构契约见 [`docs/architecture.md`](./docs/architecture.md)，本周任务见 [`docs/w1-tasks.md`](./docs/w1-tasks.md)。
+> 学习计划见 [`ROADEMAP.md`](./ROADEMAP.md)，架构契约见 [`docs/architecture.md`](./docs/architecture.md)，本周任务见 [`docs/w1/w1-tasks.md`](./docs/w1/w1-tasks.md)，各厂商 API 差异见 [`docs/w1/`](./docs/w1/)。
 
 ## 生产级 DoD（12 周后逐条自评）
 
