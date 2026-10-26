@@ -103,6 +103,8 @@
 
 ## Day 3（3h）· 两个真适配器 + mock
 
+> **详细设计见 [`w1-day3.md`](./w1-day3.md)**：三段式拆分（build_request / parse_response / 组装器）、ToolCallAssembler 状态机、A1–A8 断言、夹具目录约定、3 小时时间盒、Gate 2 验收与打回清单。本节只保留任务勾选项。
+
 ### T3.1 `providers/openai_compat.py`
 - [ ] 一个类吃掉 OpenAI / DeepSeek / Qwen / Ollama（靠 base_url + 差异开关）
 - [ ] 差异开关用**配置里的 capability / feature flag** 表达，不许 `if "deepseek" in base_url` 这种硬编码分支（review 会卡这条）

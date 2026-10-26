@@ -162,7 +162,7 @@ data: [DONE]
 | HTTP | code / 场景 | 内部异常 | 可重试 |
 |---|---|---|---|
 | 400 | `InvalidParameter` | `BadRequestError` | ❌ |
-| **400 / 403** | **`Arrearage`（欠费）** | `UpstreamQuotaError` | **❌** |
+| **400 / 403** | **`Arrearage`（欠费）** | `UpstreamAuthError` | **❌** |
 | 401 | `InvalidApiKey` | `UpstreamAuthError` | ❌ |
 | 404 | `model_not_found` | `BadRequestError` | ❌ |
 | 429 | `Throttling.*`（上表三兄弟） | `RateLimitError` | ✅ |
@@ -172,7 +172,7 @@ data: [DONE]
 **结论（本家最反直觉的一条）**：**欠费不是 429，是 400/403 的 `Arrearage`**。OpenAI 是 429 `insufficient_quota`、DeepSeek 是 402 —— **三家三个位置**。→ 错误映射**必须按 `code` 字符串判断，不能按状态码**。这是 `openai_compat.py` 里唯一必须硬编码 `code` 白名单的地方：
 
 ```text
-insufficient_quota | Arrearage | BIL.UserArrears  →  UpstreamQuotaError（不可重试）
+insufficient_quota | Arrearage | BIL.UserArrears  →  UpstreamAuthError（retryable=False，对外 502 UPSTREAM_AUTH）
 ```
 
 **坑**：欠费/额度耗尽被当成普通 400 参数错误 → 上层会提示"你的请求参数有误"，用户改半天参数也没用。这类错误文案必须能区分。

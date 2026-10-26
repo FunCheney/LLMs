@@ -190,7 +190,7 @@ cost = hit_tokens × p_in_cache + miss_tokens × p_in + completion_tokens × p_o
 |---|---|---|---|
 | 400 | 请求体格式错误（含 `reasoning_content` 未回传） | `BadRequestError` | ❌ |
 | 401 | API Key 错误 | `UpstreamAuthError` | ❌ |
-| **402** | **余额不足** | `UpstreamQuotaError` | **❌** |
+| **402** | **余额不足** | `UpstreamAuthError` | **❌** |
 | **422** | **参数错误** | `BadRequestError` | ❌ |
 | 429 | 并发/速率超限 | `RateLimitError` | ✅ |
 | 500 | 服务内部故障 | `UpstreamServerError` | ✅ |
@@ -198,7 +198,7 @@ cost = hit_tokens × p_in_cache + miss_tokens × p_in + completion_tokens × p_o
 
 **结论（三条都是归一化必改的）**：
 
-1. **`402` 是独立语义**：OpenAI 把"余额耗尽"塞进 429（`insufficient_quota`），DeepSeek 单独给 402。→ 内部统一 `UpstreamQuotaError`，**HTTP 层映射 402 给调用方**，**不可重试**
+1. **`402` 是独立语义**：OpenAI 把"余额耗尽"塞进 429（`insufficient_quota`），DeepSeek 单独给 402。→ 统一归 **`UpstreamAuthError`**（`retryable=False`，对外 502 `UPSTREAM_AUTH`，见 `architecture.md` §3.6），**不为它新建异常类**——类爆炸会让上层 `except` 分支失控
 2. **`422` 是参数错误**：OpenAI 用 400、DeepSeek 用 422。→ `openai_compat` 的错误映射表必须同时收 400 和 422，否则参数错误会被当成"未知 5xx"重试三次
 3. **429 没有 `retry-after`**：这就是 ADR-003「退避不能只依赖 header」的第二个证据（第一个是 Anthropic 的 529）
 
