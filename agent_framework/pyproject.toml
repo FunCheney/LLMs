@@ -16,6 +16,8 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["packages/agent_framework/tests", "apps/growth_agent/tests"]
 addopts = "-q --strict-markers"
+# 适配器测试全是 async：auto 模式省掉每个用例的 @pytest.mark.asyncio
+asyncio_mode = "auto"
 markers = [
     "live: 需要真实 API 凭证的用例，默认跳过；显式执行 `uv run pytest -m live`",
 ]

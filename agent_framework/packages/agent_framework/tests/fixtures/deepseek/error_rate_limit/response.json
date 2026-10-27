@@ -1,0 +1,7 @@
+{
+  "error": {
+    "message": "Concurrent requests exceeded your limit",
+    "type": "rate_limit_error",
+    "code": "rate_limit_exceeded"
+  }
+}

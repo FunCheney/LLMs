@@ -1,7 +1,4 @@
 import pytest
-from pydantic import ValidationError
-
-
 from agent_framework.llm.types import (
     Conversation,
     FinishReason,
@@ -11,6 +8,7 @@ from agent_framework.llm.types import (
     ToolCall,
     normalize_finish_reason,
 )
+from pydantic import ValidationError
 
 
 def test_tool_message_requires_tool_call_id():
@@ -78,8 +76,8 @@ def test_invalid_tool_arguments_are_recorded():
     assert tool_call.arguments_error is not None
 
 
-def test_unknown_finish_reason_is_preserved():
-    raw = "insufficient_system_resource"
+def test_unknown_finish_reason_keeps_raw_value() -> None:
+    raw = "some_vendor_specific_reason"
 
     response = LLMResponse(
         message=Message(
@@ -93,3 +91,12 @@ def test_unknown_finish_reason_is_preserved():
     assert response.finish_reason == FinishReason.UNKNOWN
     assert response.raw_finish_reason == raw
     assert response.finish_reason != FinishReason.STOP
+
+
+def test_deepseek_resource_exhaustion_is_not_success() -> None:
+    """半截回答绝不能被当成 stop：A5 要求落到 upstream_error。"""
+
+    reason = normalize_finish_reason("insufficient_system_resource")
+
+    assert reason == FinishReason.UPSTREAM_ERROR
+    assert reason != FinishReason.STOP

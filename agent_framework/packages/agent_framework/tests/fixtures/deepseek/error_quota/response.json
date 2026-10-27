@@ -1,0 +1,7 @@
+{
+  "error": {
+    "message": "Insufficient Balance",
+    "type": "insufficient_quota",
+    "code": "insufficient_quota"
+  }
+}

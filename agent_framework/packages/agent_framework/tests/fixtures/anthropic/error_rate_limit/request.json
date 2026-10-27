@@ -1,0 +1,30 @@
+{
+  "model": "claude-test",
+  "max_tokens": 512,
+  "system": "你是研究助手，只回答可验证的事实。",
+  "messages": [
+    {
+      "role": "user",
+      "content": "帮我查一下 MCP 协议的最新进展"
+    }
+  ],
+  "tools": [
+    {
+      "name": "search_web",
+      "description": "当需要最新外部信息时使用；不要用于纯计算或改写。",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "检索关键词"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

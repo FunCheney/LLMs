@@ -1,0 +1,37 @@
+{
+  "model": "gpt-test",
+  "messages": [
+    {
+      "role": "system",
+      "content": "你是研究助手，只回答可验证的事实。"
+    },
+    {
+      "role": "user",
+      "content": "帮我查一下 MCP 协议的最新进展"
+    }
+  ],
+  "max_tokens": 512,
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "search_web",
+        "description": "当需要最新外部信息时使用；不要用于纯计算或改写。",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "检索关键词"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "parallel_tool_calls": true
+}

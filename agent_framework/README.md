@@ -35,7 +35,7 @@
 
 ```bash
 uv sync                          # 安装 workspace 全部成员 + dev 依赖
-uv run pytest                    # 骨架冒烟测试（离线，无网络调用）
+uv run pytest                    # 136 个离线用例（含 conformance A1–A8，零网络调用）
 uv run ruff check . && uv run mypy
 
 uv run agent-server              # 框架服务  http://127.0.0.1:8000/health
@@ -45,8 +45,10 @@ uv run growth-agent              # 产品服务  http://127.0.0.1:8100/health
 ## 当前状态
 
 - [x] **W1 Day1**：uv workspace 结构就位，两个包可启停，冒烟测试与静态检查通过
-- [ ] W1 Day2：契约层（types / errors / base）+ 单测
-- [ ] W1 Day3：openai_compat / anthropic / mock 三个适配器 + conformance 套件
+- [x] **W1 Day2**：契约层（types / errors / base）+ 单测
+- [x] **W1 Day3**：openai_compat / anthropic / mock 三个适配器 + conformance A1–A8 全绿
+  - 夹具仍是手写的（`meta.synthetic = true`），Day5 用真机录制替换后才算 W1 验收闭环
+  - 详见 [`docs/w1/w1-day3.md`](./docs/w1/w1-day3.md) §11「实现状态」
 - [ ] W1 Day4：client / registry / router / config + `POST /v1/chat`（SSE）
 - [ ] W1 Day5：真机验证、录制夹具、基线对比表
 

@@ -1,0 +1,5 @@
+{
+  "code": "Throttling",
+  "message": "Requests rate limit exceeded, please try again later.",
+  "request_id": "req_fixture_qwen"
+}

@@ -1,0 +1,19 @@
+{
+  "synthetic": true,
+  "recorded_at": null,
+  "note": "手写协议样本，Day5 用真机录制替换",
+  "status_code": 200,
+  "expect": {
+    "text": "我先检索一下最新进展。",
+    "finish_reason": "tool_calls",
+    "tool_calls": [
+      {
+        "name": "search_web",
+        "arguments": {
+          "query": "MCP 协议 最新进展"
+        }
+      }
+    ],
+    "usage_estimated": false
+  }
+}

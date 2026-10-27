@@ -333,3 +333,60 @@ fixtures/<provider>/<case>/
 | `flags: dict` 注入 | 构造函数可选参数 | `models.yaml` → `registry.py` 组装 |
 
 > 今天结束时的判据：**换一家 provider，只改一个文件。** 如果为了接 Anthropic 你动了 `types.py` 或计划改 `client.py`，说明边界漏了。
+
+---
+
+## 11. 实现状态（Day3 收尾实录）
+
+> 本节由实现方回填，用于 Gate 2 逐条核对。**与设计不一致的地方全部列在 §11.2，不藏。**
+
+### 11.1 产出清单
+
+| 产出 | 状态 | 文件 | 总行 / 有效代码 |
+|---|---|---|---|
+| 三家共用的纯函数 | ✅ | `providers/_common.py` | 359 / 220 |
+| OpenAI 兼容（含 DeepSeek / Qwen） | ✅ | `providers/openai_compat.py` | 793 / 560 |
+| Anthropic | ✅ | `providers/anthropic.py` | 702 / 540 |
+| mock 回放器 | ✅ | `providers/mock.py` | 139 / 101 |
+| 夹具（4 家 × 6 case） | ✅ 手写 | `tests/fixtures/{openai,deepseek,qwen,anthropic}/` | 80 个文件 |
+| 夹具生成器（可重生成） | ✅ | `tests/fixtures/_generate_fixtures.py` | — |
+| conformance A1–A8 | ✅ 全绿 | `tests/test_conformance.py` | 29 个用例 |
+| 单家细节测试 | ✅ | `tests/test_openai_compat.py` / `test_anthropic.py` | 51 + 21 个用例 |
+| `client.py` / `registry.py` / `router.py` / `models.yaml` | ⬜ Day4 | — | — |
+
+### 11.2 与设计的六处偏差（均已确认是改进，不是妥协）
+
+| # | 偏差 | 原因 |
+|---|---|---|
+| 1 | `StreamEventType` 删掉 `tool_call_start` / `tool_call_delta`，只留 `tool_call` | ADR-002 规定增量由 adapter 组装后**单次发出**；留 delta 类型等于给上层"可以自己拼"的错觉 |
+| 2 | `Capability.PARALLEL_TOOLS` 只在 `send_parallel_tool_calls is True` 时声明 | `None` 表示厂商没有这个开关（DeepSeek）。声称支持却拿到串行结果，比不声称更糟 |
+| 3 | `preserve_reasoning_content` 用三态枚举 + `reasoning_replay_override` | bool 表达不了 Qwen "3.7 不回传 / 3.8 必须回传"；`per_model` 由 Day4 registry 按模型解析后注入 |
+| 4 | `errors.py` 类名按 architecture §3.6 重命名 | `AuthenticationError→UpstreamAuthError`、`InvalidRequestError→BadRequestError`、`LLMTimeoutError→UpstreamTimeoutError`、`UpstreamError→UpstreamServerError`，并补 `ContentFilteredError` |
+| 5 | `types.py` 补齐 `ToolChoice` / `Usage.estimated` / `ToolCall.raw_arguments` / `LLMResponse.provider`、`latency_ms`、`text`、`tool_calls` | architecture §3.3 / §3.4 要求，Day2 缺失 |
+| 6 | 行数超预算（793 / 702 vs 250–320 / 200–260） | 超出部分是 flags 表、逐字段防御性解析与 docstring；**不含 client 职责**——`grep -rn "sleep\|retry\|logger\.\|cost" providers/` 为空 |
+
+### 11.3 验收结果（可复现）
+
+```text
+uv run pytest            → 136 passed（全部离线，零真实调用）
+uv run ruff check .      → All checks passed
+uv run mypy              → Success: no issues found in 15 source files
+grep sleep|retry|backoff providers/        → 空
+grep logger.|cost|price  providers/        → 空
+grep "from ..client|..config|..registry" providers/ → 空
+```
+
+**A8 反向验证**（证明断言真的会红）：在 `openai_compat.chat()` 里多插一次 `await self._http.post(...)` →
+`test_a8_chat_sends_exactly_one_request` 的 openai / deepseek / qwen **3 个变红**，anthropic 保持绿
+（说明断言只对"被改的路径"敏感，不是全局误报）；还原后 4 个全绿。
+
+### 11.4 仍未闭环的三件事
+
+| 事项 | 谁负责 | 何时 |
+|---|---|---|
+| 手写夹具换成真机录制（`meta.synthetic` 改 false） | Day5 `-m live` 跑一遍 | 本周末 |
+| `request.json` 用真机抓包复核（现在按文档手写） | Day5 | 本周末 |
+| Anthropic 欠费识别依赖文案 `credit balance` | Day5 真机确认后收敛成固定 code | 本周末 |
+
+> Day5 的第一件事应该是：真机跑 `text_basic` / `tool_call_basic` 各一次，把 `stream.txt` 逐字节替换，
+> 然后**重跑 conformance**。如果换成真录制后 A1/A3 变红，说明手写夹具与真实协议存在偏差——那正是这套套件的价值所在。

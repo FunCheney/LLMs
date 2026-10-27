@@ -1,12 +1,69 @@
+"""异常层次与错误映射（契约见 docs/architecture.md §3.6）。
+
+两条纪律：
+
+1. **映射只写在这里**。adapter 只负责从响应体里取出 (status_code, code, message)，
+   然后调用 map_provider_error()。绝不在 adapter 里写 if status == 429。
+2. **对外 HTTP 状态码由这里的类决定**，不由 adapter 决定。上游鉴权失败映射 502
+   而不是 401（ADR-005）——我方 401 只表示"调用方没通过我方鉴权"。
+"""
+
 from dataclasses import dataclass
 from typing import Any
+
+# 各家的"欠费"落在不同状态码上（OpenAI 429 / DeepSeek 402 / Qwen 400-403 / Anthropic 400），
+# 按状态码分类必然出错，只能按 code 或错误文案再兜一层。
+_QUOTA_CODES = frozenset(
+    {
+        "insufficient_quota",
+        "arrearage",
+        "bil.userarrears",
+    }
+)
+
+_AUTH_CODES = frozenset(
+    {
+        "invalid_api_key",
+        "authentication_error",
+        "permission_denied",
+        "account_deactivated",
+    }
+)
+
+_RATE_LIMIT_CODES = frozenset(
+    {
+        "rate_limit_exceeded",
+        "throttling",
+        "requests rate limit exceeded",
+        "allocated quota exceeded",
+        "request rate increased too quickly",
+        "overloaded_error",
+    }
+)
+
+_CONTENT_FILTER_CODES = frozenset(
+    {
+        "content_filter",
+        "content_policy_violation",
+        "refusal",
+    }
+)
+
+# Anthropic 的余额不足没有独立 code，只能靠文案识别。
+# W1 先按文案兜底，Day5 真机录制后收敛成固定 code。
+_QUOTA_MESSAGE_HINTS = (
+    "credit balance",
+    "insufficient balance",
+    "arrearage",
+    "欠费",
+    "余额",
+)
 
 
 @dataclass(frozen=True, slots=True)
 class ErrorContext:
-    """
-    一次 LLM 错误请求的公共上下文
-    """
+    """一次 LLM 错误的公共上下文。"""
+
     provider: str | None = None
     model: str | None = None
     status_code: int | None = None
@@ -14,23 +71,25 @@ class ErrorContext:
     request_id: str | None = None
 
 
-
 class LLMError(Exception):
     """LLM 客户端基础异常。"""
-    default_retryable = False
 
-    def __init__(self,
-                 message: str,
-                 *,
-                 provider: str,
-                 model: str,
-                 status_code: int,
-                 retry_after: float,
-                 request_id: str,
-                 retryable: bool,
-                 raw_error: Any
-            ):
+    default_retryable: bool = False
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        provider: str,
+        status_code: int | None = None,
+        model: str | None = None,
+        retry_after: float | None = None,
+        request_id: str | None = None,
+        retryable: bool | None = None,
+        raw_error: Any = None,
+    ) -> None:
         super().__init__(message)
+
         self.context = ErrorContext(
             provider=provider,
             model=model,
@@ -38,7 +97,8 @@ class LLMError(Exception):
             retry_after=retry_after,
             request_id=request_id,
         )
-        # 直接暴露公共字段，方便调用方访问。
+
+        # 直接暴露公共字段，方便日志与 HTTP 响应复用。
         self.provider = provider
         self.model = model
         self.status_code = status_code
@@ -46,128 +106,140 @@ class LLMError(Exception):
         self.request_id = request_id
 
         # 未显式指定时，采用异常类的默认策略。
-        self.retryable = (
-            self.default_retryable
-            if retryable is None
-            else retryable
-        )
+        self.retryable = self.default_retryable if retryable is None else retryable
 
-        # 可选的原始错误信息，供日志和排查使用。
+        # 可选的原始错误信息，供日志与排查使用。
         self.raw_error = raw_error
 
 
-
-
-class AuthenticationError(LLMError):
-    """认证失败，例如 API Key 无效。"""
+class UpstreamAuthError(LLMError):
+    """上游鉴权失败或欠费（ADR-005：对外 502，不是 401）。"""
 
 
 class RateLimitError(LLMError):
-    """请求频率或配额限制。"""
+    """请求频率或配额限流（可重试）。"""
 
     default_retryable = True
 
 
-class InvalidRequestError(LLMError):
-    """请求参数无效或不符合 API 要求。"""
+class UpstreamTimeoutError(LLMError):
+    """连接或首 token 超时（可重试）。"""
+
+    default_retryable = True
+
+
+class BadRequestError(LLMError):
+    """请求参数无效或不符合 API 要求（不可重试）。"""
+
+
+class ContentFilteredError(LLMError):
+    """内容被上游拦截（不可重试）。"""
+
+
+class UpstreamServerError(LLMError):
+    """上游服务异常、资源不足或网络错误（可重试）。"""
+
+    default_retryable = True
 
 
 class CapabilityError(LLMError):
-    """客户端不支持调用方要求的能力。"""
+    """客户端或模型不支持调用方要求的能力（不可重试）。"""
 
 
-class LLMTimeoutError(LLMError):
-    """请求超时。"""
-
-    default_retryable = True
-
-
-class UpstreamError(LLMError):
-    """上游服务异常、网络错误或其他未分类错误。"""
-
-
-
-def map_status_code(
-    status_code: int,
-) -> type[LLMError]:
-    """将通用 HTTP 状态码映射到内部异常类。
-
-    这里只负责分类，不创建异常实例。
-    不同供应商的特殊错误码应在 map_provider_error() 中处理。
-    """
+def map_status_code(status_code: int) -> type[LLMError]:
+    """将 HTTP 状态码映射到内部异常类（只做分类，不创建实例）。"""
 
     if status_code in (401, 403):
-        return AuthenticationError
+        return UpstreamAuthError
+
+    # 402 是 DeepSeek 的"余额不足"，语义等价于 401/403 的上游凭证失效。
+    if status_code == 402:
+        return UpstreamAuthError
 
     if status_code == 429:
         return RateLimitError
 
-    if status_code in (400, 404, 413, 422):
-        return InvalidRequestError
-
     if status_code in (408, 504):
-        return LLMTimeoutError
+        return UpstreamTimeoutError
 
+    # Anthropic 用 529 表示过载，与 5xx 同语义且可重试。
     if status_code >= 500:
-        return UpstreamError
+        return UpstreamServerError
 
-    return UpstreamError
+    if 400 <= status_code < 500:
+        return BadRequestError
 
+    return UpstreamServerError
+
+
+def _matches_message_hint(message: str) -> bool:
+    """欠费类错误没有统一 code 时，按文案兜底识别。"""
+
+    lowered = message.lower()
+
+    return any(hint in lowered for hint in _QUOTA_MESSAGE_HINTS)
 
 
 def map_provider_error(
     *,
     provider: str,
-    model: str | None = None,
+    message: str = "LLM request failed",
     status_code: int | None = None,
     provider_code: str | None = None,
-    message: str = "LLM request failed",
+    model: str | None = None,
     retry_after: float | None = None,
     request_id: str | None = None,
     raw_error: Any = None,
+    extra_code_map: dict[str, type[LLMError]] | None = None,
 ) -> LLMError:
     """统一将厂商错误映射为内部异常。
 
-    adapter 负责提取供应商响应中的字段，然后调用本函数。
-    这里不依赖供应商 SDK，也不发起 HTTP 请求。
+    判定顺序（顺序本身是设计的一部分）：
+
+    1. 调用方通过 extra_code_map 注入的厂商特有 code（来自 models.yaml）
+    2. 欠费 code / 欠费文案 —— 必须排在 429 之前，否则欠费会被当成限流无限重试
+    3. 鉴权 code
+    4. 内容拦截 code
+    5. 其余按 HTTP 状态码分类
     """
 
-    normalized_provider = provider.lower()
+    normalized_code = (provider_code or "").strip().lower()
+    error_class: type[LLMError] | None = None
 
-    # 1. 先处理已明确识别的厂商特殊错误。
-    #
-    # 示例规则应根据实际 API 文档确认。
-    if (
-        normalized_provider == "deepseek"
-        and provider_code == "insufficient_system_resource"
-    ):
-        return UpstreamError(
-            message,
-            provider=provider,
-            model=model,
-            status_code=status_code,
-            retry_after=retry_after,
-            request_id=request_id,
-            retryable=True,
-            raw_error=raw_error,
+    if extra_code_map and normalized_code:
+        error_class = {
+            code.lower(): cls for code, cls in extra_code_map.items()
+        }.get(normalized_code)
+
+    if error_class is None and normalized_code in _QUOTA_CODES:
+        error_class = UpstreamAuthError
+
+    # 欠费没有统一 code 时只能靠文案兜底（Anthropic 就是 400 + invalid_request_error）。
+    # 这一步必须排在按 code 判限流之前吗？不需要——限流 code 是明确的，文案是模糊的。
+    if error_class is None and _matches_message_hint(message):
+        error_class = UpstreamAuthError
+
+    if error_class is None and normalized_code in _AUTH_CODES:
+        error_class = UpstreamAuthError
+
+    if error_class is None and normalized_code in _CONTENT_FILTER_CODES:
+        error_class = ContentFilteredError
+
+    if error_class is None and normalized_code in _RATE_LIMIT_CODES:
+        # 注意：overloaded_error（Anthropic 529）语义更接近上游过载，
+        # 但它同样可重试，这里统一进 RateLimitError 会让 429/529 的告警混在一起。
+        error_class = (
+            UpstreamServerError
+            if normalized_code == "overloaded_error"
+            else RateLimitError
         )
 
-    # 2. 没有 HTTP 状态码时，使用通用上游异常。
-    if status_code is None:
-        return UpstreamError(
-            message,
-            provider=provider,
-            model=model,
-            retry_after=retry_after,
-            request_id=request_id,
-            retryable=False,
-            raw_error=raw_error,
+    if error_class is None:
+        # 无状态码 = 传输层失败（连接断开/DNS），可重试。
+        error_class = (
+            UpstreamServerError if status_code is None else map_status_code(status_code)
         )
 
-    # 3. 按统一 HTTP 状态码分类。
-    error_class = map_status_code(status_code)
-
-    # 4. 创建异常，并附带公共上下文。
     return error_class(
         message,
         provider=provider,

@@ -1,0 +1,7 @@
+{
+  "error": {
+    "message": "Server is too busy",
+    "type": "server_error",
+    "code": "server_overloaded"
+  }
+}

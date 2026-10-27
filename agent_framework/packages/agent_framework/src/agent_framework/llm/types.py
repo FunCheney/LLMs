@@ -35,13 +35,15 @@ class MessageRole(StrEnum):
 class StreamEventType(StrEnum):
     """
     统一的流式事件类型。
+
+    只有 TOOL_CALL，没有 tool_call_start/delta：ADR-002 规定增量由 adapter 内部组装，
+    只在参数完整后发一个事件。留 delta 类型等于给了上层"可以自己拼"的错觉。
     """
 
     MESSAGE_START = "message_start"
     TEXT_DELTA = "text_delta"
     REASONING_DELTA = "reasoning_delta"
-    TOOL_CALL_START = "tool_call_start"
-    TOOL_CALL_DELTA = "tool_call_delta"
+    TOOL_CALL = "tool_call"
     MESSAGE_END = "message_end"
     ERROR = "error"
 
@@ -72,6 +74,37 @@ class ToolSpec(BaseModel):
     parameters: dict[str, Any] = Field(default_factory=dict)
 
 
+class ToolChoiceMode(StrEnum):
+    """调用方对工具选择的意图。"""
+
+    AUTO = "auto"
+    NONE = "none"
+    REQUIRED = "required"
+
+
+class ToolChoice(BaseModel):
+    """
+    工具选择策略。
+
+    mode 是策略意图，不是硬保证：当目标厂商不支持某个取值时，
+    由调用方（client 层的能力协商）降级，adapter 只负责如实翻译。
+
+    name 仅在 mode=required 时允许出现，表示"必须调用这个工具"。
+    """
+
+    mode: ToolChoiceMode = ToolChoiceMode.AUTO
+    name: str | None = None
+
+    @model_validator(mode="after")
+    def validate_named_choice(self) -> "ToolChoice":
+        """只有 required 模式可以指定具体工具。"""
+
+        if self.name is not None and self.mode != ToolChoiceMode.REQUIRED:
+            raise ValueError("tool_choice.name is only allowed when mode=required")
+
+        return self
+
+
 class ToolCall(BaseModel):
     """
     模型发起的一次工具调用。
@@ -85,6 +118,7 @@ class ToolCall(BaseModel):
     name: str
     arguments: dict[str, Any] = Field(default_factory=dict)
     arguments_error: str | None = None
+    raw_arguments: str | None = None
     index: int | None = None
 
 
@@ -229,6 +263,9 @@ class Usage(BaseModel):
     output_tokens: int = 0
     total_tokens: int = 0
 
+    # 标注该用量是否为估算值（厂商未返回 usage 时由 adapter 粗估）。
+    estimated: bool = False
+
     @model_validator(mode="after")
     def fill_total_tokens(self) -> "Usage":
         """当总量未提供时，根据输入和输出 Token 数计算。"""
@@ -247,6 +284,9 @@ class LLMResponse(BaseModel):
     id: str | None = None
     model: str | None = None
 
+    # 产出该响应的 provider 名（openai / deepseek / qwen / anthropic ...）。
+    provider: str | None = None
+
     message: Message
 
     finish_reason: FinishReason = FinishReason.UNKNOWN
@@ -255,6 +295,41 @@ class LLMResponse(BaseModel):
     raw_finish_reason: str | None = None
 
     usage: Usage = Field(default_factory=Usage)
+
+    # 由 client 层填充（adapter 不测量延迟）。
+    latency_ms: float | None = None
+
+    @property
+    def text(self) -> str | None:
+        """便捷访问：消息中的纯文本内容。"""
+
+        content = self.message.content
+
+        if content is None:
+            return None
+
+        if isinstance(content, str):
+            return content
+
+        parts = [
+            block.data
+            for block in content
+            if block.type == "text" and isinstance(block.data, str)
+        ]
+
+        return "".join(parts) or None
+
+    @property
+    def tool_calls(self) -> list[ToolCall]:
+        """便捷访问：消息中的工具调用。"""
+
+        return self.message.tool_calls
+
+    @property
+    def response_id(self) -> str | None:
+        """便捷访问：厂商返回的响应 id。"""
+
+        return self.id
 
 
 class StreamEvent(BaseModel):
@@ -282,25 +357,37 @@ class StreamEvent(BaseModel):
 
 
 def normalize_finish_reason(raw: str | None,) -> FinishReason:
-    """将已知的标准结束原因转换为统一枚举。
+    """将供应商的结束原因转换为统一枚举。
 
-    未知的供应商结束原因统一返回 UNKNOWN。
-    原始值必须另外保存在 raw_finish_reason 中。
+    这是全项目**唯一**一张 finish_reason 映射表：各 adapter 只调用它，
+    不再各自维护一份（两份表必然会漂移，A5 会直接暴露）。
 
-    注意：供应商特有的结束原因应由对应 adapter
-    根据实际 API 文档决定如何映射。
+    未知值统一返回 UNKNOWN，原始值必须另外保存在 raw_finish_reason 中。
     """
 
     if raw is None:
         return FinishReason.UNKNOWN
 
     known_reasons = {
-        "unknown": FinishReason.UNKNOWN,
+        # 正常结束
         "stop": FinishReason.STOP,
+        "end_turn": FinishReason.STOP,
+        "stop_sequence": FinishReason.STOP,
+        "pause_turn": FinishReason.STOP,
+        "unknown": FinishReason.UNKNOWN,
+        # 触顶截断
         "length": FinishReason.LENGTH,
+        "max_tokens": FinishReason.LENGTH,
+        # 要调工具
         "tool_calls": FinishReason.TOOL_CALLS,
+        "tool_use": FinishReason.TOOL_CALLS,
+        "function_call": FinishReason.TOOL_CALLS,
+        # 被拦截
         "content_filter": FinishReason.CONTENT_FILTER,
+        "refusal": FinishReason.CONTENT_FILTER,
+        # 中断 / 上游资源不足（DeepSeek），绝不能当成 stop 的成功响应
         "aborted": FinishReason.ABORTED,
+        "insufficient_system_resource": FinishReason.UPSTREAM_ERROR,
         "upstream_error": FinishReason.UPSTREAM_ERROR,
     }
 
