@@ -85,6 +85,8 @@ class ToolCall(BaseModel):
     name: str
     arguments: dict[str, Any] = Field(default_factory=dict)
     arguments_error: str | None = None
+    index: int | None = None
+
 
     @model_validator(mode="before")
     @classmethod
