@@ -1,0 +1,58 @@
+providers:
+  openai:
+    type: openai_compat
+    base_url: "https://api.openai.com/v1"
+    api_key_env: OPENAI_API_KEY
+  deepseek:
+    type: openai_compat
+    base_url: "https://api.deepseek.com/v1"
+    api_key_env: DEEPSEEK_API_KEY
+  qwen:
+    type: openai_compat
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    api_key_env: DASHSCOPE_API_KEY
+    flags:
+      send_parallel_tool_calls: true      # Qwen 默认 false，不显式开就静默串行
+  anthropic:
+    type: anthropic
+    base_url: "https://api.anthropic.com"
+    api_key_env: ANTHROPIC_API_KEY
+
+models:
+  # alias（左）≠ wire 名（model 字段）：Qwen 必须钉日期快照，否则 12 周指标曲线不可比
+  qwen3.7-plus:
+    provider: qwen
+    model: qwen3.7-plus-2026-05-26
+    tier: cheap
+    capabilities: [stream, tools, parallel_tools]
+    pricing: { input: 2.0, output: 8.0, currency: CNY, per: 1000000 }
+
+  deepseek-flash:
+    provider: deepseek
+    model: deepseek-flash
+    tier: cheap
+    capabilities: [stream, tools]
+    pricing: { input: 0.5, output: 2.0, currency: CNY, per: 1000000 }   # 占位，按官网核对
+
+  gpt-4o-mini:
+    provider: openai
+    model: gpt-4o-mini
+    tier: cheap
+    capabilities: [stream, tools, json_mode, parallel_tools]
+    pricing: { input: 0.15, output: 0.60, currency: USD, per: 1000000 }
+
+  claude-sonnet-4-6:
+    provider: anthropic
+    model: claude-sonnet-4-6
+    tier: strong
+    max_tokens: 4096                    # Anthropic 必填
+    capabilities: [stream, tools, parallel_tools, prompt_caching]
+    pricing: { input: 3.0, output: 15.0, currency: USD, per: 1000000 }
+
+routes:
+  cheap:  { primary: qwen3.7-plus, fallback: [deepseek-flash, gpt-4o-mini] }
+  strong: { primary: claude-sonnet-4-6, fallback: [gpt-4o-mini] }
+
+tasks:
+  chat: cheap
+  research: strong
