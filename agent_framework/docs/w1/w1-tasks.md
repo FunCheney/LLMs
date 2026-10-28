@@ -135,7 +135,10 @@
 
 ## Day 4（3h）· 归一化收口 + SSE 端点
 
-### T4.1 `llm/client.py`（装饰器链）
+> **详细教程见 [`w1-day4.md`](./w1-day4.md)**：逐文件签名、`models.yaml` 全文、六条校验规则、`chat()/stream()` 算法步骤、SSE 帧格式、A9–A12 断言、8 条打回清单、3 小时时间盒。
+> 两处对下方原始清单的修订：① 装饰器链改为**编排方法**（ADR-008，理由见教程 §7.1）；② 新增 `precheck()`，把可预知错误挡在 `StreamingResponse` 之前（否则一律 200）。本节保留任务勾选项。
+
+### T4.1 `llm/client.py`（编排方法：重试 / 计量 / 日志 / fallback 唯一归属）
 - [ ] 顺序固定：`trace/日志 → 计量 → 重试 → 能力校验 → adapter`
 - [ ] 重试严格按 ADR-003：首 token 前才重试，`first_token_timeout` 作为判定边界
 - [ ] 每次重试/fallback 记 `retry_count` / `fallback_from` / `fallback_reason`
