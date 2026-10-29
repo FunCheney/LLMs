@@ -263,7 +263,7 @@ tasks:
 
 ---
 
-## 9. 五条 ADR 摘要（W12 拆成独立文件）
+## 9. ADR 摘要（W12 拆成独立文件）
 
 | 编号 | 决策 | 主要代价 |
 |---|---|---|
@@ -272,3 +272,10 @@ tasks:
 | ADR-003 | 重试只在 client 实现，adapter 禁止重试 | client 需感知流式边界 |
 | ADR-004 | 框架与业务同仓不同包、依赖单向 | 需守住 import 方向 |
 | ADR-005 | 上游鉴权失败映射 502 而非 401 | 调用方需按 code 区分错误 |
+| ADR-006 | 协议基准选 `/chat/completions`，不实现 Responses API（详见 `w1/llm-api-matrix.md` §5） | 避开"仅 Responses 支持 tool calling"的型号 |
+| ADR-007 | `Message.provider_meta` 透传 `reasoning_content` / `thinking.signature`，业务层禁止解读 | 多一个不透明字段，需防泄漏到对外响应 |
+| ADR-008 | 客户端层用编排方法而非装饰器链（详见 `w1/w1-day4.md` §7.1） | 单方法较长，靠私有方法控制可读性 |
+| ADR-009 | alias 与 wire model 名分离；允许混币种但 `currency` 必进日志 | 排查时要同时看两个名字 |
+| ADR-010 | 夹具分两级：`_synthetic/` 永久保留手写基线，真录制带 `synthetic=false + recorded_at`（详见 `w1/w1-day5.md` §5） | 夹具目录翻倍，需维护 A13 键路径比对 |
+| ADR-011 | 录制走 transport 层 tee，不另写 HTTP 客户端，且不覆盖 `request.json` | Registry 多注入点；漂移需人工裁决 |
+| ADR-012 | 日志在应用边界配置，指标读取方挂 handler 消费同一条 `RequestLog` | 每个可执行入口都要调一次，需幂等 |

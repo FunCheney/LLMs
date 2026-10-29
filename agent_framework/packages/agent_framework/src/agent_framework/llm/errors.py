@@ -146,6 +146,35 @@ class CapabilityError(LLMError):
     """客户端或模型不支持调用方要求的能力（不可重试）。"""
 
 
+# 内部异常 → (对外 HTTP, 对外 code)。architecture §3.6 是这张表的唯一来源。
+# 放在 errors.py 而不是 server/：客户端层打日志也要用 code，两处各写一份必然漂移。
+ERROR_HTTP: dict[type[LLMError], tuple[int, str]] = {
+    UpstreamAuthError: (502, "UPSTREAM_AUTH"),
+    RateLimitError: (429, "RATE_LIMITED"),
+    UpstreamTimeoutError: (504, "UPSTREAM_TIMEOUT"),
+    BadRequestError: (400, "BAD_REQUEST"),
+    ContentFilteredError: (422, "CONTENT_FILTERED"),
+    UpstreamServerError: (502, "UPSTREAM_ERROR"),
+    CapabilityError: (400, "CAPABILITY_UNSUPPORTED"),
+}
+
+# 未登记的异常一律按上游故障处理：宁可 502 可重试，也不要把未知错误伪装成 400
+# 让调用方以为是自己参数写错了。
+_HTTP_FALLBACK: tuple[int, str] = (502, "UPSTREAM_ERROR")
+
+
+def http_status_for(exc: LLMError) -> int:
+    """异常 → 对外 HTTP 状态码。"""
+
+    return ERROR_HTTP.get(type(exc), _HTTP_FALLBACK)[0]
+
+
+def error_code_for(exc: LLMError) -> str:
+    """异常 → 对外/日志里的稳定 code。"""
+
+    return ERROR_HTTP.get(type(exc), _HTTP_FALLBACK)[1]
+
+
 def map_status_code(status_code: int) -> type[LLMError]:
     """将 HTTP 状态码映射到内部异常类（只做分类，不创建实例）。"""
 

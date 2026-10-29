@@ -907,3 +907,80 @@ grep -rn "sleep\|retry" packages/agent_framework/src/agent_framework/llm/provide
 2. `chat()` 的 fallback 是否真的只绕一圈（有没有 `while` 回环）
 3. `schemas.py` 是否是手写投影（有没有 `model_dump` 直出）
 4. `routes_chat.py` 有没有在流式分支里做业务判断
+
+---
+
+## 16. 实现状态（Day4 收尾实录）
+
+> 与设计不一致的地方全部列在 §11.2。**验收命令都可复现**，不要只看文字。
+
+### 16.1 产出清单
+
+| 产出 | 状态 | 文件 | 总行 |
+|---|---|---|---|
+| 配置与启动校验（V1–V6） | ✅ | `config.py` + `models.yaml` | 261 / 73 |
+| 可观测（contextvar / RequestLog / cost / 打码） | ✅ | `observability.py` | 165 |
+| 懒加载工厂 | ✅ | `llm/registry.py` | 249 |
+| 路由（含第二实现 `StaticRouter`） | ✅ | `llm/router.py` | 69 |
+| 编排（重试 / 计量 / committed / fallback） | ✅ | `llm/client.py` | 552 |
+| 组装入口 | ✅ | `bootstrap.py` | 36 |
+| HTTP 契约（手写投影） | ✅ | `server/schemas.py` | 208 |
+| SSE 编解码 | ✅ | `server/sse.py` | 75 |
+| 路由与异常映射 | ✅ | `server/routes_chat.py` / `server/app.py` | 62 / 160 |
+| 链路层测试（8 个文件） | ✅ | `tests/test_{config,router,cost,sse,gateway_retry,gateway_stream,server_chat}.py` + `gateway_helpers.py` | 86 个用例 |
+| A9–A12 | ✅ 全绿 | 分布在 `test_gateway_retry` / `test_gateway_stream` / `test_sse` / `test_server_chat` | — |
+
+### 16.2 与设计的六处偏差
+
+| # | 偏差 | 原因 |
+|---|---|---|
+| 1 | `chat()` 返回 `ChatOutcome`（响应 + alias + retry_count + fallback_from），不是单个 `LLMResponse` | `retry_count` / `fallback_from` 是客户端层的运营信息，塞进契约层（§3.4）会让契约层替客户端实现背锅 |
+| 2 | `precheck(call, *, stream=False)` 多一个 `stream` 参数 | 流式与能力校验有交叉（无 `STREAM` 能力的模型要在 200 之前拒掉） |
+| 3 | 新增 `bootstrap.py` | `config.py` 不能 import `registry.py`（config → registry → providers → config 成环）；组装逻辑塞进 `server/app.py` 又会让测试无法只测三层 |
+| 4 | `usage_estimated` 是 `RequestLog` 第 18 个字段 | 没有它就分不清"成本低"和"厂商没给 usage"，成本看板无法解释异常 |
+| 5 | `RequestIDMiddleware` 写成纯 ASGI 中间件 | `BaseHTTPMiddleware` 把下游放进独立 task，`StreamingResponse` 的 body 迭代发生在 `call_next` 之后，contextvar 是否可见依赖实现细节 |
+| 6 | 空流判定挂在 `_first_event`（`StopAsyncIteration` → `UpstreamServerError`） | adapter 的 `finalize()` 总会补一个 `message_end`，所以"真·空流"只可能来自完全不产事件的实现；判定点必须在首个事件之前 |
+| 7 | `call.model` 打错 alias → **400**，路由里的 alias 打错 → **500** | 前者是调用方输入错误，后者才是我们配置坏了。混成一个会让值班同学为"调用方拼错模型名"收 500 告警（原实现一律 500，`curl` 验端到端时暴露） |
+
+### 16.3 验收结果（可复现）
+
+```text
+uv run pytest            → 222 passed（136 → 222，新增 86 个，全部离线）
+uv run ruff check .      → All checks passed
+uv run mypy              → Success: no issues found in 23 source files
+grep -rn "sleep|retry|backoff" providers/        → 空
+grep -rn "logger.|cost|price"  providers/        → 空
+grep -rn "from ..client|..config|..registry" providers/ → 空
+grep -rn "deepseek|qwen|reasoning_content|input_schema" llm/client.py server/ → 空
+```
+
+**端到端（真起服务 + curl，用 `fixture` 走 mock 回放，不花钱）**：
+
+```text
+GET  /health               → {"status":"ok",...}
+POST /v1/chat  model=fixture          → 200，text 正确，X-Request-ID == body.request_id
+POST /v1/chat  stream=true            → event: text_delta ×2 → event: message_end（usage 58/22）
+POST /v1/chat  model=ghost            → 400 BAD_REQUEST（见偏差 7）
+```
+
+**A9 反向验证**：在 `openai_compat.chat()` 里多插一次 `await self._http.post(...)`
+→ `test_a9_retry_lives_in_gateway_not_adapter` / `test_a9_adapter_has_no_retry_of_its_own` **2 个变红**
+（`assert 2 == 1`）；还原后 2 个全绿。
+
+**A10 反向验证**：把 `client.py` 的 `if committed:` 改成 `if False:`
+→ `test_no_retry_after_text_committed` / `test_committed_stream_does_not_fall_back_to_next_candidate` /
+`test_a10_real_adapter_mid_stream_failure_does_not_replay` **3 个变红**
+（日志显示 `candidate failed attempt=3`，即真的重试并重放了半截回答）；还原后 3 个全绿。
+
+### 16.4 仍未闭环的三件事
+
+| 事项 | 谁负责 | 何时 |
+|---|---|---|
+| `models.yaml` 的价格除 Qwen 两档外均为占位值 | Day5 去官网核对 | 本周末 |
+| `first_token_timeout_s` 默认 10s 未用真机校准 | Day5 `-m live` 跑一次取 p95 | 本周末 |
+| Anthropic 欠费仍靠文案 `credit balance` 识别 | Day5 真机确认后收敛成固定 code | 本周末 |
+
+> Day5 的第一条命令建议是：
+> `uv run pytest -m live -k "text_basic or tool_call_basic" --basetemp=.pytest_tmp`，
+> 把四家的 `stream.txt` 逐字节换成真录制，再重跑 `uv run pytest`。
+> 若 A1/A3/A10 在真录制下变红，说明手写夹具与真实协议存在偏差——那正是这套套件的价值。

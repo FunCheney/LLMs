@@ -17,7 +17,19 @@ providers:
     type: anthropic
     base_url: "https://api.anthropic.com"
     api_key_env: ANTHROPIC_API_KEY
+  # 离线回放：不联网、不花钱。用于本地联调与 Gate3「3 家 + mock 一键切换」。
+  mock:
+    type: mock
+    flags:
+      delegate: openai                      # 复用哪个真 adapter 的解析逻辑
+      case: text_basic                      # 回放哪个夹具用例
+      fixtures_root: packages/agent_framework/tests/fixtures
 
+# pricing 口径（2026-10-29 核对官网，见 docs/w1/w1-day5.md §3）：
+#   1. 一律"每百万 token"，`per` 必须是 1000000（config.py V5 强制）
+#   2. cache_read = 输入缓存命中价；`compute_cost` 暂不使用（W11 成本优化时接入）
+#   3. 单值字段无法表达"峰谷分时 / 阶梯计价"，两家各有此问题，一律取**最保守的常规档**
+#      并在此注明，W11 做成本看板时改为按 (上下文长度, 时段) 取价
 models:
   # alias（左）≠ wire 名（model 字段）：Qwen 必须钉日期快照，否则 12 周指标曲线不可比
   qwen3.7-plus:
@@ -25,21 +37,25 @@ models:
     model: qwen3.7-plus-2026-05-26
     tier: cheap
     capabilities: [stream, tools, parallel_tools]
-    pricing: { input: 2.0, output: 8.0, currency: CNY, per: 1000000 }
+    # 阶梯计价：输入 ≤256K 时 2/8，>256K 时 6/24。此处取 ≤256K 档。
+    pricing: { input: 2.0, output: 8.0, cache_read: 0.2, currency: CNY, per: 1000000 }
 
   deepseek-flash:
     provider: deepseek
     model: deepseek-flash
     tier: cheap
     capabilities: [stream, tools]
-    pricing: { input: 0.5, output: 2.0, currency: CNY, per: 1000000 }   # 占位，按官网核对
+    # 峰谷分时：空闲时段 1.5/4.5，高峰（工作日 09–12、14–18 北京时间）翻倍为 3/9。
+    # 此处取空闲档；若基线在高峰时段测，成本会偏低 2 倍——对比表里必须记时间戳。
+    pricing: { input: 1.5, output: 4.5, cache_read: 0.05, currency: CNY, per: 1000000 }
 
   gpt-4o-mini:
     provider: openai
     model: gpt-4o-mini
     tier: cheap
     capabilities: [stream, tools, json_mode, parallel_tools]
-    pricing: { input: 0.15, output: 0.60, currency: USD, per: 1000000 }
+    # 缓存命中输入为原价 5 折（>1024 token 前缀自动命中）
+    pricing: { input: 0.15, output: 0.60, cache_read: 0.075, currency: USD, per: 1000000 }
 
   claude-sonnet-4-6:
     provider: anthropic
@@ -47,9 +63,18 @@ models:
     tier: strong
     max_tokens: 4096                    # Anthropic 必填
     capabilities: [stream, tools, parallel_tools, prompt_caching]
-    pricing: { input: 3.0, output: 15.0, currency: USD, per: 1000000 }
+    # cache_read = 0.3；另有 cache_write = 3.75（未建模，W11 接 prompt caching 时再加）
+    pricing: { input: 3.0, output: 15.0, cache_read: 0.3, currency: USD, per: 1000000 }
+
+  fixture:
+    provider: mock
+    model: ""
+    tier: cheap
+    capabilities: [stream, tools]
+    pricing: { input: 0, output: 0, currency: CNY, per: 1000000 }
 
 routes:
+  default: { primary: qwen3.7-plus, fallback: [deepseek-flash, gpt-4o-mini] }
   cheap:  { primary: qwen3.7-plus, fallback: [deepseek-flash, gpt-4o-mini] }
   strong: { primary: claude-sonnet-4-6, fallback: [gpt-4o-mini] }
 

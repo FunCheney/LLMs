@@ -15,9 +15,21 @@ from typing import Any
 import httpx
 from agent_framework.llm.base import LLMClient
 from agent_framework.llm.providers import AnthropicClient, OpenAICompatClient
-from agent_framework.llm.types import Message, MessageRole, ToolSpec
+from canonical_input import (  # noqa: F401  (re-export：测试与录制器共用同一份输入)
+    MAX_TOKENS,
+    SYSTEM_TEXT,
+    TOOL_DESCRIPTION,
+    TOOL_NAME,
+    TOOL_PARAMETERS,
+    USER_TEXT,
+    canonical_messages,
+    canonical_tools,
+)
 
 FIXTURES_ROOT = Path(__file__).parent / "fixtures"
+
+# 手写协议样本的快照目录（Day5 引入）：录制夹具替换后，靠它做 A13「超集」断言。
+SYNTHETIC_ROOT = FIXTURES_ROOT / "_synthetic"
 
 PROVIDERS: tuple[str, ...] = ("openai", "deepseek", "qwen", "anthropic")
 
@@ -35,37 +47,26 @@ PROVIDER_BASE_URL: dict[str, str] = {
     "anthropic": "https://api.anthropic.test",
 }
 
-# 必须与 fixtures/_generate_fixtures.py 的常量一致：夹具是"内部输入"的另一端。
-SYSTEM_TEXT = "你是研究助手，只回答可验证的事实。"
-USER_TEXT = "帮我查一下 MCP 协议的最新进展"
-MAX_TOKENS = 512
-
-TOOL_DESCRIPTION = "当需要最新外部信息时使用；不要用于纯计算或改写。"
-TOOL_PARAMETERS: dict[str, Any] = {
-    "type": "object",
-    "properties": {"query": {"type": "string", "description": "检索关键词"}},
-    "required": ["query"],
-    "additionalProperties": False,
-}
-
-
-def canonical_messages() -> list[Message]:
-    """conformance 的统一内部输入。"""
-
-    return [
-        Message(role=MessageRole.SYSTEM, content=SYSTEM_TEXT),
-        Message(role=MessageRole.USER, content=USER_TEXT),
-    ]
-
-
-def canonical_tools() -> list[ToolSpec]:
-    return [
-        ToolSpec(
-            name="search_web",
-            description=TOOL_DESCRIPTION,
-            parameters=TOOL_PARAMETERS,
-        )
-    ]
+__all__ = [
+    "FIXTURES_ROOT",
+    "MAX_TOKENS",
+    "PROVIDERS",
+    "PROVIDER_BASE_URL",
+    "PROVIDER_MODEL",
+    "SYNTHETIC_ROOT",
+    "SYSTEM_TEXT",
+    "TOOL_DESCRIPTION",
+    "TOOL_NAME",
+    "TOOL_PARAMETERS",
+    "USER_TEXT",
+    "FixtureCase",
+    "Recorder",
+    "canonical_messages",
+    "canonical_tools",
+    "load_case",
+    "make_client",
+    "recorded_client",
+]
 
 
 @dataclass(frozen=True)

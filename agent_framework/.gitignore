@@ -10,6 +10,8 @@ build/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+# 受限环境（容器/沙箱）下把 pytest tmp 落在仓库内时用：--basetemp=.pytest_tmp
+.pytest_tmp/
 
 # 密钥与环境（绝不入库）
 .env

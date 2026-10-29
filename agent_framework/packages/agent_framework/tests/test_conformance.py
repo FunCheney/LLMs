@@ -23,8 +23,10 @@ from agent_framework.llm.errors import (
 )
 from agent_framework.llm.providers._common import StreamAccumulator
 from conftest import (
+    FIXTURES_ROOT,
     MAX_TOKENS,
     PROVIDERS,
+    SYNTHETIC_ROOT,
     canonical_messages,
     canonical_tools,
     load_case,
@@ -34,6 +36,8 @@ from conftest import (
 SUCCESS_CASES = ("text_basic", "tool_call_basic", "usage_missing")
 
 ERROR_CASES = ("error_rate_limit", "error_quota", "error_server")
+
+ALL_CASES = SUCCESS_CASES + ERROR_CASES
 
 # 同一错误语义 → 同一个异常类 + 同一个 retryable（四家落点不同：429 / 402 / 400 / 529）
 ERROR_EXPECT: dict[str, tuple[type[LLMError], bool]] = {
@@ -374,3 +378,150 @@ async def test_a8_stream_sends_exactly_one_request(provider: str) -> None:
         pass
 
     assert recorder.count == 1
+
+
+# --------------------------------------------------------------------------- #
+# A13 录制夹具 ⊇ 手写基线（防"手写幻觉字段"）
+# --------------------------------------------------------------------------- #
+
+
+def key_paths(value: Any, prefix: str = "$") -> set[str]:
+    """把一个 JSON 体压成**键路径**集合（`$.choices[].message.content` 这种）。
+
+    为什么不比键名集合：`id` / `type` / `index` 在四家到处都是，键名集合会让
+    "位置放错但字段存在"的 bug 蒙混过关。路径能区分 `$.usage.prompt_tokens`
+    与 `$.choices[].usage.prompt_tokens`——后者正是 DeepSeek 的真实形态。
+    """
+
+    paths: set[str] = set()
+
+    if isinstance(value, dict):
+        for key, item in value.items():
+            path = f"{prefix}.{key}"
+            paths.add(path)
+            paths |= key_paths(item, path)
+    elif isinstance(value, list):
+        for item in value:
+            paths |= key_paths(item, f"{prefix}[]")
+
+    return paths
+
+
+def _read_json(path: Any) -> dict[str, Any]:
+    return json.loads(path.read_text("utf-8"))
+
+
+@pytest.mark.parametrize("provider", PROVIDERS)
+@pytest.mark.parametrize("case_name", ALL_CASES)
+def test_a13_recorded_body_is_superset_of_handwritten(
+    provider: str, case_name: str
+) -> None:
+    """真录制可以**多**字段（厂商加字段是常态），绝不能**少**字段。
+
+    少的含义只有一个：手写基线里存在一个真实协议里不存在的字段——
+    也就是说 adapter 里可能为了这个幻觉字段写了永远不会执行的代码。
+    Day5 把四家的 response 换成真录制后，这条断言就是"手写猜测"的清算单。
+    """
+
+    baseline_dir = SYNTHETIC_ROOT / provider / case_name
+    recorded_path = FIXTURES_ROOT / provider / case_name / "response.json"
+
+    if not baseline_dir.is_dir() or not recorded_path.is_file():
+        pytest.skip(f"{provider}/{case_name} 缺少手写基线或录制体")
+
+    baseline = _read_json(baseline_dir / "response.json")
+    recorded = _read_json(recorded_path)
+
+    missing = key_paths(baseline) - key_paths(recorded)
+
+    assert missing == set(), (
+        f"{provider}/{case_name}: 手写夹具里有真实协议不存在的字段路径：{sorted(missing)}"
+    )
+
+
+def test_a13_meta_flags_recording_state_consistently() -> None:
+    """`synthetic` 与 `recorded_at` 必须互相印证，否则"哪些是编的"就查不清了。"""
+
+    for provider in PROVIDERS:
+        for case_name in ALL_CASES:
+            meta = _read_json(FIXTURES_ROOT / provider / case_name / "meta.json")
+
+            if meta.get("synthetic") is False:
+                assert meta.get("recorded_at"), f"{provider}/{case_name}: 录制体缺时间戳"
+            else:
+                assert meta.get("recorded_at") is None, (
+                    f"{provider}/{case_name}: 手写体不该有 recorded_at"
+                )
+
+
+# --------------------------------------------------------------------------- #
+# A14 工具调用必须落在自己声明的 schema 内
+# --------------------------------------------------------------------------- #
+
+
+def _declared_tool_schemas(request: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """从 request.json 抽出 {工具名: parameters}，两种协议结构都要认。"""
+
+    schemas: dict[str, dict[str, Any]] = {}
+
+    for raw in request.get("tools") or []:
+        if not isinstance(raw, dict):
+            continue
+
+        if "function" in raw:  # OpenAI / DeepSeek / Qwen
+            function = raw.get("function") or {}
+            schemas[str(function.get("name"))] = function.get("parameters") or {}
+        else:  # Anthropic
+            schemas[str(raw.get("name"))] = raw.get("input_schema") or {}
+
+    return schemas
+
+
+def _assert_call_matches_schema(call: Any, schemas: dict[str, dict[str, Any]]) -> None:
+    assert call.name in schemas, f"调用了未声明的工具 '{call.name}'；已声明：{sorted(schemas)}"
+
+    parameters = schemas[call.name]
+    allowed = set((parameters.get("properties") or {}).keys())
+    required = set(parameters.get("required") or [])
+
+    assert set(call.arguments) <= allowed, (
+        f"'{call.name}' 收到 schema 外的参数 {sorted(set(call.arguments) - allowed)}"
+    )
+    assert required <= set(call.arguments), (
+        f"'{call.name}' 缺少必填参数 {sorted(required - set(call.arguments))}"
+    )
+
+
+@pytest.mark.parametrize("provider", PROVIDERS)
+async def test_a14_response_tool_call_matches_declared_schema(provider: str) -> None:
+    """真实模型可能返回未声明的工具名或凭空加参数。
+
+    这条断言在真录制替换后才有杀伤力：手写夹具永远是"照 schema 编的"，
+    而真实模型会跑偏。跑偏必须在这里变红，由我们改 prompt / 改工具描述，
+    而不是放宽断言——放宽等于把"模型乱调工具"放进生产。
+    """
+
+    case = load_case(provider, "tool_call_basic")
+    schemas = _declared_tool_schemas(case.request)
+
+    assert schemas, f"{provider}: request.json 里没有 tools 声明"
+
+    response = await _chat(case)
+
+    for call in response.tool_calls:
+        _assert_call_matches_schema(call, schemas)
+
+
+@pytest.mark.parametrize("provider", PROVIDERS)
+def test_a14_expected_tool_call_matches_declared_schema(provider: str) -> None:
+    """夹具自带的 expect 也必须落在 schema 内——防止手写 expect 编造参数。"""
+
+    case = load_case(provider, "tool_call_basic")
+    schemas = _declared_tool_schemas(case.request)
+
+    for expected in case.expect["tool_calls"]:
+        class _Stub:
+            name = expected["name"]
+            arguments = expected["arguments"]
+
+        _assert_call_matches_schema(_Stub(), schemas)
