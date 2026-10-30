@@ -1,0 +1,12 @@
+{
+  "synthetic": true,
+  "recorded_at": null,
+  "note": "手写协议样本，Day5 用真机录制替换",
+  "status_code": 200,
+  "expect": {
+    "text": "MCP 协议最新进展：新增了工具注解与异步任务支持。",
+    "finish_reason": "stop",
+    "tool_calls": [],
+    "usage_estimated": false
+  }
+}

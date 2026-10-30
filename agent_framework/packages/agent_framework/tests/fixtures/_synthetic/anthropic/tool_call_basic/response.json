@@ -1,0 +1,26 @@
+{
+  "id": "msg_fixture_tool",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-test",
+  "content": [
+    {
+      "type": "text",
+      "text": "我先检索一下最新进展。"
+    },
+    {
+      "type": "tool_use",
+      "id": "toolu_fixture01",
+      "name": "search_web",
+      "input": {
+        "query": "MCP 协议 最新进展"
+      }
+    }
+  ],
+  "stop_reason": "tool_use",
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 120,
+    "output_tokens": 42
+  }
+}

@@ -1,0 +1,17 @@
+data: {"id": "chatcmpl-stream", "model": "gpt-test", "choices": [{"index": 0, "delta": {"role": "assistant", "content": ""}, "finish_reason": null}]}
+
+data: {"choices": [{"index": 0, "delta": {"content": "我先检索一"}, "finish_reason": null}]}
+
+data: {"choices": [{"index": 0, "delta": {"content": "下最新进展。"}, "finish_reason": null}]}
+
+data: {"choices": [{"index": 0, "delta": {"tool_calls": [{"index": 0, "id": "call_fixture01", "type": "function", "function": {"name": "search_web", "arguments": ""}}]}, "finish_reason": null}]}
+
+data: {"choices": [{"index": 0, "delta": {"tool_calls": [{"index": 0, "function": {"arguments": "{\"query\": \"M"}}]}, "finish_reason": null}]}
+
+data: {"choices": [{"index": 0, "delta": {"tool_calls": [{"index": 0, "function": {"arguments": "CP 协议 最新进展\"}"}}]}, "finish_reason": null}]}
+
+data: {"choices": [{"index": 0, "delta": {}, "finish_reason": "tool_calls"}]}
+
+data: {"choices": [], "usage": {"prompt_tokens": 58, "completion_tokens": 22, "total_tokens": 80}}
+
+data: [DONE]

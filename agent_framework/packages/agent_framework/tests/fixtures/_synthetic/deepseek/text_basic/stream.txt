@@ -1,0 +1,11 @@
+: keep-alive
+
+data: {"id": "chatcmpl-stream", "model": "deepseek-flash", "choices": [{"index": 0, "delta": {"reasoning_content": "用户要的是最新进展，我需要调用搜索工具。"}, "finish_reason": null}]}
+
+data: {"choices": [{"index": 0, "delta": {"content": "MCP 协议最新进展：新增"}, "finish_reason": null}]}
+
+data: {"choices": [{"index": 0, "delta": {"content": "了工具注解与异步任务支持。"}, "finish_reason": null}]}
+
+data: {"choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 58, "completion_tokens": 22, "total_tokens": 80}}
+
+data: [DONE]

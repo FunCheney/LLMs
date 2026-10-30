@@ -1,0 +1,31 @@
+{
+  "id": "chatcmpl-openai-tool",
+  "object": "chat.completion",
+  "created": 1700000000,
+  "model": "gpt-test",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "我先检索一下最新进展。",
+        "tool_calls": [
+          {
+            "id": "call_fixture01",
+            "type": "function",
+            "function": {
+              "name": "search_web",
+              "arguments": "{\"query\": \"MCP 协议 最新进展\"}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 58,
+    "completion_tokens": 18,
+    "total_tokens": 76
+  }
+}

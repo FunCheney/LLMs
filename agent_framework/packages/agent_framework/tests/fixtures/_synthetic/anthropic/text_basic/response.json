@@ -1,0 +1,18 @@
+{
+  "id": "msg_fixture_text",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-test",
+  "content": [
+    {
+      "type": "text",
+      "text": "MCP 协议最新进展：新增了工具注解与异步任务支持。"
+    }
+  ],
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 120,
+    "output_tokens": 42
+  }
+}
