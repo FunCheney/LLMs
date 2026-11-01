@@ -43,6 +43,14 @@
       "queue_backend": "inmemory",
       "verdict": "Gate「100 并发错误率 < 1%」离线档通过"
     },
+    "e2e_check": {
+      "script": "evals/scripts/w2_e2e_check.py（make e2e）",
+      "overload": "限额 1 + 20 并发（每请求 200ms）→ 200×1 / 503×19，Retry-After=1，code=SERVER_BUSY",
+      "retry_storm": "0 条日志 retry_count>0",
+      "tasks": "POST /v1/tasks 202 → 轮询至 succeeded",
+      "trace": "响应头 X-Trace-ID == RequestLog.trace_id；span_id 非空；first_token_ms=26.9",
+      "note": "mock 回放不 await IO，压不出并发；过载用例必须注入真实延迟才有效"
+    },
     "quality": {
       "golden_set_size": 10,
       "success_rate": 1.0,
@@ -60,7 +68,7 @@
     "1_session_idempotent": "pass（InMemory + Redis 双实现，同 request_id 不翻倍；provider_meta 保留）",
     "2_layering": "pass（/v1/chat 仍直连 gateway；workflow/ 只有 Protocol 缝，零调用点）",
     "3_concurrency": "pass-offline（100 并发 0 失败）",
-    "4_overload_no_retry": "pass-unit（ServerBusyError.retryable=False；满载走 503 + Retry-After；retry_count 不增长）",
+    "4_overload_no_retry": "pass-e2e（限额 1 + 20 并发 → 19 个 503 + Retry-After，code=SERVER_BUSY；日志 retry_count>0 为 0）",
     "5_trace": "pass（一条请求可追到 llm.call span 的 first_token_ms/tokens/cost）",
     "6_compose": "config-ready（compose/Dockerfile 就位，未在本机执行 docker build）",
     "7_eval_gate": "pass（10/10 绿；CI 内反向验证改坏一条 expect 必须变红）",
@@ -78,7 +86,9 @@
     "测试只在全量串跑时慢到分钟级，单文件运行却是秒级 —— 环境调度停顿会伪装成「实现慢」，所以延迟结论只能取服务端 RequestLog 口径",
     "「幂等」不做兜底 request_id 会在脚本/队列消费者场景直接失效（第二次 append 被误判重复），这是只在多轮对话第二轮才暴露的 bug",
     "队列入口先 precheck 再入队：alias 打错这类注定失败的请求不该占队列槽位，否则输入错误被放大成容量问题",
-    "trace_id 生成放中间件而非 span()，否则同一请求内的多个 span 会各拿一个新 trace，跨调用无法串联"
+    "trace_id 生成放中间件而非 span()，否则同一请求内的多个 span 会各拿一个新 trace，跨调用无法串联",
+    "mock 回放是同步读文件、不 await 任何 IO：它天然压不出并发，用它验证『限额 1 会不会 503』只会得到假绿（必须先注入真实延迟）",
+    "框架日志只挂在 agent_framework 这棵树上，抓日志做断言必须抓同一棵树；抓 root 会得到空列表"
   ],
   "risks": [
     "在线档（真实 alias）延迟/成本未测，W11 成本曲线仍缺第一批真实数据点",

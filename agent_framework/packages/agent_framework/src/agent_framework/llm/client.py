@@ -140,31 +140,40 @@ class LLMGateway:
         return alias
 
     # -- 非流式 ---------------------------------------------------------- #
-
     async def chat(self, call: ChatCall) -> ChatOutcome:
+        # ── 阶段 1：路由。_plan 内部已经做完结构校验：
+        #    call.model 拼错（调用方输入问题）→ BadRequestError(400)
+        #    路由里的 alias 在 models.yaml 里不存在（我方配置问题）→ ConfigError(500)
         aliases = self._plan(call)
-        tier = self._tier(call)
-        fallback_from: str | None = None
-        last_error: LLMError | None = None
-        started_all = self._clock()
+        tier = self._tier(call)  # 只用于日志：task 所属的 tier（cheap/strong/...）
+        fallback_from: str | None = None  # 记录"我是从哪个 alias 掉下来的"，写进日志
+        last_error: LLMError | None = None  # 保留最后一次真实错误，全链失败时抛它（不要造新错）
+        started_all = self._clock()  # 整条链的起点，只用于「全链失败」那条日志的耗时
 
+        # ── 阶段 2：候选维度（fallback 链）
         for alias in aliases:
+            # 能力校验放在每次尝试之外：能力是静态属性，重试 3 次不该校验 3 次。
+            # 注意：这里抛的 CapabilityError 不进入 except（在 try 外），
+            #      即"候选不支持 tools"会直接终止整个调用，而不是换下一个候选。
             adapter = self._ensure_capabilities(alias, call, stream=False)
-            model = self._registry.get_model(alias)
-            started = self._clock()
+            model = self._registry.get_model(alias)  # 取价格表；放在 attempt 循环外避免重复查
+            started = self._clock()  # 该候选的起点（注意：包含后续退避等待）
 
+            # ── 阶段 3：重试维度
             for attempt in range(1, self._settings.max_attempts + 1):
-                # span 包在"真正发 HTTP 的那一次尝试"上，而不是整个 chat()：
-                # 重试 3 次就该有 3 个 span，否则 trace 里看不出是第几次失败的。
+                # span 只包「一次真实 HTTP」，不是包整个 chat()：
+                # 重试 3 次就该有 3 个 span，trace 里才看得出是第几次才通。
                 async with span(
-                    "llm.call",
-                    task=call.task,
-                    alias=alias,
-                    provider=adapter.name,
-                    attempt=attempt,
-                    stream=False,
+                        "llm.call",
+                        task=call.task,
+                        alias=alias,
+                        provider=adapter.name,
+                        attempt=attempt,
+                        stream=False,
                 ) as current_span:
                     try:
+                        # adapter.chat 只做协议翻译（OpenAI/Anthropic/Qwen 各家格式 → LLMResponse）
+                        # **call.opts 透传**：temperature / max_tokens 等厂商中立参数，网关不认识具体字段
                         response = await adapter.chat(
                             call.messages,
                             call.tools,
@@ -172,64 +181,71 @@ class LLMGateway:
                             **call.opts,
                         )
                     except (LLMError, httpx.HTTPError) as exc:
+                        # 统一异常口径：adapter 内部的 httpx 传输错误在这里翻译成 UpstreamTimeout/UpstreamServer，
+                        # 否则 ConnectError 会以原始形态冒到 HTTP 层，变成没法归因的 500。
                         error = self._as_llm_error(exc, adapter)
-                        self._mark_span_error(current_span, error)
+                        self._mark_span_error(current_span, error)  # 失败 span 也带 error_code，便于按码归因
 
+                        # 是否重试只看 error.retryable（由 errors.py 按 429/402/5xx/code 白名单判定），
+                        # 这里不再写 if status == 429 —— 同一份逻辑两处实现，必然改一处漏一处。
                         if not self._should_retry(error, attempt):
                             last_error = error
+                            # 候选"最终失败"单独打 WARNING，不进 RequestLog：
+                            # 一个请求可能试 3 个候选，但只允许产出一条 RequestLog，
+                            # 否则 W11 统计请求量和成本时会翻倍。
                             emit_candidate_failure(
                                 alias, attempt, error_code_for(error), str(error)
                             )
-                            break
+                            break  # 跳出重试循环 → 进入下一个候选（fallback）
 
+                        # 可重试：指数退避 + 抖动（限流时听上游 Retry-After）
                         _LOG.info(
                             "retry alias=%s attempt=%d code=%s",
-                            alias,
-                            attempt,
-                            error_code_for(error),
+                            alias, attempt, error_code_for(error),
                         )
                         await self._sleep(self._delay(attempt - 1, error.retry_after))
                         continue
 
+                    # ── 阶段 4：成功路径（以下代码只在没抛异常时执行）
                     latency_ms = (self._clock() - started) * 1000
-                    response.provider = response.provider or adapter.name
-                    response.latency_ms = latency_ms
-                    cost = compute_cost(model.pricing, response.usage)
+                    response.provider = response.provider or adapter.name  # 兜底：adapter 没填就用适配器名
+                    response.latency_ms = latency_ms  # 延迟由网关测，不信上游
+                    cost = compute_cost(model.pricing, response.usage)  # 计费只写一份（observability.py）
 
-                    current_span.attributes.update(
-                        {
-                            "prompt_tokens": response.usage.input_tokens,
-                            "completion_tokens": response.usage.output_tokens,
-                            "cost": cost,
-                            "currency": model.pricing.currency,
-                            "latency_ms": round(latency_ms, 3),
-                            "finish_reason": str(response.finish_reason),
-                            "retry_count": attempt - 1,
-                        }
-                    )
+                    # 先把这次调用的运营指标挂到 span 上（token/成本/延迟/finish_reason/第几次重试）
+                    current_span.attributes.update({
+                        "prompt_tokens": response.usage.input_tokens,
+                        "completion_tokens": response.usage.output_tokens,
+                        "cost": cost,
+                        "currency": model.pricing.currency,
+                        "latency_ms": round(latency_ms, 3),
+                        "finish_reason": str(response.finish_reason),
+                        "retry_count": attempt - 1,
+                    })
 
-                    emit(
-                        RequestLog(
-                            request_id=current_request_id(),
-                            task=call.task,
-                            tier=tier,
-                            provider=response.provider,
-                            model=alias,
-                            fallback_from=fallback_from,
-                            prompt_tokens=response.usage.input_tokens,
-                            completion_tokens=response.usage.output_tokens,
-                            cost=cost,
-                            currency=model.pricing.currency,
-                            latency_ms=round(latency_ms, 3),
-                            first_token_ms=None,
-                            retry_count=attempt - 1,
-                            finish_reason=str(response.finish_reason),
-                            error_code=None,
-                            stream=False,
-                            usage_estimated=response.usage.estimated,
-                        )
-                    )
+                    # 每个请求恰好一条结构化 JSON 日志（字段固定，W11 看板直接读它）
+                    emit(RequestLog(
+                        request_id=current_request_id(),
+                        task=call.task,
+                        tier=tier,
+                        provider=response.provider,
+                        model=alias,  # 注意：日志里 model 记的是 alias（我方别名），provider 才是厂商
+                        fallback_from=fallback_from,  # 从谁掉下来的，一眼看出降级发生了
+                        prompt_tokens=response.usage.input_tokens,
+                        completion_tokens=response.usage.output_tokens,
+                        cost=cost,
+                        currency=model.pricing.currency,
+                        latency_ms=round(latency_ms, 3),
+                        first_token_ms=None,  # 非流式没有首 token 概念
+                        retry_count=attempt - 1,
+                        finish_reason=str(response.finish_reason),
+                        error_code=None,
+                        stream=False,
+                        usage_estimated=response.usage.estimated,  # 厂商没给 usage 时由 adapter 估算，必须标记
+                    ))
 
+                    # 成功即返回，不再尝试后续候选；ChatOutcome 携带路由/重试元信息，
+                    # 这些是"客户端层运营信息"，不塞进契约层 LLMResponse。
                     return ChatOutcome(
                         response=response,
                         alias=alias,
@@ -237,30 +253,33 @@ class LLMGateway:
                         fallback_from=fallback_from,
                     )
 
-            # 这个候选彻底失败 → 进入下一个（全链只绕一圈，绝不回头）
+            # ── 阶段 5：该候选彻底失败（重试用尽或不可重试）→ 换下一个候选
+            # 单向：fallback 链只绕一圈，绝不回头（避免 primary/fb 互相踢皮球形成活锁）
             fallback_from = alias
 
+        # ── 阶段 6：全链失败
+        # 没有 last_error 说明 aliases 为空之类的情况，给一个明确的 BadRequest 而不是 assert
         error = last_error or BadRequestError(
             f"task '{call.task}' 没有可用候选",
             provider="gateway",
         )
 
-        emit(
-            RequestLog(
-                request_id=current_request_id(),
-                task=call.task,
-                tier=tier,
-                provider=error.provider,
-                model=fallback_from or "",
-                fallback_from=fallback_from,
-                latency_ms=round((self._clock() - started_all) * 1000, 3),
-                finish_reason="error",
-                error_code=error_code_for(error),
-                stream=False,
-            )
-        )
+        # 失败也要有且只有一条 RequestLog（与成功路径对称）：
+        # 少了它，"请求量 / 失败率"只能从 access log 猜。
+        emit(RequestLog(
+            request_id=current_request_id(),
+            task=call.task,
+            tier=tier,
+            provider=error.provider,
+            model=fallback_from or "",  # 最后一个试过的候选
+            fallback_from=fallback_from,
+            latency_ms=round((self._clock() - started_all) * 1000, 3),  # 这里才用整链耗时
+            finish_reason="error",
+            error_code=error_code_for(error),
+            stream=False,
+        ))
 
-        raise error
+        raise error  # 保持异常语义：不返回 None、不吞错，让上层（server 层）统一映射 HTTP 状态码
 
     # -- 流式 ------------------------------------------------------------ #
 

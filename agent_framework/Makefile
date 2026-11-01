@@ -6,7 +6,7 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
-.PHONY: help sync test lint type check smoke baseline up down ps logs load clean
+.PHONY: help sync test lint type check smoke baseline up down ps logs load e2e clean
 
 help: ## 列出所有目标
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
@@ -48,6 +48,9 @@ logs: ## 跟踪 agent-server 日志（grep first_token_ms / trace_id 用）
 load: ## 离线档压测（20 并发 30s，需先 make up 或 uv run agent-server）
 	uv run --with locust locust -f evals/scripts/locustfile.py \
 		--headless -u 20 -r 5 -t 30s --host http://127.0.0.1:8000
+
+e2e: ## 端到端自检：过载 503 / 任务端点 / trace 贯穿（进程内起服务，不占端口）
+	uv run python evals/scripts/w2_e2e_check.py
 
 clean: ## 清掉本地缓存（不碰 .venv 与 .env*）
 	rm -rf .pytest_tmp .pytest_cache .ruff_cache .mypy_cache
