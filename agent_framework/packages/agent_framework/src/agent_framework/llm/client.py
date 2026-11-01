@@ -33,6 +33,7 @@ from ..observability import (
     emit,
     emit_candidate_failure,
 )
+from ..tracing import Span, span
 from .base import Capability, LLMClient
 from .errors import (
     BadRequestError,
@@ -153,65 +154,88 @@ class LLMGateway:
             started = self._clock()
 
             for attempt in range(1, self._settings.max_attempts + 1):
-                try:
-                    response = await adapter.chat(
-                        call.messages,
-                        call.tools,
-                        tool_choice=call.tool_choice,
-                        **call.opts,
-                    )
-                except (LLMError, httpx.HTTPError) as exc:
-                    error = self._as_llm_error(exc, adapter)
-
-                    if not self._should_retry(error, attempt):
-                        last_error = error
-                        emit_candidate_failure(
-                            alias, attempt, error_code_for(error), str(error)
-                        )
-                        break
-
-                    _LOG.info(
-                        "retry alias=%s attempt=%d code=%s",
-                        alias,
-                        attempt,
-                        error_code_for(error),
-                    )
-                    await self._sleep(self._delay(attempt - 1, error.retry_after))
-                    continue
-
-                latency_ms = (self._clock() - started) * 1000
-                response.provider = response.provider or adapter.name
-                response.latency_ms = latency_ms
-                cost = compute_cost(model.pricing, response.usage)
-
-                emit(
-                    RequestLog(
-                        request_id=current_request_id(),
-                        task=call.task,
-                        tier=tier,
-                        provider=response.provider,
-                        model=alias,
-                        fallback_from=fallback_from,
-                        prompt_tokens=response.usage.input_tokens,
-                        completion_tokens=response.usage.output_tokens,
-                        cost=cost,
-                        currency=model.pricing.currency,
-                        latency_ms=round(latency_ms, 3),
-                        first_token_ms=None,
-                        retry_count=attempt - 1,
-                        finish_reason=str(response.finish_reason),
-                        error_code=None,
-                        stream=False,
-                        usage_estimated=response.usage.estimated,
-                    )
-                )
-
-                return ChatOutcome(
-                    response=response,
+                # span 包在"真正发 HTTP 的那一次尝试"上，而不是整个 chat()：
+                # 重试 3 次就该有 3 个 span，否则 trace 里看不出是第几次失败的。
+                async with span(
+                    "llm.call",
+                    task=call.task,
                     alias=alias,
-                    retry_count=attempt - 1,
-                    fallback_from=fallback_from,
-                )
+                    provider=adapter.name,
+                    attempt=attempt,
+                    stream=False,
+                ) as current_span:
+                    try:
+                        response = await adapter.chat(
+                            call.messages,
+                            call.tools,
+                            tool_choice=call.tool_choice,
+                            **call.opts,
+                        )
+                    except (LLMError, httpx.HTTPError) as exc:
+                        error = self._as_llm_error(exc, adapter)
+                        self._mark_span_error(current_span, error)
+
+                        if not self._should_retry(error, attempt):
+                            last_error = error
+                            emit_candidate_failure(
+                                alias, attempt, error_code_for(error), str(error)
+                            )
+                            break
+
+                        _LOG.info(
+                            "retry alias=%s attempt=%d code=%s",
+                            alias,
+                            attempt,
+                            error_code_for(error),
+                        )
+                        await self._sleep(self._delay(attempt - 1, error.retry_after))
+                        continue
+
+                    latency_ms = (self._clock() - started) * 1000
+                    response.provider = response.provider or adapter.name
+                    response.latency_ms = latency_ms
+                    cost = compute_cost(model.pricing, response.usage)
+
+                    current_span.attributes.update(
+                        {
+                            "prompt_tokens": response.usage.input_tokens,
+                            "completion_tokens": response.usage.output_tokens,
+                            "cost": cost,
+                            "currency": model.pricing.currency,
+                            "latency_ms": round(latency_ms, 3),
+                            "finish_reason": str(response.finish_reason),
+                            "retry_count": attempt - 1,
+                        }
+                    )
+
+                    emit(
+                        RequestLog(
+                            request_id=current_request_id(),
+                            task=call.task,
+                            tier=tier,
+                            provider=response.provider,
+                            model=alias,
+                            fallback_from=fallback_from,
+                            prompt_tokens=response.usage.input_tokens,
+                            completion_tokens=response.usage.output_tokens,
+                            cost=cost,
+                            currency=model.pricing.currency,
+                            latency_ms=round(latency_ms, 3),
+                            first_token_ms=None,
+                            retry_count=attempt - 1,
+                            finish_reason=str(response.finish_reason),
+                            error_code=None,
+                            stream=False,
+                            usage_estimated=response.usage.estimated,
+                        )
+                    )
+
+                    return ChatOutcome(
+                        response=response,
+                        alias=alias,
+                        retry_count=attempt - 1,
+                        fallback_from=fallback_from,
+                    )
 
             # 这个候选彻底失败 → 进入下一个（全链只绕一圈，绝不回头）
             fallback_from = alias
@@ -250,143 +274,183 @@ class LLMGateway:
         for alias in aliases:
             adapter = self._ensure_capabilities(alias, call, stream=True)
             model = self._registry.get_model(alias)
+
             for attempt in range(1, self._settings.max_attempts + 1):
-                started = self._clock()
-                agen = cast(
-                    AsyncGenerator[StreamEvent, None],
-                    adapter.stream(
-                        call.messages,
-                        call.tools,
-                        tool_choice=call.tool_choice,
-                        **call.opts,
-                    ),
-                )
+                # 一次尝试一个 span：重试 3 次就有 3 个 span，trace 里直接看出"第几次才通"。
+                # `async with` 里 yield 是合法的：span 的生命周期跟着迭代方走，
+                # 消费方半途关闭流时 `__aexit__` 仍会导出（否则失败流在 trace 里会消失）。
+                async with span(
+                    "llm.call",
+                    task=call.task,
+                    alias=alias,
+                    provider=adapter.name,
+                    attempt=attempt,
+                    stream=True,
+                ) as current_span:
+                    started = self._clock()
+                    agen = cast(
+                        AsyncGenerator[StreamEvent, None],
+                        adapter.stream(
+                            call.messages,
+                            call.tools,
+                            tool_choice=call.tool_choice,
+                            **call.opts,
+                        ),
+                    )
 
-                committed = False
-                first_token_ms: float | None = None
-                usage: Usage | None = None
-                finish_reason: FinishReason = FinishReason.UNKNOWN
-                error: LLMError | None = None
+                    committed = False
+                    first_token_ms: float | None = None
+                    usage: Usage | None = None
+                    finish_reason: FinishReason = FinishReason.UNKNOWN
+                    error: LLMError | None = None
 
-                try:
                     try:
-                        event = await self._first_event(agen, adapter, alias)
-                    except LLMError as exc:
-                        # 首个事件之前失败 = 用户什么都还没看到 → 允许重试
-                        error = exc
-                    else:
-                        while True:
-                            committed = committed or event.type in _COMMITTING_EVENTS
+                        try:
+                            event = await self._first_event(agen, adapter, alias)
+                        except LLMError as exc:
+                            # 首个事件之前失败 = 用户什么都还没看到 → 允许重试
+                            error = exc
+                        else:
+                            while True:
+                                committed = (
+                                    committed or event.type in _COMMITTING_EVENTS
+                                )
 
-                            if first_token_ms is None and event.type in _FIRST_TOKEN_EVENTS:
-                                first_token_ms = (self._clock() - started) * 1000
+                                if (
+                                    first_token_ms is None
+                                    and event.type in _FIRST_TOKEN_EVENTS
+                                ):
+                                    first_token_ms = (self._clock() - started) * 1000
 
-                            if event.usage is not None:
-                                usage = event.usage
+                                if event.usage is not None:
+                                    usage = event.usage
 
-                            if event.finish_reason is not None:
-                                finish_reason = event.finish_reason
+                                if event.finish_reason is not None:
+                                    finish_reason = event.finish_reason
 
-                            yield event
+                                yield event
 
-                            try:
-                                event = await agen.__anext__()
-                            except StopAsyncIteration:
-                                break
-                            except (LLMError, httpx.HTTPError) as exc:
-                                error = self._as_llm_error(exc, adapter)
-                                break
-                finally:
-                    # 放弃半开的流必须显式关闭：不关会把连接留在池里，
-                    # 功能测试一天都发现不了，W2 压测立刻 `Too many open files`。
-                    await agen.aclose()
+                                try:
+                                    event = await agen.__anext__()
+                                except StopAsyncIteration:
+                                    break
+                                except (LLMError, httpx.HTTPError) as exc:
+                                    error = self._as_llm_error(exc, adapter)
+                                    break
+                    finally:
+                        # 放弃半开的流必须显式关闭：不关会把连接留在池里，
+                        # 功能测试一天都发现不了，W2 压测立刻 `Too many open files`。
+                        await agen.aclose()
 
-                if error is None:
-                    latency_ms = (self._clock() - started) * 1000
-                    final_usage = usage or Usage(estimated=True)
-                    cost = compute_cost(model.pricing, final_usage)
-
-                    emit(
-                        RequestLog(
-                            request_id=current_request_id(),
-                            task=call.task,
-                            tier=tier,
-                            provider=adapter.name,
-                            model=alias,
-                            fallback_from=fallback_from,
-                            prompt_tokens=final_usage.input_tokens,
-                            completion_tokens=final_usage.output_tokens,
-                            cost=cost,
-                            currency=model.pricing.currency,
-                            latency_ms=round(latency_ms, 3),
-                            first_token_ms=(
-                                round(first_token_ms, 3)
-                                if first_token_ms is not None
-                                else None
-                            ),
-                            retry_count=attempt - 1,
-                            finish_reason=str(finish_reason),
-                            error_code=None,
-                            stream=True,
-                            usage_estimated=final_usage.estimated,
+                    if error is None:
+                        latency_ms = (self._clock() - started) * 1000
+                        final_usage = usage or Usage(estimated=True)
+                        cost = compute_cost(model.pricing, final_usage)
+                        rounded_first = (
+                            round(first_token_ms, 3)
+                            if first_token_ms is not None
+                            else None
                         )
-                    )
 
-                    return
-
-                if committed:
-                    # 已经吐过内容：只能以 error 帧终止，绝不重放（§3.7 红线）。
-                    code = error_code_for(error)
-                    _LOG.warning(
-                        "stream aborted after commit alias=%s code=%s", alias, code
-                    )
-                    emit(
-                        RequestLog(
-                            request_id=current_request_id(),
-                            task=call.task,
-                            tier=tier,
-                            provider=adapter.name,
-                            model=alias,
-                            fallback_from=fallback_from,
-                            latency_ms=round((self._clock() - started) * 1000, 3),
-                            first_token_ms=(
-                                round(first_token_ms, 3)
-                                if first_token_ms is not None
-                                else None
-                            ),
-                            retry_count=attempt - 1,
-                            finish_reason="error",
-                            error_code=code,
-                            stream=True,
+                        current_span.attributes.update(
+                            {
+                                "first_token_ms": rounded_first,
+                                "prompt_tokens": final_usage.input_tokens,
+                                "completion_tokens": final_usage.output_tokens,
+                                "cost": cost,
+                                "currency": model.pricing.currency,
+                                "latency_ms": round(latency_ms, 3),
+                                "finish_reason": str(finish_reason),
+                                "retry_count": attempt - 1,
+                                "usage_estimated": final_usage.estimated,
+                            }
                         )
+
+                        emit(
+                            RequestLog(
+                                request_id=current_request_id(),
+                                task=call.task,
+                                tier=tier,
+                                provider=adapter.name,
+                                model=alias,
+                                fallback_from=fallback_from,
+                                prompt_tokens=final_usage.input_tokens,
+                                completion_tokens=final_usage.output_tokens,
+                                cost=cost,
+                                currency=model.pricing.currency,
+                                latency_ms=round(latency_ms, 3),
+                                first_token_ms=rounded_first,
+                                retry_count=attempt - 1,
+                                finish_reason=str(finish_reason),
+                                error_code=None,
+                                stream=True,
+                                usage_estimated=final_usage.estimated,
+                            )
+                        )
+
+                        return
+
+                    if committed:
+                        # 已经吐过内容：只能以 error 帧终止，绝不重放（§3.7 红线）。
+                        code = error_code_for(error)
+                        current_span.status = "error"
+                        current_span.error_code = code
+                        current_span.attributes["first_token_ms"] = (
+                            round(first_token_ms, 3)
+                            if first_token_ms is not None
+                            else None
+                        )
+                        _LOG.warning(
+                            "stream aborted after commit alias=%s code=%s", alias, code
+                        )
+                        emit(
+                            RequestLog(
+                                request_id=current_request_id(),
+                                task=call.task,
+                                tier=tier,
+                                provider=adapter.name,
+                                model=alias,
+                                fallback_from=fallback_from,
+                                latency_ms=round((self._clock() - started) * 1000, 3),
+                                first_token_ms=(
+                                    round(first_token_ms, 3)
+                                    if first_token_ms is not None
+                                    else None
+                                ),
+                                retry_count=attempt - 1,
+                                finish_reason="error",
+                                error_code=code,
+                                stream=True,
+                            )
+                        )
+
+                        yield StreamEvent(
+                            type=StreamEventType.ERROR,
+                            data={
+                                "code": code,
+                                "message": str(error),
+                                "request_id": current_request_id() or "-",
+                            },
+                        )
+
+                        return
+
+                    last_error = error
+                    self._mark_span_error(current_span, error)
+
+                    if not self._should_retry(error, attempt):
+                        emit_candidate_failure(
+                            alias, attempt, error_code_for(error), str(error)
+                        )
+                        break
+
+                    _LOG.info(
+                        "retry stream alias=%s attempt=%d code=%s",
+                        alias,
+                        attempt,
+                        error_code_for(error),
                     )
-
-                    yield StreamEvent(
-                        type=StreamEventType.ERROR,
-                        data={
-                            "code": code,
-                            "message": str(error),
-                            "request_id": current_request_id() or "-",
-                        },
-                    )
-
-                    return
-
-                last_error = error
-
-                if not self._should_retry(error, attempt):
-                    emit_candidate_failure(
-                        alias, attempt, error_code_for(error), str(error)
-                    )
-                    break
-
-                _LOG.info(
-                    "retry stream alias=%s attempt=%d code=%s",
-                    alias,
-                    attempt,
-                    error_code_for(error),
-                )
-                await self._sleep(self._delay(attempt - 1, error.retry_after))
+                    await self._sleep(self._delay(attempt - 1, error.retry_after))
 
             fallback_from = alias
 
@@ -414,8 +478,29 @@ class LLMGateway:
 
     # -- 生命周期 -------------------------------------------------------- #
 
+    @property
+    def catalog(self) -> Catalog:
+        """暴露 catalog 给服务层（并发限额、能力查询都要读它，别各自 load 一次）。"""
+
+        return self._catalog
+
+    @property
+    def settings(self) -> Settings:
+        return self._settings
+
     async def aclose(self) -> None:
         await self._registry.aclose()
+
+    @staticmethod
+    def _mark_span_error(current_span: Span, error: LLMError) -> None:
+        """失败 span 也要有 code。
+
+        没有它，trace 里只看到"慢/失败"，要翻日志才知道是哪类错误；
+        而 W4 的根因归因正是按 error_code 分层定位的。
+        """
+
+        current_span.status = "error"
+        current_span.error_code = error_code_for(error)
 
     # -- 内部：路由与能力 ------------------------------------------------ #
 

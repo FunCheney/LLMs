@@ -16,7 +16,14 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, Field, SecretStr, ValidationError, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    ValidationError,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .llm.base import Capability
@@ -103,6 +110,34 @@ class RouteConfig(BaseModel):
     fallback: list[str] = Field(default_factory=list)
 
 
+class LimitsConfig(BaseModel):
+    """并发限额（W2 D2）。**数字只从 yaml 来，代码里不许出现 `Semaphore(8)`**。
+
+    写法是"三层覆盖"：alias 覆盖 > provider 覆盖 > 全局默认。
+    不用"每家写死一个值"的原因：同一家下 cheap/strong 两档的池子大小本来就不同
+    （claude-sonnet 的并发额度远小于 gpt-4o-mini），把它压成 provider 级必然写错一半。
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    # yaml 里写 `global:`，Python 侧不能叫 global，所以用 alias。
+    max_inflight: int = Field(default=16, alias="global", ge=1)
+    per_provider: dict[str, int] = Field(default_factory=dict)
+    per_alias: dict[str, int] = Field(default_factory=dict)
+
+    def limit_for(self, alias: str, provider: str) -> int:
+        """alias 覆盖 → provider 覆盖 → 全局默认。"""
+
+        if alias in self.per_alias:
+            return self.per_alias[alias]
+
+        if provider in self.per_provider:
+            return self.per_provider[provider]
+
+        return self.max_inflight
+
+
+
 class Catalog(BaseModel):
     """models.yaml 的内存形态。"""
 
@@ -110,6 +145,7 @@ class Catalog(BaseModel):
     models: dict[str, ModelConfig]
     routes: dict[str, RouteConfig]
     tasks: dict[str, str] = Field(default_factory=dict)
+    limits: LimitsConfig = Field(default_factory=LimitsConfig)
 
     @model_validator(mode="after")
     def validate_references(self) -> Catalog:
@@ -142,6 +178,16 @@ class Catalog(BaseModel):
         for task, tier in self.tasks.items():
             if tier not in self.routes:
                 problems.append(f"tasks.{task}: '{tier}' 不是有效的 route")
+
+        # limits 里的 key 打错（比如把 qwen 写成 qwen3）不会报错、只会静默不生效——
+        # 那正好是"压测时以为限了、其实没限"的成因，所以启动时就查。
+        for provider in self.limits.per_provider:
+            if provider not in self.providers:
+                problems.append(f"limits.per_provider: 未知 provider '{provider}'")
+
+        for alias in self.limits.per_alias:
+            if alias not in self.models:
+                problems.append(f"limits.per_alias: 未知模型 alias '{alias}'")
 
         if problems:
             raise ValueError("models.yaml 校验失败：\n  - " + "\n  - ".join(problems))
@@ -207,6 +253,20 @@ class Settings(BaseSettings):
 
     # 默认不记 prompt 原文：合规与隐私优先，需要排查时再显式打开。
     log_prompts: bool = False
+
+    # -- W2：会话 / 过载 / 队列 ----------------------------------------- #
+    # 默认 memory：离线测试与 CI 不该被一个 Redis 挡住。生产用 `SESSION_BACKEND=redis`。
+    session_backend: Literal["memory", "redis"] = "memory"
+    redis_url: str = "redis://localhost:6379/0"
+    session_ttl_s: int = Field(default=86400, ge=60)
+    session_max_turns: int = Field(default=50, ge=1)
+
+    # 过载时最多等多久再回 503。等太久会把 p99 拖成秒级，比直接拒绝更糟。
+    overload_wait_s: float = Field(default=0.25, ge=0)
+
+    # 长任务队列上限与消费者数：满了给 503 + Retry-After，而不是把内存吃光。
+    task_queue_size: int = Field(default=100, ge=1)
+    task_workers: int = Field(default=2, ge=1)
 
     openai_api_key: SecretStr | None = None
     deepseek_api_key: SecretStr | None = None

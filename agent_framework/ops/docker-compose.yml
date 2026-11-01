@@ -1,0 +1,117 @@
+# 一键拉起：agent-server + growth-agent + redis（+ 可选 temporal profile）
+#
+#   cd ops && docker compose up -d --build          # 默认档
+#   docker compose --profile temporal up -d         # 需要长任务工作流时
+#   docker compose ps && curl -s localhost:8000/health
+#
+# 密钥只走 env（compose 从同目录的 .env 读，模板见 .env.example）。
+
+name: agent-platform
+
+services:
+  agent-server:
+    build:
+      context: ..
+      dockerfile: ops/Dockerfile
+    command:
+      - uvicorn
+      - agent_framework.server.app:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+    env_file:
+      - .env
+    environment:
+      SESSION_BACKEND: redis
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # 必须打 /health：没有 healthcheck 时 depends_on 只等"容器起来了"，
+      # 压测脚本会在应用还没就绪时开火，错误率直接爆表。
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  growth-agent:
+    build:
+      context: ..
+      dockerfile: ops/Dockerfile
+    command:
+      - uvicorn
+      - growth_agent.app:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8100"
+    env_file:
+      - .env
+    environment:
+      SESSION_BACKEND: redis
+      REDIS_URL: redis://redis:6379/0
+      # 容器内访问框架走服务名，不走 localhost
+      AGENT_SERVER_URL: http://agent-server:8000
+    ports:
+      - "8100:8100"
+    depends_on:
+      agent-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8100/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # -- 可选：长任务工作流（W9 才真正用上；这里先保证"要起就能起"） ---------- #
+  temporal:
+    image: temporalio/auto-setup:1.28.1
+    profiles: ["temporal"]
+    depends_on:
+      temporal-postgres:
+        condition: service_healthy
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: temporal-postgres
+    ports:
+      - "7233:7233"
+
+  temporal-postgres:
+    image: postgres:16-alpine
+    profiles: ["temporal"]
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - temporal-data:/var/lib/postgresql/data
+
+volumes:
+  redis-data:
+  temporal-data:

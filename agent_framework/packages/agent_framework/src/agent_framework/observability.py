@@ -23,6 +23,12 @@ from .llm.types import Usage
 
 request_id_var: ContextVar[str] = ContextVar("request_id", default="")
 
+# W2 D3：一次用户任务 = 一个 trace_id，任务内的每次 LLM / 工具调用 = 一个 span_id。
+# 与 request_id 分开的原因：一次任务可能跨多次 HTTP（前端轮询、队列消费），
+# 用 request_id 冒充 trace_id 会让"同一个任务"在日志里碎成好几段。
+trace_id_var: ContextVar[str] = ContextVar("trace_id", default="")
+span_id_var: ContextVar[str] = ContextVar("span_id", default="")
+
 _LOG = logging.getLogger("agent_framework.request")
 _ROUTER_LOG = logging.getLogger("agent_framework.router")
 _CANDIDATE_LOG = logging.getLogger("agent_framework.llm.candidate")
@@ -30,6 +36,10 @@ _CANDIDATE_LOG = logging.getLogger("agent_framework.llm.candidate")
 
 def new_request_id() -> str:
     return "req_" + uuid4().hex[:12]
+
+
+def new_trace_id() -> str:
+    return "trace_" + uuid4().hex[:16]
 
 
 def current_request_id() -> str:
@@ -40,6 +50,14 @@ def current_request_id() -> str:
     """
 
     return request_id_var.get()
+
+
+def current_trace_id() -> str:
+    return trace_id_var.get()
+
+
+def current_span_id() -> str:
+    return span_id_var.get()
 
 
 @contextmanager
@@ -57,6 +75,23 @@ def request_scope(request_id: str | None = None) -> Iterator[str]:
         yield resolved
     finally:
         request_id_var.reset(token)
+
+
+@contextmanager
+def trace_scope(trace_id: str | None = None) -> Iterator[str]:
+    """设置 trace_id 并复位（与 `request_scope` 同一手法）。
+
+    后台任务（队列消费者）必须显式进这个 scope：它不经过 ASGI 中间件，
+    否则一个任务的所有 span 会共享空 trace_id，trace 直接断成两截。
+    """
+
+    resolved = trace_id or new_trace_id()
+    token = trace_id_var.set(resolved)
+
+    try:
+        yield resolved
+    finally:
+        trace_id_var.reset(token)
 
 
 @dataclass(slots=True)
@@ -85,9 +120,16 @@ class RequestLog:
     stream: bool = False
     usage_estimated: bool = False
 
+    # W2 D3 追加的两个字段（只加不改：W1 那 18 个字段的语义一个字都没动，
+    # 否则 W11 的成本看板与历史日志会变成两套口径）。
+    trace_id: str = ""
+    span_id: str = ""
+
     def as_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         payload["request_id"] = self.request_id or "-"
+        payload["trace_id"] = self.trace_id or "-"
+        payload["span_id"] = self.span_id or "-"
 
         return payload
 
@@ -96,9 +138,19 @@ def emit(record: RequestLog, *, logger: logging.Logger | None = None) -> None:
     """输出一条结构化日志。
 
     W1 直接打 JSON 到 logging；W3 接 Langfuse 时只换 exporter，字段不动。
+
+    trace_id / span_id 在这里统一补：调用方（client.py 的 6 处 emit）
+    不用各自去读 contextvar，少写一处就少一个"日志里 trace 断掉"的可能。
     """
 
     target = logger or _LOG
+
+    if not record.trace_id:
+        record.trace_id = current_trace_id()
+
+    if not record.span_id:
+        record.span_id = current_span_id()
+
     target.info(
         json.dumps(record.as_dict(), ensure_ascii=False, default=str, sort_keys=True)
     )

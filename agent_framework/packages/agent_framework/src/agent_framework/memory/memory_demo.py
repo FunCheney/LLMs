@@ -13,7 +13,7 @@ import sqlite3
 import tempfile
 import time
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 
@@ -347,7 +347,9 @@ def demo():
         assert mm.retrieve(ctx, "", direct_keys=["response_language"])[0]["id"] == second
         print("PASS: correction replaces the old active memory atomically")
 
-        local_source = mm.record_event(ctx, "thread-2", "user", "这个项目用中文解释。", explicit=True)
+        local_source = mm.record_event(
+            ctx, "thread-2", "user", "这个项目用中文解释。", explicit=True
+        )
         local = mm.propose(ctx, scope="project", kind="semantic", key="response_language",
                            content="这个项目用中文解释。", source_id=local_source)
         mm.activate(ctx, local)
@@ -377,7 +379,9 @@ def demo():
         assert mm.retrieve(ctx, "Rust") == []
         print("PASS: unsupported assistant guesses stay out of retrieval")
 
-        tool_source = mm.record_event(ctx, "thread-2", "tool", "配置文件：database=PostgreSQL", verified=True)
+        tool_source = mm.record_event(
+            ctx, "thread-2", "tool", "配置文件：database=PostgreSQL", verified=True
+        )
         fact = mm.propose(ctx, scope="project", kind="semantic", key="database",
                           content="订单项目使用 PostgreSQL", source_id=tool_source, ttl_seconds=60)
         mm.activate(ctx, fact)

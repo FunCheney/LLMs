@@ -146,6 +146,58 @@ class CapabilityError(LLMError):
     """客户端或模型不支持调用方要求的能力（不可重试）。"""
 
 
+# --------------------------------------------------------------------------- #
+# 入口层异常（W2 起）
+#
+# 它们**不是**上游故障，但必须走同一张映射表。否则 503 与 404 会出现第二份定义，
+# 而"同一类错误两个服务返回不同 code"正是 W12 提取框架时最难拆的债。
+# 定义放在这里而不是 resilience/errors.py：映射表在这里，跨模块互相 import 会成环；
+# `resilience/errors.py` 只做 re-export，给文档里的导入路径一个落点。
+# --------------------------------------------------------------------------- #
+
+
+class ServerBusyError(LLMError):
+    """入口层过载：并发信号量满 / 任务队列满 → 503 + Retry-After。
+
+    **`retryable` 必须是 False。** ADR-003 说重试归 `LLMGateway`，而它只认
+    `error.retryable`：这里若为 True，100 并发过载会被放大成 300 并发，
+    压测第一分钟就能把自己打死。退避是**调用方**的事，靠 `Retry-After` 告诉它。
+    """
+
+    default_retryable = False
+    default_retry_after = 2.0
+
+    def __init__(
+        self,
+        message: str = "服务繁忙，请稍后重试",
+        *,
+        provider: str = "gateway",
+        retry_after: float | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(
+            message,
+            provider=provider,
+            retry_after=(
+                retry_after if retry_after is not None else self.default_retry_after
+            ),
+            **kwargs,
+        )
+
+
+class TaskNotFoundError(LLMError):
+    """查不到 task_id → 404。调用方拿到一个已过期的 id 属于输入问题，不是 500。"""
+
+    def __init__(
+        self,
+        message: str = "任务不存在",
+        *,
+        provider: str = "gateway",
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(message, provider=provider, **kwargs)
+
+
 # 内部异常 → (对外 HTTP, 对外 code)。architecture §3.6 是这张表的唯一来源。
 # 放在 errors.py 而不是 server/：客户端层打日志也要用 code，两处各写一份必然漂移。
 ERROR_HTTP: dict[type[LLMError], tuple[int, str]] = {
@@ -156,6 +208,8 @@ ERROR_HTTP: dict[type[LLMError], tuple[int, str]] = {
     ContentFilteredError: (422, "CONTENT_FILTERED"),
     UpstreamServerError: (502, "UPSTREAM_ERROR"),
     CapabilityError: (400, "CAPABILITY_UNSUPPORTED"),
+    ServerBusyError: (503, "SERVER_BUSY"),
+    TaskNotFoundError: (404, "TASK_NOT_FOUND"),
 }
 
 # 未登记的异常一律按上游故障处理：宁可 502 可重试，也不要把未知错误伪装成 400

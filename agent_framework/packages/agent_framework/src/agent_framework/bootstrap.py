@@ -11,6 +11,7 @@ from .config import Catalog, Settings, load_catalog
 from .llm.client import LLMGateway
 from .llm.registry import Registry
 from .llm.router import TaskRouter
+from .resilience.concurrency import ConcurrencyLimiter
 
 
 def build_gateway(
@@ -33,4 +34,30 @@ def build_gateway(
         router=TaskRouter(resolved_catalog),
         catalog=resolved_catalog,
         settings=resolved_settings,
+    )
+
+
+def build_limiter(
+    catalog: Catalog,
+    settings: Settings | None = None,
+) -> ConcurrencyLimiter:
+    """按 `models.yaml` 的 limits 造并发闸门。
+
+    在 gateway **之外**而不是之内：gateway 的职责是"把一次调用打出去"，
+    入口过载属于服务层（谁收请求谁拒绝）。混进 gateway 会让"重试一次"
+    与"重新排队一次"看起来像同一件事，而过载时最怕的就是这个。
+    """
+
+    limits = {
+        alias: catalog.limits.limit_for(alias, model.provider)
+        for alias, model in catalog.models.items()
+    }
+
+    return ConcurrencyLimiter(
+        limits,
+        max_inflight=catalog.limits.max_inflight,
+        # 未登记的 key（新加的 alias、评测临时钉的模型）走全局默认档，
+        # 而不是代码里另一个写死的数字。
+        default_limit=catalog.limits.max_inflight,
+        default_timeout_s=settings.overload_wait_s if settings is not None else 0.25,
     )

@@ -5,6 +5,57 @@
 
 ---
 
+## 2026-W45（11-02 ~ 11-06）· W2：运行底座 + 可观测基线 + 评测冒烟集
+
+> 实际落盘时间 11-01（周日）预跑；数字全部来自离线档，在线档待 key。
+
+### 本周做了什么
+
+| Day | 产出 | 结论 |
+|---|---|---|
+| D1 | `session/{base,memory,redis,factory}.py` + `workflow/research_workflow.py` + `docs/w2/adr-w2-session-boundary.md` | 幂等键必须三档解析（显式 → contextvar → uuid）；少第三档，脚本与队列消费者一调就误判重复 |
+| D2 | `resilience/{concurrency,errors}.py` + `queue/{base,inmemory}.py` + `server/routes_task.py` | 入口过载 `retryable=False`：让 gateway 再重试一次，100 并发立刻变 300（压测直接崩） |
+| D3 | `observability.py`（+`trace_id`/`span_id`）+ `tracing.py`（Span/span()/Exporter） | `trace_id` 必须在中间件生成，放进 `span()` 会让同一请求的多个 span 各拿一个新 trace |
+| D4 | `ops/{Dockerfile,docker-compose.yml,.env.example}` + `evals/scripts/locustfile.py` + 压测报告 | 客户端口径与服务端口径差一个数量级，延迟结论只能取 `RequestLog` |
+| D5 | `evals/golden/smoke_v1.jsonl`（10 条）+ `run_smoke.py` + CI + `Makefile` | 门禁必须先证明"能红"：CI 里改坏一条 expect，退出码非 0 才算门禁成立 |
+
+### 指标变化
+
+- 离线用例：`278 → 337`（新增会话/限流/队列/trace/任务端点/smoke runner 六组），live 仍 16 个跳过
+- **100 并发离线压测：1224 请求 / 0 失败 / `retry_count>0` 为 0 / 994 条日志 994 个 trace_id**
+- 首 token（port 口径）：p50 `20.9 ms`、p95 `32.5 ms` —— **仅证明埋点链路正确**，fixture 回放不代表真实模型
+- 成本：仍为 0（fixture 不计价）；质量：smoke `10/10`，只有"没坏"这一档
+- 静态检查：`ruff` 全绿、`mypy` 43 文件无问题
+
+### 本周暴露的四个真问题（都不是写代码时能想到的）
+
+1. **"实现慢"可能是机器慢**：全量串跑 15 分钟、单文件跑 6 秒，同一份代码。宿主调度一停顿，
+   客户端 p95 就从 35 ms 涨到 1200 ms。**结论**：延迟只认服务端 `RequestLog`，客户端分位数只能横向比。
+2. **幂等的兜底键不是可选项**：没有"显式 → contextvar → 本地 uuid"第三档，`request_id=""` 会让
+   第二次 `append` 被判成重复，表现为"多轮对话第二轮丢消息"——只在真实多轮里复现。
+3. **入队前必须 `precheck`**：alias 打错这类注定失败的请求，占了队列槽位排 30 秒再 failed，
+   等于把调用方的输入错误升级成我们的容量问题。
+4. **compose 的 healthcheck 不能指向未就绪端口**：`depends_on` 只保证"容器起了"，不保证"能连"，
+   `agent-server` 起得比 redis 慢时，首批请求全是 `Connection refused`。
+
+### 遗留问题（带责任人与时限）
+
+| # | 问题 | 处理 |
+|---|---|---|
+| 1 | 在线档延迟/成本未测 | 有 key 时 `MODEL=qwen3.7-plus make load`，报告记时段（峰谷差 2 倍） |
+| 2 | `docker build` 未在本机执行（无 docker） | compose 仅静态检查；首次 `make up` 时补 `docker compose ps` 无 restart 的记录 |
+| 3 | 队列进程内实现 | 多副本会丢任务；换 Redis Stream 时 `TaskQueue` 签名不变 |
+| 4 | 满载 503 只有单测 | 把 `limits.global` 调成 1 跑 10 并发，端到端验 `Retry-After` |
+| 5 | smoke 只判"全过" | W4 升级为"指标不得劣化"，需要先有 3 周基线 |
+
+### 下周（W3）只做三件事
+
+1. golden set 扩到 50+（每类覆盖从 2–3 条提到 8–10 条），判据从"文本包含"升级到结构化断言；
+2. 接 Langfuse：只实现 `LangfuseExporter` 替换 `NoopExporter`，`RequestLog` 字段一个不改；
+3. 记忆层（W7 前置）只定接口，不实现——先把"哪些事实值得记"的判据写进文档。
+
+---
+
 ## 2026-W44（10-26 ~ 10-30）· W1：LLM 适配层 + 首个纵向切片
 
 ### 本周做了什么

@@ -81,3 +81,17 @@ routes:
 tasks:
   chat: cheap
   research: strong
+
+# 并发限额（W2 D2）：入口层用信号量挡住过载，超时 → 503 + Retry-After。
+# 三层覆盖：per_alias > per_provider > global。数字是"每实例在飞请求数"，
+# 不是 QPS——QPS 由上游限流决定，这里只保护自己的连接池与内存。
+limits:
+  global: 16
+  per_provider:
+    anthropic: 4          # 单 key 的并发额度最小，压测时最先打到 429
+    qwen: 8
+    deepseek: 8
+    openai: 8
+    mock: 32              # 离线回放不占连接，放宽以便压测工具链本身
+  per_alias:
+    claude-sonnet-4-6: 2

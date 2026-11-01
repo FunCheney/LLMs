@@ -1,0 +1,24 @@
+# 构建上下文排除项：镜像里不需要的东西一律别拷，构建缓存才会稳定命中。
+
+.git
+.gitignore
+.venv
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.pytest_tmp
+__pycache__
+*.py[cod]
+
+# 密钥绝不进镜像层（即使 .dockerignore 失效，也不该有文件可拷）
+.env
+.env.*
+!.env.example
+
+# 评测原始产物与历史（镜像里不需要；W3 的评测在 CI 里跑）
+evals/**/tmp
+docs
+
+# 本地工具
+.DS_Store
+.workbuddy

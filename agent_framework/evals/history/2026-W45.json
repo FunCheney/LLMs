@@ -1,0 +1,94 @@
+{
+  "week": "2026-W45",
+  "period": { "from": "2026-11-02", "to": "2026-11-06" },
+  "gate": "W2",
+  "status": "code-complete-live-pending",
+  "note": "记录于 2026-11-01（周日）本地预跑；数据全部来自离线档（model=fixture），在线档待有 key 后补",
+  "summary": "运行底座成形：会话层（内存/Redis 双实现）+ 并发限流与背压 + 进程内任务队列 + trace 贯穿 + 一键 compose + 10 条 smoke eval 接进 CI。100 并发离线档 0 失败，真实延迟与成本仍待在线档。",
+  "metrics": {
+    "tests": {
+      "offline_passed": 337,
+      "offline_collected": 353,
+      "live_defined": 16,
+      "live_skipped_reason": "无 API 凭证；显式 `-m live` 且 .env.local 就绪后执行",
+      "static_checks": { "ruff": "pass", "mypy_files": 43, "mypy": "pass" }
+    },
+    "conformance": {
+      "assertions": "A1-A14",
+      "passing": 14,
+      "fixtures_total": 24,
+      "note": "W2 未新增断言；A13/A14 仍等真机录制后才有杀伤力"
+    },
+    "latency": {
+      "first_token_ms_p50": 20.9,
+      "first_token_ms_p95": 32.5,
+      "latency_ms_p50": 21.0,
+      "latency_ms_p95": 35.5,
+      "source": "evals/history/2026-W45-w2-load.md（客户端口径 p95 1200ms 受宿主调度停顿污染，不采用）",
+      "status": "offline-only",
+      "caveat": "fixture 回放，只证明埋点链路正确，不代表真实模型延迟"
+    },
+    "cost": {
+      "per_request_avg": 0.0,
+      "currency": "CNY",
+      "status": "offline-only",
+      "note": "fixture 不计价；在线档需按时段记录（DeepSeek 峰谷差 2 倍）"
+    },
+    "load": {
+      "concurrency": 100,
+      "duration_planned_s": 40,
+      "requests": 1224,
+      "error_rate": 0.0,
+      "retry_count_gt0": 0,
+      "queue_backend": "inmemory",
+      "verdict": "Gate「100 并发错误率 < 1%」离线档通过"
+    },
+    "quality": {
+      "golden_set_size": 10,
+      "success_rate": 1.0,
+      "judge_score": null,
+      "status": "smoke-only",
+      "note": "3 文本 / 3 tool_call / 2 错误映射 / 2 流式；只回答「没坏」，不回答「多好」"
+    },
+    "observability": {
+      "request_log_fields": 20,
+      "trace_propagation": "trace_id 由中间件生成，span_id 每次 span() 新建，994 条日志 994 个 trace_id（无串号）",
+      "exporter": "NoopExporter（W3 接 Langfuse，只换 exporter）"
+    }
+  },
+  "gate_checklist": {
+    "1_session_idempotent": "pass（InMemory + Redis 双实现，同 request_id 不翻倍；provider_meta 保留）",
+    "2_layering": "pass（/v1/chat 仍直连 gateway；workflow/ 只有 Protocol 缝，零调用点）",
+    "3_concurrency": "pass-offline（100 并发 0 失败）",
+    "4_overload_no_retry": "pass-unit（ServerBusyError.retryable=False；满载走 503 + Retry-After；retry_count 不增长）",
+    "5_trace": "pass（一条请求可追到 llm.call span 的 first_token_ms/tokens/cost）",
+    "6_compose": "config-ready（compose/Dockerfile 就位，未在本机执行 docker build）",
+    "7_eval_gate": "pass（10/10 绿；CI 内反向验证改坏一条 expect 必须变红）",
+    "8_merge": "docs/log.md W2 条目 + 本文件已更新"
+  },
+  "decisions": [
+    "ADR-W2-01：/v1/chat 永不进 Temporal，SessionStore 永不调 LLMGateway（编排权归调用方）",
+    "幂等键三档解析（显式入参 → request_id contextvar → 本地 uuid），放契约层让两个实现共用",
+    "Redis 幂等用 SET NX EX 而非 LRANGE 扫描：O(1) 且天然抗并发写重复",
+    "并发限额只从 models.yaml 读（alias 覆盖 > provider 覆盖 > global），代码里不出现 Semaphore(N)",
+    "ServerBusyError.retryable=False：入口过载绝不能被 gateway 再重试，否则 100 并发变 300",
+    "工作流本周只钉 activity 签名（workflow/research_workflow.py），不引入 temporalio 依赖"
+  ],
+  "discovered": [
+    "测试只在全量串跑时慢到分钟级，单文件运行却是秒级 —— 环境调度停顿会伪装成「实现慢」，所以延迟结论只能取服务端 RequestLog 口径",
+    "「幂等」不做兜底 request_id 会在脚本/队列消费者场景直接失效（第二次 append 被误判重复），这是只在多轮对话第二轮才暴露的 bug",
+    "队列入口先 precheck 再入队：alias 打错这类注定失败的请求不该占队列槽位，否则输入错误被放大成容量问题",
+    "trace_id 生成放中间件而非 span()，否则同一请求内的多个 span 会各拿一个新 trace，跨调用无法串联"
+  ],
+  "risks": [
+    "在线档（真实 alias）延迟/成本未测，W11 成本曲线仍缺第一批真实数据点",
+    "docker build 未在本机执行（无 docker 环境），compose 仅静态检查",
+    "队列是进程内的：多副本部署时任务不跨实例，重投递会丢；换 Redis Stream 时签名不变",
+    "满载 503 行为目前只有单测覆盖，没有端到端压测验证 Retry-After 的实际退避效果"
+  ],
+  "next": [
+    "在线档压测：MODEL=qwen3.7-plus make load，记录时段与 p50/p95/成本",
+    "容器内重跑离线档，排除宿主调度停顿对分位数的污染",
+    "W3：golden set 扩到 50+，接 Langfuse（只换 exporter），并把 smoke 从「全过」升级为「指标不得劣化」"
+  ]
+}

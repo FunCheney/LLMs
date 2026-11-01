@@ -1,0 +1,64 @@
+{
+  "week": "2026-W44",
+  "period": { "from": "2026-10-26", "to": "2026-10-30" },
+  "gate": "W1",
+  "status": "code-complete-live-pending",
+  "summary": "LLM 适配层收口：四家协议归一化 + HTTP/SSE 契约 + 产品端首个消费端点。代码与工具链全部就位并离线验证通过；真机录制与基线表待执行（需 .env.local）。",
+  "metrics": {
+    "tests": {
+      "offline_passed": 278,
+      "live_defined": 16,
+      "live_skipped_reason": "无 API 凭证；显式 `-m live` 且 .env.local 就绪后执行",
+      "static_checks": { "ruff": "pass", "mypy_files": 26, "mypy": "pass" }
+    },
+    "conformance": {
+      "assertions": "A1-A14",
+      "passing": 14,
+      "fixtures_total": 24,
+      "fixtures_synthetic": 24,
+      "fixtures_recorded": 0,
+      "note": "A13/A14 在真录制替换后才有杀伤力：A13 抓手写幻觉字段，A14 抓真实模型跑偏 schema"
+    },
+    "latency": {
+      "first_token_ms_p50": null,
+      "first_token_ms_p95": null,
+      "source": "evals/history/2026-W44-w1-baseline.json（待生成）",
+      "status": "pending-live"
+    },
+    "cost": {
+      "per_request_avg": null,
+      "currency": null,
+      "status": "pending-live",
+      "note": "pricing 已按 2026-10-29 官网核对；DeepSeek 为峰谷分时、Qwen 为阶梯计价，单值字段取常规档"
+    },
+    "quality": {
+      "golden_set_size": 0,
+      "success_rate": null,
+      "judge_score": null,
+      "status": "w2"
+    }
+  },
+  "decisions": [
+    "ADR-008 客户端层用编排方法而非装饰器链（流式重试依赖运行时 committed 状态）",
+    "ADR-009 alias 与 wire model 名分离；Qwen 钉日期快照保证 12 周曲线可比",
+    "RequestIDMiddleware / 错误契约从 server/app.py 抽到 middleware.py / errors.py，供产品层复用",
+    "录制器走 RecordingTransport 包住真 adapter，而不是另写 HTTP 客户端：录下来的就是生产路径真正发出的 body"
+  ],
+  "discovered": [
+    "RequestLog 打 INFO 但 root logger 是 WARNING —— uvicorn 起来后日志里一行都没有，Gate 验收项会假通过（已修：configure_logging）",
+    "DeepSeek 定价为峰谷分时（高峰翻倍），单一 pricing 字段无法表达，基线表必须记时间戳",
+    "Qwen 定价按上下文长度阶梯（≤256K 为 2/8，>256K 为 6/24）",
+    "产品层无法只拿中间件而不触发 app.py 顶层 create_app() —— 边界画错的信号，已抽离",
+    "录制器若覆盖 request.json 会让 A1 失去断言锚，已改为硬失败"
+  ],
+  "risks": [
+    "真机录制未执行：手写夹具可能与真实协议存在偏差（A13 会在录制后清算）",
+    "first_token_timeout_s=10s 未用真机校准",
+    "Anthropic 欠费仍靠文案 'credit balance' 识别，未收敛成固定 code",
+    "错误路径（usage_missing / error_*）无法安全录制，长期依赖手写 + error_auth 真机探测"
+  ],
+  "next": [
+    "执行 Day5 真机三连（record → conformance → bench）",
+    "W2：golden set 最小 10 条 + CI 门禁 + 压测脚本，把本文件的 latency/cost 字段填上"
+  ]
+}

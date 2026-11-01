@@ -1,0 +1,64 @@
+name: ci
+
+# 门禁只跑"零网络"的那一套：没有 key、没有 Redis、没有 docker。
+# 需要真机/容器的步骤（-m live、make load、compose）留给人工，别让 CI 变成
+# "有 key 就烧钱、没 key 就红叉"的两难。
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Ruff
+        run: uv run ruff check .
+
+      - name: Mypy
+        run: uv run mypy
+
+      - name: Pytest (offline, live 自动跳过)
+        run: uv run pytest --basetemp=.pytest_tmp
+
+      - name: Smoke eval (10 cases, fixture 回放)
+        run: uv run python evals/scripts/run_smoke.py
+
+      # 反向验证：门禁必须能红。这里故意把 smoke 集复制一份并改坏一条断言，
+      # 期望退出码为 1。没有这一步，"全绿"永远无法证明门禁在工作。
+      - name: Smoke gate must be able to fail
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          src = Path("evals/golden/smoke_v1.jsonl")
+          out = Path("evals/golden/_broken.jsonl")
+          lines = [
+              line.replace('"text_contains": ["MCP"]', '"text_contains": ["绝不存在的文案"]')
+              if '"smoke-01"' in line
+              else line
+              for line in src.read_text("utf-8").splitlines()
+          ]
+          out.write_text("\n".join(lines) + "\n", "utf-8")
+          PY
+          if uv run python evals/scripts/run_smoke.py --golden evals/golden/_broken.jsonl; then
+            echo "门禁没有变红：判据是摆设" >&2
+            exit 1
+          fi
+          rm -f evals/golden/_broken.jsonl
