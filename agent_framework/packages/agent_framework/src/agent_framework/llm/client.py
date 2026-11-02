@@ -173,7 +173,8 @@ class LLMGateway:
                 ) as current_span:
                     try:
                         # adapter.chat 只做协议翻译（OpenAI/Anthropic/Qwen 各家格式 → LLMResponse）
-                        # **call.opts 透传**：temperature / max_tokens 等厂商中立参数，网关不认识具体字段
+                        # **call.opts 透传**：temperature / max_tokens 等厂商中立参数，网关不认识具
+                        # 体字段
                         response = await adapter.chat(
                             call.messages,
                             call.tools,
@@ -181,12 +182,15 @@ class LLMGateway:
                             **call.opts,
                         )
                     except (LLMError, httpx.HTTPError) as exc:
-                        # 统一异常口径：adapter 内部的 httpx 传输错误在这里翻译成 UpstreamTimeout/UpstreamServer，
+                        # 统一异常口径：adapter 内部的 httpx 传输错误在这里翻译成 UpstreamTimeout/Up
+                        # streamServer，
                         # 否则 ConnectError 会以原始形态冒到 HTTP 层，变成没法归因的 500。
                         error = self._as_llm_error(exc, adapter)
-                        self._mark_span_error(current_span, error)  # 失败 span 也带 error_code，便于按码归因
+                        # 失败 span 也带 error_code，便于按码归因
+                        self._mark_span_error(current_span, error)
 
-                        # 是否重试只看 error.retryable（由 errors.py 按 429/402/5xx/code 白名单判定），
+                        # 是否重试只看 error.retryable（由 errors.py 按 429/402/5xx/code 白名单判定
+                        # ），
                         # 这里不再写 if status == 429 —— 同一份逻辑两处实现，必然改一处漏一处。
                         if not self._should_retry(error, attempt):
                             last_error = error
@@ -208,9 +212,11 @@ class LLMGateway:
 
                     # ── 阶段 4：成功路径（以下代码只在没抛异常时执行）
                     latency_ms = (self._clock() - started) * 1000
-                    response.provider = response.provider or adapter.name  # 兜底：adapter 没填就用适配器名
+                    # 兜底：adapter 没填就用适配器名
+                    response.provider = response.provider or adapter.name
                     response.latency_ms = latency_ms  # 延迟由网关测，不信上游
-                    cost = compute_cost(model.pricing, response.usage)  # 计费只写一份（observability.py）
+                    # 计费只写一份（observability.py）
+                    cost = compute_cost(model.pricing, response.usage)
 
                     # 先把这次调用的运营指标挂到 span 上（token/成本/延迟/finish_reason/第几次重试）
                     current_span.attributes.update({
@@ -229,7 +235,8 @@ class LLMGateway:
                         task=call.task,
                         tier=tier,
                         provider=response.provider,
-                        model=alias,  # 注意：日志里 model 记的是 alias（我方别名），provider 才是厂商
+                        # 注意：日志里 model 记的是 alias（我方别名），provider 才是厂商
+                        model=alias,
                         fallback_from=fallback_from,  # 从谁掉下来的，一眼看出降级发生了
                         prompt_tokens=response.usage.input_tokens,
                         completion_tokens=response.usage.output_tokens,
@@ -241,7 +248,8 @@ class LLMGateway:
                         finish_reason=str(response.finish_reason),
                         error_code=None,
                         stream=False,
-                        usage_estimated=response.usage.estimated,  # 厂商没给 usage 时由 adapter 估算，必须标记
+                        # 厂商没给 usage 时由 adapter 估算，必须标记
+                        usage_estimated=response.usage.estimated,
                     ))
 
                     # 成功即返回，不再尝试后续候选；ChatOutcome 携带路由/重试元信息，

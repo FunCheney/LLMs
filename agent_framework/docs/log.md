@@ -5,6 +5,62 @@
 
 ---
 
+## 2026-W46（11-09 ~ 11-13）· W3：评测体系 I（golden set / 分层指标 / trace 落地）
+
+> 实际落盘 11-02 预跑；数字全部来自离线档，在线档与 Langfuse 真机验证待凭证。
+
+### 本周做了什么
+
+| Day | 产出 | 结论 |
+|---|---|---|
+| D1 | `docs/w3/metric-spec.md` + `evals/metrics.py` + `docs/w3/adr-w3-eval-scope.md` | **口径必须先于 runner**：四态机（passed/failed/interrupted/skipped）定完，`success_rate` 的分母才有意义 |
+| D2 | `evals/golden/{golden_v1.jsonl,schema.md}` + `validate_golden.py` | 54 条、难度 12/26/16、4 条对抗；校验器对待"重复输入/悬空引用/拼错判据键"零容忍 |
+| D3 | `evals/scripts/{run_eval,offline_fixtures}.py` + `Makefile` 的 `run-eval` | 一条命令出分层指标 + md + json；`--break-case` 让"单条失败不中断"可被反向证明 |
+| D4 | `exporters/langfuse.py` + `server/app.py` 注入点 + `adr-w3-trace-backend.md` | **缺 key 返回 Noop 而不是抛错**：否则没有账号的机器连测试都跑不了 |
+| D5 | `classify_failures.py` + `report_template.md` + 报告自动渲染 | 规则先行：`UPSTREAM` 与 `HALLUCINATION` 混淆是最贵的归因错误 |
+
+### 指标变化
+
+- 离线用例：`337 → 416`（新增指标层 24 / golden 校验 13 / runner 11 / 分类器 13 / exporter 18），live 仍 16 跳过
+- golden：`10 → 54` 条，难度 `12 / 26 / 16`，对抗样例 4 条，引用 20 处全部可达（anchor 逐条命中）
+- **`make run-eval`：50 passed / 0 failed / 0 interrupted / 4 skipped，2.17s，零网络**
+- 分位：`latency p50 0.17ms / p95 1.80ms`（50 样本）；首 token 仅 4 个流式样本，**p95 按规则返回 null**
+- 成本：`0.0 CNY`（fixture 不计价）；`usage_estimated_ratio 0`
+- **质量：`quality` 块恒 `null`** —— 离线跑通的 100% 不是质量结论
+- 静态检查：`ruff` 全绿、`mypy` 45 文件无问题
+
+### 本周暴露的六个真问题
+
+1. **口径先于代码**：先写 runner 后补定义，指标会变成"代码碰巧算出来的东西"。
+   `success_rate` 的分母一旦把上游中断算进去，一次厂商发版就能把质量分打掉 20 个点，
+   然后团队去调 prompt——查三天发现是对方 503。
+2. **`usage_estimated` 混进均值 = 无意义的数**：既不是实测也不是上界。宁可 `cost_per_task=null`
+   并让 `usage_estimated_ratio` 说明原因，也不给一个能画在图上但解释不了的数。
+3. **"多币种"报警其实是错误路径的默认值**：错误日志没有价目，`currency` 落的是 dataclass 默认的 USD。
+   把带 `error_code` 的样本排除出币种判定即可，不必回头改 W1 的 emit。
+4. **对抗样例不能有离线判据**：补一个 `offline.expect` 让 CI 变绿，等于"用夹具回放证明模型会拒绝"，
+   比没有测试更糟。宁可让它长期 skipped，并在报告里显式展示 7.4% 的覆盖率缺口。
+5. **离线判据抄在线判据必然二选一**：恰好成立（假绿）或永远不成立（红一片后被人放宽）。
+   离线只断言 `require_log` + `finish_reason`，在线才断言语义。
+6. **`ruff` 的 line-length 按显示宽度算**：85 个字符的中文注释被判成 105。按 `len()` 折行写了等于没写。
+
+### 遗留问题（带责任人与时限）
+
+| # | 问题 | 处理 |
+|---|---|---|
+| 1 | 在线档质量分仍为 null | 填 `.env.local` 后 `make run-eval WEEK=2026-W47 --live`，回填 quality 与模型快照日期 |
+| 2 | Langfuse 只做过单测与降级验证 | 注册账号 → 配 `LANGFUSE_*` → 跑一次 `/v1/chat` → 确认 `llm.call` span 与 trace 树 |
+| 3 | 4 条对抗样例长期 skipped | W4 接 Judge 后改为在线档评估；每期报告保留 skip_rate |
+| 4 | `judge_score` 字段恒 null | W4 接 LLM-as-judge，在此之前"质量趋势"只有成功率一条线 |
+
+### 下周（W4）只做三件事
+
+1. 接 LLM-as-judge，把 `judge_score` 从 null 变成数字（含 judge 与被评模型不同的证据）；
+2. 把 `make eval` 升级成"指标不得劣化"的对比门禁（对上一期 history 做差）；
+3. 首次在线档跑通，产出第一批真实延迟/成本/质量数据点。
+
+---
+
 ## 2026-W45（11-02 ~ 11-06）· W2：运行底座 + 可观测基线 + 评测冒烟集
 
 > 实际落盘时间 11-01（周日）预跑；数字全部来自离线档，在线档待 key。

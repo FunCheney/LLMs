@@ -25,6 +25,7 @@ from fastapi import FastAPI
 
 from agent_framework import __version__
 from agent_framework.bootstrap import build_gateway, build_limiter
+from agent_framework.exporters import build_exporter
 from agent_framework.llm.client import LLMGateway
 from agent_framework.observability import configure_logging
 from agent_framework.queue.base import TaskQueue
@@ -37,6 +38,7 @@ from agent_framework.server.routes_task import make_task_handler
 from agent_framework.server.routes_task import router as task_router
 from agent_framework.session.base import SessionStore
 from agent_framework.session.factory import build_session_store
+from agent_framework.tracing import TraceExporter, configure_exporter
 
 
 def create_app(
@@ -45,12 +47,18 @@ def create_app(
     session_store: SessionStore | None = None,
     limiter: ConcurrencyLimiter | None = None,
     task_queue: TaskQueue | None = None,
+    exporter: TraceExporter | None = None,
 ) -> FastAPI:
     # 应用边界才配日志：库本身不擅自改宿主的 logging 配置。
     configure_logging()
 
     resolved_gateway = gateway if gateway is not None else build_gateway()
     settings = resolved_gateway.settings
+
+    # 观测出口在应用边界注入（W3 D4）：缺 key 时 `build_exporter` 自己降级成 Noop，
+    # 所以这里不需要 if——把"要不要上报"的判断留在 exporter 内部，只有一处真相。
+    resolved_exporter = exporter if exporter is not None else build_exporter(settings)
+    configure_exporter(resolved_exporter)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -64,10 +72,17 @@ def create_app(
             await app.state.session_store.aclose()
             await app.state.gateway.aclose()
 
+            # exporter 可能持有 httpx 连接池（Langfuse）。谁建谁关。
+            close_exporter = getattr(app.state.exporter, "aclose", None)
+
+            if close_exporter is not None:
+                await close_exporter()
+
     app = FastAPI(title="agent-framework", version=__version__, lifespan=lifespan)
 
     # 启动时只做结构校验，不建 adapter（懒加载）；测试可直接注入替身。
     app.state.gateway = resolved_gateway
+    app.state.exporter = resolved_exporter
     app.state.session_store = session_store or build_session_store(settings)
     app.state.limiter = limiter or build_limiter(resolved_gateway.catalog, settings)
     app.state.task_queue = task_queue or InMemoryTaskQueue(

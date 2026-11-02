@@ -1,0 +1,107 @@
+{
+  "week": "2026-W46",
+  "period": { "from": "2026-11-09", "to": "2026-11-13" },
+  "gate": "W3",
+  "status": "code-complete-live-pending",
+  "note": "记录于 2026-11-02 本地预跑；评测数字全部来自离线档（fixture 回放），在线档与 Langfuse 真机验证待凭证",
+  "summary": "评测体系立骨架：指标口径先定（四态机 + 五层指标）→ 54 条 golden（难度 12/26/16，含 4 条对抗）→ 一条命令出分层指标与报告 → 失败按规则自动归类 → trace 后端换成 Langfuse（缺 key 自动降级）。离线档 50 条全绿、4 条语义类显式 skipped，quality 块保持 null。",
+  "metrics": {
+    "tests": {
+      "offline_passed": 416,
+      "offline_collected": 432,
+      "live_defined": 16,
+      "live_skipped_reason": "无 API 凭证；显式 `-m live` 且 .env.local 就绪后执行",
+      "static_checks": { "ruff": "pass", "mypy_files": 45, "mypy": "pass" }
+    },
+    "golden": {
+      "path": "evals/golden/golden_v1.jsonl",
+      "sha256": "1c31832c2bbf",
+      "total": 54,
+      "by_kind": { "chat": 12, "tool_call": 12, "research": 10, "draft": 8, "stream": 4, "error": 4, "adversarial": 4 },
+      "by_difficulty": { "1": 12, "2": 26, "3": 16 },
+      "offline_executable": 50,
+      "offline_skipped": 4,
+      "skip_reason": "对抗样例的判据是「模型拒绝做某事」，夹具回放无法证明，硬套离线判据只会假绿"
+    },
+    "eval": {
+      "command": "make run-eval WEEK=2026-W46",
+      "mode": "offline",
+      "total": 54,
+      "passed": 50,
+      "failed": 0,
+      "interrupted": 0,
+      "skipped": 4,
+      "pipeline_success_rate": 1.0,
+      "elapsed_s": 2.17,
+      "source": "evals/history/2026-W46-eval.json（pipeline 块）"
+    },
+    "latency": {
+      "first_token_p50_ms": 0.384,
+      "first_token_p95_ms": null,
+      "first_token_samples": 4,
+      "latency_p50_ms": 0.171,
+      "latency_p95_ms": 1.802,
+      "latency_samples": 50,
+      "status": "offline-only",
+      "caveat": "夹具回放，只证明埋点与分位算法可用；p95 只在 ≥5 样本时计算，首 token 仅 4 个流式样本故为 null"
+    },
+    "cost": {
+      "per_task": 0.0,
+      "currency": "CNY",
+      "usage_estimated_ratio": 0.0,
+      "status": "offline-only",
+      "note": "fixture 不计价；在线档需按时段记录（DeepSeek 峰谷差 2 倍）"
+    },
+    "quality": {
+      "success_rate": null,
+      "judge_score": null,
+      "status": "pending-online",
+      "note": "离线档不写 quality（ADR-W3-01 D2）：夹具跑通的 100% 不是质量结论"
+    },
+    "observability": {
+      "exporter": "LangfuseExporter（缺 key → NoopExporter；连续 3 次失败自禁用）",
+      "privacy": "默认不含 prompt/回答全文，内容类字段替换为 {len, sha256[:8]}",
+      "span_tree": "parent_span_id → parentObservationId，失败 span 以 level=ERROR 上报",
+      "live_verified": false
+    }
+  },
+  "gate_checklist": {
+    "1_metric_defined": "pass（docs/w3/metric-spec.md：四态机 + 五层指标，每个指标有分子/分母/来源/边界）",
+    "2_golden": "pass（54 条；难度 12/26/16；4 条对抗；引用 20 处全部可达，anchor 逐条命中）",
+    "3_one_command": "pass（make run-eval 一条命令出分层指标 + md 报告 + json，2.17s）",
+    "4_reproducible": "pass（alias + temperature=0 强制注入；同一批夹具两次跑数字一致，测试覆盖）",
+    "5_no_abort": "pass（LLMError→interrupted，其余→failed；--break-case gold-c03 证明其余 53 条照跑完）",
+    "6_trace": "pass-unit（exporter 18 个用例；真机 trace 待 Langfuse key）",
+    "7_failure_class": "pass（UPSTREAM/TIMEOUT 短路返回，不再报 FORMAT/HALLUCINATION；13 个规则用例）",
+    "8_merge": "docs/log.md W3 条目 + 本文件 + 2026-W46-eval.json / -w3-eval.md 已更新"
+  },
+  "decisions": [
+    "ADR-W3-01：expect（在线语义）与 offline.expect（离线管道）是两套判据，不是一套的宽松版",
+    "ADR-W3-01：success_rate 分母 = passed + failed；interrupted/skipped 不进分母，也不进分子",
+    "ADR-W3-01：离线结果只写 pipeline，quality 恒 null——避免「夹具 100%」被当成质量结论",
+    "ADR-W3-02：只实现 TraceExporter 协议，不改字段；缺 key 返回 NoopExporter 而不是抛错",
+    "ADR-W3-02：exporter 连续失败 3 次自禁用——观测组件不能把线上请求拖成 3 秒 p99",
+    "ADR-W3-02：默认上报内容指纹（len + sha256），全文需显式 capture_content=True",
+    "指标层拒绝多币种混算；错误路径日志的 currency 默认值不参与币种判定",
+    "runner 逐条串行：指标从共享日志 handler 读，并发会让 latest() 串到别人的记录上"
+  ],
+  "discovered": [
+    "`usage_estimated=True` 的成本一旦混进均值，得到的数既不是实测也不是上界：W45 的 cost_per_task 因此改成分母只取精确样本",
+    "同一批结果里出现「多币种」不是配置错了，而是错误路径的 RequestLog 落了 dataclass 默认值 USD——把错误样本排除出币种判定即可，不必改 W1 代码",
+    "对抗样例不能有离线判据：给它补一个 offline.expect 让 CI 变绿，本质是「用夹具回放证明模型会拒绝」，比没有测试更糟",
+    "离线判据若抄在线判据，结果只有两种：恰好成立（假绿）或永远不成立（红一片后被人放宽）——所以 schema 里离线判据只断言 require_log + finish_reason",
+    "分位算法必须与 W1 同源：换一次实现，p95 就会在某一期无声地跳一下，而没人能说清是模型变了还是算法变了",
+    "ruff 的 line-length 按显示宽度算（中文占 2 列）：85 个字符的中文注释会被判成 105，纯按 len() 折行写了等于没写"
+  ],
+  "risks": [
+    "在线档（真实 alias）的质量分仍为 null，W4 的回归门禁还没有基线可比",
+    "Langfuse 只做了单测与降级验证，真实 trace 未在平台上看过（缺账号）",
+    "4 条对抗样例长期 skipped，skip_rate 固定在 7.4%——覆盖率缺口必须每期显式展示",
+    "judge_score 字段已留位但恒 null，W4 接 Judge 前所有「质量趋势」只有成功率一条线"
+  ],
+  "next": [
+    "在线档：填 .env.local 后 `make run-eval WEEK=2026-W47` 并加 --live，回填 quality 块与模型快照日期",
+    "Langfuse 真机：注册账号 → 配 LANGFUSE_* → 跑一次 /v1/chat → 截图确认 llm.call span 与 trace 树",
+    "W4：接 LLM-as-judge，把 judge_score 从 null 变成数字，并做「gate 不得劣化」的对比逻辑"
+  ]
+}

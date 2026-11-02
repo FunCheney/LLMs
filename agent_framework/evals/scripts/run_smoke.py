@@ -33,8 +33,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import httpx
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GOLDEN_PATH = REPO_ROOT / "evals" / "golden" / "smoke_v1.jsonl"
 FIXTURES_ROOT = REPO_ROOT / "packages" / "agent_framework" / "tests" / "fixtures"
@@ -43,19 +41,12 @@ FIXTURES_ROOT = REPO_ROOT / "packages" / "agent_framework" / "tests" / "fixtures
 # "两条命令读同一份日志却给出不同 p50"。
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from agent_framework.config import Catalog, Settings, load_catalog  # noqa: E402
 from agent_framework.llm.client import ChatCall, LLMGateway  # noqa: E402
 from agent_framework.llm.errors import (  # noqa: E402
     LLMError,
     error_code_for,
     http_status_for,
 )
-from agent_framework.llm.providers.anthropic import AnthropicClient  # noqa: E402
-from agent_framework.llm.providers.mock import MockLLMClient  # noqa: E402
-from agent_framework.llm.providers.openai_compat import (  # noqa: E402
-    OpenAICompatClient,
-)
-from agent_framework.llm.router import StaticRouter  # noqa: E402
 from agent_framework.llm.types import (  # noqa: E402
     Message,
     MessageRole,
@@ -65,6 +56,7 @@ from agent_framework.llm.types import (  # noqa: E402
 )
 from agent_framework.observability import get_request_logger  # noqa: E402
 from bench_baseline import LogCapture  # noqa: E402
+from offline_fixtures import build_offline_gateway  # noqa: E402
 
 SMOKE_TOOLS = [
     ToolSpec(
@@ -152,102 +144,17 @@ def load_cases(path: Path) -> list[Case]:
 # --------------------------------------------------------------------------- #
 
 
-class _SingleClientRegistry:
-    """最小的 Registry 替身：一个 alias 一个 client。
+def _offline_gateway(case: Case) -> LLMGateway:
+    """Case → 工厂参数。
 
-    不实例化真 `Registry` 的原因：它会按 `models.yaml` 去读 API key，
-    而离线档一个 key 都不该需要。
+    工厂本身在 `offline_fixtures.py`（W3 抽出，与 `run_eval.py` 共用）：
+    两份实现漂移时，两条命令会对同一批夹具给出不同的重试次数，而报告看起来都正常。
     """
 
-    def __init__(self, catalog: Catalog, alias: str, client: Any) -> None:
-        self._catalog = catalog
-        self._alias = alias
-        self._client = client
-
-    def get(self, alias: str) -> Any:
-        return self._client
-
-    def get_model(self, alias: str) -> Any:
-        return self._catalog.get_model(alias)
-
-    async def aclose(self) -> None:
-        await self._client.aclose()
-
-
-def _delegate_adapter(provider: str) -> Any:
-    if provider == "anthropic":
-        return AnthropicClient(
-            name="anthropic",
-            model="claude-test",
-            base_url="https://api.anthropic.test",
-            api_key="smoke",
-            default_max_tokens=1024,
-        )
-
-    return OpenAICompatClient(
-        name=provider,
-        model=f"{provider}-test",
-        base_url=f"https://{provider}.test/v1",
-        api_key="smoke",
-    )
-
-
-def _error_client(provider: str, case_name: str) -> Any:
-    case_dir = FIXTURES_ROOT / provider / case_name
-    meta = json.loads((case_dir / "meta.json").read_text("utf-8"))
-    body = (case_dir / "response.json").read_text("utf-8")
-
-    def handler(_: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            int(meta.get("status_code", 500)),
-            content=body.encode("utf-8"),
-            headers={"content-type": "application/json"},
-        )
-
-    transport = httpx.MockTransport(handler)
-
-    if provider == "anthropic":
-        return AnthropicClient(
-            name="anthropic",
-            model="claude-test",
-            base_url="https://api.anthropic.test",
-            api_key="smoke",
-            default_max_tokens=1024,
-            transport=transport,
-        )
-
-    return OpenAICompatClient(
-        name=provider,
-        model=f"{provider}-test",
-        base_url=f"https://{provider}.test/v1",
-        api_key="smoke",
-        transport=transport,
-    )
-
-
-def _offline_gateway(case: Case) -> LLMGateway:
-    catalog = load_catalog()
-    # 退避压到 1ms：离线档不需要真等，否则一条 429 用例就让 CI 多花 1.5s。
-    settings = Settings(  # type: ignore[call-arg]
-        _env_file=None, backoff_base_s=0.001, backoff_cap_s=0.002
-    )
-
-    if case.kind == "error":
-        client: Any = _error_client(case.provider, case.fixture_case)
-    else:
-        client = MockLLMClient(
-            _delegate_adapter(case.provider),
-            fixtures_root=FIXTURES_ROOT,
-            case=case.fixture_case,
-        )
-
-    alias = "fixture"
-
-    return LLMGateway(
-        registry=_SingleClientRegistry(catalog, alias, client),  # type: ignore[arg-type]
-        router=StaticRouter([alias]),
-        catalog=catalog,
-        settings=settings,
+    return build_offline_gateway(
+        provider=case.provider,
+        fixture_case=case.fixture_case,
+        expect_error=case.kind == "error",
     )
 
 

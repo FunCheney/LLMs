@@ -6,7 +6,10 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
-.PHONY: help sync test lint type check smoke baseline up down ps logs load e2e clean
+# 报告期号。默认按 ISO 周，需要写"下周"的报告时 `make run-eval WEEK=2026-W47`。
+WEEK ?= $(shell date +%G-W%V)
+
+.PHONY: help sync test lint type check check-all golden run-eval smoke eval baseline up down ps logs load e2e clean
 
 help: ## 列出所有目标
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
@@ -28,7 +31,13 @@ check: lint type test ## 本地门禁：静态检查 + 全量用例
 smoke: ## 10 条 smoke eval（离线档，model=fixture）
 	uv run python evals/scripts/run_smoke.py
 
-eval: check smoke ## CI 里跑的那一套
+golden: ## 校验 golden set（引用完整性 / 难度分布 / 去重 / 对抗样例规则）
+	uv run python evals/scripts/validate_golden.py
+
+run-eval: ## 54 条 golden 离线评测（分层指标 + 落盘报告）
+	uv run python evals/scripts/run_eval.py --week $(WEEK)
+
+eval: check golden run-eval ## CI 里跑的那一套：静态 + 用例 + golden 校验 + 离线评测
 
 baseline: ## W1 基线表（dry-run，不落盘）
 	uv run python evals/scripts/bench_baseline.py --dry-run --models fixture

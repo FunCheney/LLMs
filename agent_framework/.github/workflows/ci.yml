@@ -40,6 +40,22 @@ jobs:
       - name: Smoke eval (10 cases, fixture 回放)
         run: uv run python evals/scripts/run_smoke.py
 
+      - name: Golden set validation (引用 / 难度分布 / 去重 / 对抗样例)
+        run: uv run python evals/scripts/validate_golden.py
+
+      - name: Golden eval (54 cases, fixture 回放, 分层指标)
+        run: uv run python evals/scripts/run_eval.py --no-write
+
+      # 反向验证之三：单条失败必须让整批的退出码非 0，但**不许中断整批**。
+      # 只验退出码不够——把 try/except 写成 raise 也能让退出码非 0，
+      # 所以 run_eval 的 --break-case 内部还会断言"其余 case 照常跑完"。
+      - name: Eval gate must be able to fail
+        run: |
+          if uv run python evals/scripts/run_eval.py --no-write --break-case gold-c03; then
+            echo "评测门禁没有变红：判据是摆设" >&2
+            exit 1
+          fi
+
       # 反向验证：门禁必须能红。这里故意把 smoke 集复制一份并改坏一条断言，
       # 期望退出码为 1。没有这一步，"全绿"永远无法证明门禁在工作。
       - name: Smoke gate must be able to fail

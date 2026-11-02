@@ -8,6 +8,7 @@ monkeypatch 掉 `_post` 只测到 parse，header / URL / body 序列化 / SSE �
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,16 @@ from canonical_input import (  # noqa: F401  (re-export：测试与录制器共�
     canonical_messages,
     canonical_tools,
 )
+
+# 仓库根入 path：`evals/metrics.py` 要能被 `from evals.metrics import ...` 导入。
+# 放 conftest 而不是 pyproject 的 pythonpath，是因为 apps/ 下的用例也要读同一份指标层，
+# 加一处比在每处写 sys.path.insert 少一次漏写的机会。
+REPO_ROOT = Path(__file__).resolve().parents[3]
+SCRIPTS = REPO_ROOT / "evals" / "scripts"
+
+for entry in (REPO_ROOT, SCRIPTS):
+    if str(entry) not in sys.path:
+        sys.path.insert(0, str(entry))
 
 FIXTURES_ROOT = Path(__file__).parent / "fixtures"
 

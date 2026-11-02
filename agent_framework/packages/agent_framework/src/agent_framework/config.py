@@ -268,6 +268,14 @@ class Settings(BaseSettings):
     task_queue_size: int = Field(default=100, ge=1)
     task_workers: int = Field(default=2, ge=1)
 
+    # -- W3：观测后端 ------------------------------------------------ #
+    # 缺 key 时强制降级为 NoopExporter（见 exporters/langfuse.py）：
+    # 观测组件挂掉不能影响主链路，这是可观测性组件的基本操守。
+    langfuse_host: str = "https://cloud.langfuse.com"
+    langfuse_public_key: SecretStr | None = None
+    langfuse_secret_key: SecretStr | None = None
+    trace_sample_ratio: float = Field(default=1.0, ge=0.0, le=1.0)
+
     openai_api_key: SecretStr | None = None
     deepseek_api_key: SecretStr | None = None
     dashscope_api_key: SecretStr | None = None
