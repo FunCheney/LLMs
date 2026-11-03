@@ -18,6 +18,10 @@
 5. **逐条串行**：指标从共享的日志 handler 读，并发跑会让 `latest()` 串到别人的记录上。
    要测并发请用 `locustfile.py`，它是另一个问题。
 6. **离线结果不进 `quality` 块**：只写 `pipeline`。离线跑通的 100% 不等于"系统很好"。
+7. **judge 默认关闭**（W4 D1）：一次 judge 调用比被测模型本身还贵。开 `--judge` 才打分，
+   且报告里单列 `judge_alias` 与调用数——分数由谁打的，不能被省略。
+8. **RAGAS 只对带 references 的 case 算**（W4 D2）：没引用的 case 返回 `None`，
+   不进均值。把"算不了"当 0 会让 faithfulness 随数据集构成漂移。
 
 用法
 ----
@@ -25,6 +29,7 @@
     uv run python evals/scripts/run_eval.py --live             # 在线档（需 .env.local）
     uv run python evals/scripts/run_eval.py --only gold-c01 -v
     uv run python evals/scripts/run_eval.py --break-case gold-c03   # 反向验证"不中断"
+    uv run python evals/scripts/run_eval.py --judge            # 顺带跑 judge（离线档=规则基线）
     uv run python evals/scripts/run_eval.py --no-write         # 只看输出，不落盘
 
 退出码：0 全过 / 1 有失败或中断 / 2 环境不满足。
@@ -67,17 +72,29 @@ from classify_failures import (  # noqa: E402
     FailureCategory,
     classify,
     is_quality_failure,
+    is_reliability_code,
     summarize,
 )
 from offline_fixtures import OFFLINE_ALIAS, build_offline_gateway  # noqa: E402
 
+from evals.judge.llm_judge import (  # noqa: E402
+    Judge,
+    JudgeCase,
+    build_judge,
+    mean_overall,
+    summarize_tokens,
+)
+from evals.judge.ragas_metrics import score_case  # noqa: E402
+from evals.judge.rubric import DEFAULT_RUBRIC, JudgeResult  # noqa: E402
 from evals.metrics import (  # noqa: E402
     CaseMetrics,
     CaseStatus,
     EvalResult,
+    RagasScores,
     TaskMetrics,
     aggregate,
     by_difficulty,
+    by_kind,
     by_tag,
 )
 
@@ -110,8 +127,8 @@ TOOL_SYMBOLS: dict[str, tuple[str, ...]] = {
     "search_or_fetch": ("search_web", "fetch_doc"),
 }
 
-# 这些错误码说明"链路没跑通"，不是"模型答错"（metric-spec §1 的四态机）。
-_RELIABILITY_CODES = {"UPSTREAM_AUTH", "UPSTREAM_ERROR", "RATE_LIMITED", "UPSTREAM_TIMEOUT"}
+# 哪些错误码算"链路没跑通"（→ interrupted，不进成功率分母）由分类器单点决定，
+# 这里不再维护第二份表（W4 D5 案例 3：两份表曾让 6/10 个码判定不一致）。
 
 
 # --------------------------------------------------------------------------- #
@@ -314,7 +331,8 @@ async def evaluate(
     expect: dict[str, Any],
     *,
     alias: str,
-) -> EvalResult:
+    judge: Judge | None = None,
+) -> tuple[EvalResult, JudgeResult | None]:
     capture.records.clear()
     call = ChatCall(
         messages=case.messages,
@@ -333,12 +351,15 @@ async def evaluate(
         observation.error_code = error_code_for(exc)
         observation.http_status = http_status_for(exc)
     except Exception as exc:  # noqa: BLE001 - 单条异常绝不能中断整批
-        return _result(
-            case,
-            status=CaseStatus.FAILED,
-            capture=capture,
-            observation=Observation(),
-            failures=[f"执行异常 {type(exc).__name__}: {exc}"],
+        return (
+            _result(
+                case,
+                status=CaseStatus.FAILED,
+                capture=capture,
+                observation=Observation(),
+                failures=[f"执行异常 {type(exc).__name__}: {exc}"],
+            ),
+            None,
         )
 
     failures = check(observation, expect) + _check_log(case.id, expect, capture)
@@ -346,14 +367,120 @@ async def evaluate(
     # 期望报错的 case：错误码对上就算通过，别再去挑文本断言（它没有文本）。
     if case.kind == "error" and observation.error_code:
         status = CaseStatus.PASSED if not failures else CaseStatus.FAILED
-    elif observation.error_code in _RELIABILITY_CODES:
+    elif is_reliability_code(observation.error_code):
         # 上游挂了：记 interrupted，不进 success_rate 分母。
         status = CaseStatus.INTERRUPTED
         failures = failures + [f"上游中断 {observation.error_code}"]
     else:
         status = CaseStatus.PASSED if not failures else CaseStatus.FAILED
 
-    return _result(case, status=status, capture=capture, observation=observation, failures=failures)
+    ragas = await _ragas(case, observation.text)
+    judged = await _judge(case, observation.text, judge)
+
+    return (
+        _result(
+            case,
+            status=status,
+            capture=capture,
+            observation=observation,
+            failures=failures,
+            ragas=ragas,
+        ),
+        judged,
+    )
+
+
+def _contexts(case: GoldenCase) -> list[str]:
+    """把 references 解析成**正文**，供 RAGAS 使用（W5 接检索后换成真实 chunk）。
+
+    两种引用要分开处理，否则指标恒为 0：
+    - `kind=repo`：target 是仓库内真实文件，读正文；
+    - `kind=url`：离线档不联网，没有正文。**不用 URL 字符串冒充 context**——
+      `"https://modelcontextprotocol.io/specification"` 的实词是
+      `https/modelcontextprotocol/io/specification`，任何答案都不会命中，
+      faithfulness 会恒为 0，而读者会以为"模型在编造"。
+    """
+
+    contexts: list[str] = []
+
+    for item in case.references:
+        text = _reference_text(item)
+
+        if text:
+            contexts.append(text)
+
+    return contexts
+
+
+def _reference_text(reference: dict[str, Any]) -> str | None:
+    explicit = reference.get("text")
+
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit
+
+    if reference.get("kind") != "repo":
+        return None
+
+    target = str(reference.get("target") or "")
+
+    if not target:
+        return None
+
+    path = (REPO_ROOT / target).resolve()
+
+    if REPO_ROOT.resolve() not in path.parents or not path.is_file():
+        return None
+
+    try:
+        body = path.read_text("utf-8", errors="ignore")
+    except OSError:
+        return None
+
+    # 截断：整篇文档进词面判定会把 faithfulness 顶满（context 越大越容易命中），
+    # 6000 字符约等于一次检索返回的前几个 chunk。
+    return body[:6000]
+
+
+async def _ragas(case: GoldenCase, answer: str) -> RagasScores | None:
+    """只有带 references 的 case 才算 RAGAS。
+
+    错误 case 的 answer 是空串，`score_case` 会返回一个全 None 的结构——
+    那不该计入 `ragas_samples`，否则"分母里塞了一堆算不了的样本"。
+    """
+
+    contexts = _contexts(case)
+
+    if not contexts:
+        return None
+
+    scores = await score_case(
+        question=_question(case), answer=answer, references=contexts
+    )
+
+    return scores if scores is not None and scores.has_any else None
+
+
+async def _judge(case: GoldenCase, answer: str, judge: Judge | None) -> JudgeResult | None:
+    if judge is None:
+        return None
+
+    return await judge.score(
+        JudgeCase(
+            id=case.id,
+            question=_question(case),
+            answer=answer,
+            references=tuple(_contexts(case)),
+            tags=case.tags,
+        )
+    )
+
+
+def _question(case: GoldenCase) -> str:
+    for message in case.messages:
+        if str(message.role) == "user":
+            return str(message.content or "")
+
+    return ""
 
 
 async def _invoke(
@@ -410,6 +537,7 @@ def _result(
     capture: LogCapture,
     observation: Observation,
     failures: list[str],
+    ragas: RagasScores | None = None,
 ) -> EvalResult:
     metrics = CaseMetrics.from_request_log(capture.latest())
     metrics.tool_calls = observation.tool_calls
@@ -440,6 +568,7 @@ def _result(
         if status is CaseStatus.FAILED
         else (),
         detail=None,
+        ragas=ragas,
     )
 
 
@@ -459,8 +588,11 @@ def _skipped(case: GoldenCase, reason: str) -> EvalResult:
 # --------------------------------------------------------------------------- #
 
 
-async def run_offline(cases: list[GoldenCase], capture: LogCapture) -> list[EvalResult]:
+async def run_offline(
+    cases: list[GoldenCase], capture: LogCapture, judge: Judge | None = None
+) -> tuple[list[EvalResult], list[JudgeResult]]:
     results: list[EvalResult] = []
+    judged: list[JudgeResult] = []
 
     for case in cases:
         expect = case.offline_expect
@@ -478,14 +610,23 @@ async def run_offline(cases: list[GoldenCase], capture: LogCapture) -> list[Eval
         )
 
         try:
-            results.append(await evaluate(case, gateway, capture, expect, alias=OFFLINE_ALIAS))
+            result, judge_result = await evaluate(
+                case, gateway, capture, expect, alias=OFFLINE_ALIAS, judge=judge
+            )
         finally:
             await gateway.aclose()
 
-    return results
+        results.append(result)
+
+        if judge_result is not None:
+            judged.append(judge_result)
+
+    return results, judged
 
 
-async def run_online(cases: list[GoldenCase], capture: LogCapture) -> list[EvalResult]:
+async def run_online(
+    cases: list[GoldenCase], capture: LogCapture, judge: Judge | None = None
+) -> tuple[list[EvalResult], list[JudgeResult]]:
     settings = Settings()
     catalog = load_catalog()
 
@@ -495,16 +636,26 @@ async def run_online(cases: list[GoldenCase], capture: LogCapture) -> list[EvalR
         raise SystemExit(f"在线档需要可用的 API key（.env.local）：{exc}") from exc
 
     results: list[EvalResult] = []
+    judged: list[JudgeResult] = []
 
     try:
         for case in cases:
-            results.append(
-                await evaluate(case, gateway, capture, case.expect, alias=case.online_model)
+            result, judge_result = await evaluate(
+                case,
+                gateway,
+                capture,
+                case.expect,
+                alias=case.online_model,
+                judge=judge,
             )
+            results.append(result)
+
+            if judge_result is not None:
+                judged.append(judge_result)
     finally:
         await gateway.aclose()
 
-    return results
+    return results, judged
 
 
 def build_gateway_or_raise(settings: Settings, catalog: Any) -> LLMGateway:
@@ -605,7 +756,7 @@ def render_markdown(
     if mode == "offline":
         lines += [
             "> **离线档声明**：本报告来自夹具回放，`success_rate` 只证明执行管道可用。",
-            "> 质量结论必须等在线档（`--live`）；`judge_score` 本周为 `null`（W4 才接 Judge）。",
+            "> 质量结论必须等在线档（`--live`）。未开 `--judge` 时 `judge_score` 为 `null`。",
             "",
         ]
 
@@ -627,8 +778,14 @@ def render_markdown(
         f" {metrics.passed + metrics.failed} |",
         f"| 成本 | usage_estimated_ratio | {metrics.usage_estimated_ratio:.2%} |"
         f" {metrics.total} |",
-        "| 质量 | judge_score | "
-        f"{metrics.judge_score if metrics.judge_score is not None else 'null (W4)'} | - |",
+        "| 质量 | judge_score（1–5） | "
+        f"{_fmt_score(metrics.judge_score)} | {metrics.judge_samples} |",
+        "| 质量 | faithfulness | "
+        f"{_fmt_ratio(metrics.faithfulness)} | {metrics.ragas_samples} |",
+        "| 质量 | answer_relevancy | "
+        f"{_fmt_ratio(metrics.answer_relevancy)} | {metrics.ragas_samples} |",
+        "| 质量 | context_precision | "
+        f"{_fmt_ratio(metrics.context_precision)} | {metrics.ragas_samples} |",
         "",
     ]
 
@@ -644,6 +801,20 @@ def render_markdown(
 
     for tag, group in by_tag(results).items():
         lines.append(f"| tag | {tag} | {_fmt_rate(group.success_rate)} | {group.total} |")
+
+    lines += [
+        "",
+        "### 按调用形态拆延迟（chat 与 stream 不是一个分布）",
+        "",
+        "| kind | 条数 | latency p50 | latency p95 | 样本 |",
+        "|---|---|---|---|---|",
+    ]
+
+    for kind, group in by_kind(results).items():
+        lines.append(
+            f"| {kind} | {group.total} | {_fmt_ms(group.latency_p50_ms)} |"
+            f" {_fmt_ms(group.latency_p95_ms)} | {group.latency_samples} |"
+        )
 
     trend = _trend()
     lines += [
@@ -670,7 +841,12 @@ def render_markdown(
         lines += ["| 分类 | 条数 | 归因性质 |", "|---|---|---|"]
 
         for name, count in counts.items():
-            nature = "可靠性（不计入模型质量）" if name in ("upstream", "timeout") else "质量"
+            if name in ("upstream", "timeout"):
+                nature = "可靠性（不计入模型质量）"
+            elif name == "request":
+                nature = "我方请求/配置（不计入模型质量）"
+            else:
+                nature = "质量"
             lines.append(f"| {name} | {count} | {nature} |")
 
         lines += ["", "| case | 状态 | 分类 | 首条失败原因 |", "|---|---|---|---|"]
@@ -696,6 +872,14 @@ def render_markdown(
     return "\n".join(lines)
 
 
+def _fmt_score(value: float | None) -> str:
+    return "null（未开 judge）" if value is None else f"{value:.2f}"
+
+
+def _fmt_ratio(value: float | None) -> str:
+    return "n/a（无 references）" if value is None else f"{value:.2f}"
+
+
 def _fmt_rate(value: float | None) -> str:
     return "n/a" if value is None else f"{value:.2%}"
 
@@ -719,6 +903,7 @@ def snapshot(
     week: str,
     golden_path: Path,
     golden_digest: str,
+    judged_alias: str | None = None,
 ) -> dict[str, Any]:
     """落盘结构：与 W44/W45 的 `metrics` 对齐，离线结果只写 `pipeline`。"""
 
@@ -736,6 +921,7 @@ def snapshot(
             str(level): group.as_dict() for level, group in by_difficulty(results).items()
         },
         "by_tag": {tag: group.as_dict() for tag, group in by_tag(results).items()},
+        "by_kind": {kind: group.as_dict() for kind, group in by_kind(results).items()},
         "failures": summarize(
             [FailureCategory(value) for value in item.categories] for item in results
         ),
@@ -751,6 +937,19 @@ def snapshot(
             }
             for item in results
         ],
+    }
+
+    payload["judge"] = {
+        "alias": judged_alias,
+        "samples": metrics.judge_samples,
+        "score": metrics.judge_score,
+        "rubric": f"{DEFAULT_RUBRIC.name}@{DEFAULT_RUBRIC.version}",
+    }
+    payload["ragas"] = {
+        "samples": metrics.ragas_samples,
+        "faithfulness": metrics.faithfulness,
+        "answer_relevancy": metrics.answer_relevancy,
+        "context_precision": metrics.context_precision,
     }
 
     if mode == "offline":
@@ -809,6 +1008,12 @@ async def _run(args: argparse.Namespace) -> int:
 
         print(f"[break-case] {args.break_case} 的判据已被改坏（预期：它红、其余照跑）")
 
+    judge: Judge | None = None
+
+    if args.judge:
+        # 离线档 = 规则基线；在线档 = strong tier。别把两者混为一谈（报告会标 alias）。
+        judge = build_judge(live=args.live)
+
     capture = LogCapture()
     logger = get_request_logger()
     # 直接挂 handler 不改 level：库不该动宿主 logging 配置，runner 自己负责看得见。
@@ -818,15 +1023,19 @@ async def _run(args: argparse.Namespace) -> int:
     started = time.perf_counter()
 
     try:
-        results = (
-            await run_online(cases, capture)
+        results, judged = (
+            await run_online(cases, capture, judge)
             if args.live
-            else await run_offline(cases, capture)
+            else await run_offline(cases, capture, judge)
         )
     finally:
         logger.removeHandler(capture)
 
     metrics = aggregate(results)
+    # judge 均分只对"评成了"的样本求均值；judge_samples 落盘，读者能判断覆盖率。
+    metrics.judge_score = mean_overall(judged, DEFAULT_RUBRIC) if judged else None
+    metrics.judge_samples = len(judged)
+    judged_alias = getattr(judge, "alias", judge.name) if judge is not None else None
     mode = "online" if args.live else "offline"
     # 默认按 ISO 周；`--week` 用于"提前一周做下周的活"——本仓库 W2 就是这么排的，
     # 用日历周自动命名会把 W3 的报告写成 W2 那一周，趋势图上两期并成一条。
@@ -834,6 +1043,17 @@ async def _run(args: argparse.Namespace) -> int:
     digest = _digest(golden_path)
 
     print_table(results, metrics, mode=mode)
+
+    if judged:
+        print(f"judge：{json.dumps(summarize_tokens(judged), ensure_ascii=False)}")
+        print(f"judge 均分 {metrics.judge_score}（{metrics.judge_samples} 条）")
+
+    if metrics.ragas_samples:
+        print(
+            f"RAGAS（{metrics.ragas_samples} 条）：faithfulness {metrics.faithfulness}"
+            f" · relevancy {metrics.answer_relevancy}"
+            f" · context_precision {metrics.context_precision}"
+        )
 
     if args.verbose:
         for item in results:
@@ -856,6 +1076,7 @@ async def _run(args: argparse.Namespace) -> int:
                     week=week,
                     golden_path=golden_path,
                     golden_digest=digest,
+                    judged_alias=judged_alias,
                 ),
                 ensure_ascii=False,
                 indent=2,
@@ -887,6 +1108,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--break-case", default=None, help="把指定 case 的判据改坏（反向验证）")
     parser.add_argument("--no-write", action="store_true", help="不落盘（只看输出）")
     parser.add_argument("--week", default=None, help="覆盖报告期号，如 2026-W46")
+    parser.add_argument(
+        "--judge", action="store_true", help="顺带跑 judge（离线档为规则基线，在线档走 strong）"
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
 

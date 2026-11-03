@@ -140,10 +140,12 @@ async def test_passed_case_has_no_failure_categories() -> None:
     )
     gateway = _RecordingGateway()
 
-    result = await run_eval.evaluate(
+    # W4 起 `evaluate` 返回 (EvalResult, JudgeResult|None)：judge 结果与指标分开走
+    result, judged = await run_eval.evaluate(
         case, gateway, LogCapture(), case.expect, alias="fixture"
     )
 
+    assert judged is None
     assert result.status is CaseStatus.PASSED
     assert result.categories == ()
 
@@ -277,4 +279,6 @@ def test_markdown_has_four_blocks_and_offline_disclaimer() -> None:
         assert heading in text
 
     assert "离线档声明" in text
-    assert "judge_score | null (W4)" in text
+    assert "judge_score（1–5）" in text
+    assert "null（未开 judge）" in text
+    assert "faithfulness" in text

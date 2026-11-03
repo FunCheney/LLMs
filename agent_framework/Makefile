@@ -9,7 +9,7 @@ SHELL := /bin/bash
 # 报告期号。默认按 ISO 周，需要写"下周"的报告时 `make run-eval WEEK=2026-W47`。
 WEEK ?= $(shell date +%G-W%V)
 
-.PHONY: help sync test lint type check check-all golden run-eval smoke eval baseline up down ps logs load e2e clean
+.PHONY: help sync test lint type check check-all golden run-eval run-eval-judge gate baseline-snapshot judge-agreement smoke eval baseline up down ps logs load e2e clean
 
 help: ## 列出所有目标
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
@@ -37,7 +37,24 @@ golden: ## 校验 golden set（引用完整性 / 难度分布 / 去重 / 对抗�
 run-eval: ## 54 条 golden 离线评测（分层指标 + 落盘报告）
 	uv run python evals/scripts/run_eval.py --week $(WEEK)
 
-eval: check golden run-eval ## CI 里跑的那一套：静态 + 用例 + golden 校验 + 离线评测
+run-eval-judge: ## 同上，但顺带跑 judge（离线档=规则基线）
+	uv run python evals/scripts/run_eval.py --week $(WEEK) --judge
+
+gate: ## 回归门禁：当前一期 vs baseline.json
+	uv run python evals/scripts/regression_gate.py --current evals/history/$(WEEK)-eval.json
+
+baseline-snapshot: ## 用当前一期重建基线（慎用：会覆盖历史基准）
+	uv run python evals/scripts/regression_gate.py --current evals/history/$(WEEK)-eval.json --write-baseline
+
+judge-agreement: ## Judge 与人工标注的一致性（离线档=规则基线）
+	uv run python evals/scripts/judge_agreement.py --week $(WEEK)
+
+# 注意：门禁这条链故意用 `run-eval-judge` 而不是 `run-eval`。
+# 两者写的是同一个文件 `evals/history/<WEEK>-eval.json`，谁后跑谁说了算；
+# 若这里退化成 `run-eval`，每周快照就会把 judge/ragas 块冲成 null,
+# 下一期对比时 quality 指标全部变成"本期缺失 → skipped"，趋势图悄悄断掉。
+# 离线档 judge 是规则基线、零成本，没有理由不带。
+eval: check golden run-eval-judge gate ## CI 里跑的那一套：静态 + 用例 + golden + 评测（含质量）+ 回归门禁
 
 baseline: ## W1 基线表（dry-run，不落盘）
 	uv run python evals/scripts/bench_baseline.py --dry-run --models fixture

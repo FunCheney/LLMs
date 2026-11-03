@@ -5,6 +5,83 @@
 
 ---
 
+## 2026-W47（11-16 ~ 11-20）· W4：评测体系 II（Judge / RAGAS / 回归门禁 / 四层归因）
+
+> 实际落盘 11-03 预跑；judge 一致性来自**规则基线**（无 key），LLM judge 与在线档待凭证。
+
+### 本周做了什么
+
+| Day | 产出 | 结论 |
+|---|---|---|
+| D1 | `evals/judge/{rubric,llm_judge,stats}.py` + `judge_agreement.py` + `adr-w4-judge-design.md` | **一致性系数才是交付物**：没有 kappa 的 Judge 等于随机数，"分数涨了"就无法被追问 |
+| D2 | `evals/judge/{ragas_metrics,text}.py` + `metric-spec-ragas.md` + `metrics.RagasScores` | `None ≠ 0`：无 context 返回 None，否则 faithfulness 随数据集构成漂移 |
+| D3 | `regression_gate.py` + `baseline.json` + CI 两步 + `adr-w4-gate-threshold.md` | 相对劣化 + 延迟绝对下限；**基线缺失退出 2，不静默放行** |
+| D4 | `root-cause-playbook.md` + `attribute_failure.py` | 证据不足判 `unknown`：把"埋点缺失"判成"某层坏了"，团队会去改一个没坏的模块 |
+| D5 | `docs/w4/cases/case-{1,2,3}.md` + 3 处真实代码改动 | 每篇都有前后数字，且都不是"全绿"——真实性来自取舍被写出来 |
+
+### 指标变化
+
+- 离线用例：`416 → 496`（judge 24 / ragas 20 / gate 17 / 归因 15 / 分类不变量 4），live 仍 16 跳过
+- **`make run-eval-judge`：50 passed / 0 failed / 4 skipped，2.12s**
+- Judge：`judge_score 1.92`（50 条，alias `heuristic-keyword`）、rubric `answer-quality@w4-v1`
+- 一致性（24 条人工标注）：加权 kappa `0.343`、名义 kappa `0.200`、spearman `0.437`、MAE `1.167`
+  → **阈值 0.40 未通过**（结论见下）
+- RAGAS（9 条带引用）：`faithfulness 0.0`、`answer_relevancy 0.054`、`context_precision 1.00`
+- 延迟：混合 p95 `2.45ms`，但 chat p95 `0.47ms`、tool_call `0.74ms`、error p50 `3.95ms`
+- 回归门禁：对比 W46 基线，`2 项可比 / 4 项跳过 / 0 违规`，通过
+- 静态检查：`ruff` 全绿、`mypy` 45 文件无问题
+- 全链路 `make eval WEEK=2026-W47` 一次通过：`check → golden → run-eval-judge → gate`
+  （`judge_score` 判跳过是因为基线是 W46、那时还没有这个指标，不是本期缺数据）
+
+> 排障记录：若在**只读沙箱**里跑 `make test`，会看到 20+ 个
+> `ERROR ...::test_x - assert not self._finalizers`，散布在 `test_config` / `test_regression_gate`
+> 等互不相关的模块。这不是代码问题：`tmp_path` 无写权限建不出来，teardown 被打断后
+> finalizer 留在 fixturedef 上，之后每个用 `tmp_path` 的用例都在同一行炸。判据是
+> "换到可写环境立刻全绿"——别去改 conftest。
+
+### 本周暴露的五个真问题
+
+1. **references 只有路径时，RAGAS 结构性为 0**：context 是 `docs/architecture.md` 这样的字符串，
+   实词是 `docs/architecture/md`，任何答案都命中不了。指标恒 0 不代表模型差，代表我们把路径当成了正文。
+2. **单字口径会把 faithfulness 顶到 1.0**：context 换成整篇文档后，任何中文句子都能凑够单字重合。
+   换成二元组后回落——**同一份数据、两种分词，结论相反**，指标口径必须写进文档。
+3. **一个 p95 混四种调用形态**：混合 2.45ms 是 chat p95 的 5.2 倍，误差量级 420%，
+   抬它起来的是 4 条故意重试的 error case。读者会去查一个没变慢的链路。
+4. **错误码表写两遍必然漂移**：10 个已知码里 6 个判定相反，`SERVER_BUSY`（自家限流器）在
+   `run_eval` 里是"质量失败"、在分类器里是"上游问题"。漂移不报错，只让两个数字互相矛盾。
+5. **规则基线判不了事实**：它从不给 1–2 分，因为"事实错误"在词面上往往比正确答案更像个答案。
+   kappa 0.20 就是这件事的数字，也是 LLM judge 必须存在的理由。
+
+### 遗留问题（带责任人与时限）
+
+| # | 问题 | 处理 |
+|---|---|---|
+| 1 | LLM judge 一致性未测（当前 0.20 是规则基线） | 填 key → `judge_agreement.py --live`；低于 0.40 先改锚，不改温度 |
+| 2 | 24 条标注 `labeler=impl-draft` | 负责人逐条复核改成 `human`；自评自标只能证明流程通 |
+| 3 | 门禁拦不住"答得差" | 离线 success_rate 恒 100%；建 `baseline-online.json` 后才真正有质量门禁 |
+| 4 | `faithfulness` 离线恒 0 | 夹具答案是固定文本，与引用无关；W5 接检索后才有读数 |
+| 5 | 字面判定认不出同义改写 | 需要 `LLMSupport`（走 strong 模型）；成本约 0.4 美分/条 |
+
+### 收尾时补的一个坑
+
+`run-eval` 与 `run-eval-judge` 写的是**同一个** `evals/history/<WEEK>-eval.json`，谁后跑谁说了算。
+`make eval` 原来走 `run-eval`，于是本地一跑就把刚产出的 `judge`/`ragas` 块冲成 `null`；
+下一期对比时质量指标会"本期缺失 → skipped"，趋势图悄悄断掉，而且**不会报错**。
+已把 `eval` 改成依赖 `run-eval-judge`（离线档是规则基线、零成本）。同类隐患记一条原则：
+同一份产物有两个写入者时，默认路径必须选"信息更全"的那个，否则隐性丢数据。
+
+### P3 决策（W4 末 = ROADEMAP §7 第一个决策点）
+
+**不解锁深入档。** 本周预算 12–15h 全部用于默认档，进度余量 < 15h；
+按 ROI 顺序（A2A 轻量 > 多语言 > 前端极简 > 高并发 > 向量库/微调 > Computer Use），
+解锁任何一个都会挤压 W5 的 RAG（P0 主线）。余量补上后再判。
+
+### 下周（W5）只做三件事
+
+1. 接检索（chunk + 混合召回），把 `context_precision` 从"引用质量代理"换成真实检索前 k 条；
+2. 用 D3 的门禁 + D4 的归因跑第一轮真实调优，产出第 4 篇案例；
+3. 首次在线档，回填 judge kappa 与 faithfulness 的真实读数。
+
 ## 2026-W46（11-09 ~ 11-13）· W3：评测体系 I（golden set / 分层指标 / trace 落地）
 
 > 实际落盘 11-02 预跑；数字全部来自离线档，在线档与 Langfuse 真机验证待凭证。

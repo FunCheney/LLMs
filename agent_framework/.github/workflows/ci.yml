@@ -78,3 +78,36 @@ jobs:
             exit 1
           fi
           rm -f evals/golden/_broken.jsonl
+
+      # ---- W4 D3：回归门禁 ---------------------------------------------- #
+      # 先产出一份可比的离线快照（落盘到 runner 的 evals/history，不进仓库），
+      # 再拿它与仓库里提交的 baseline.json 比。基线是**离线**指标，
+      # 只证明执行管道在线；在线档要另建 baseline-online.json（两者不可互比）。
+      - name: Eval snapshot for gate (offline)
+        run: uv run python evals/scripts/run_eval.py --week gate --judge
+
+      - name: Regression gate vs baseline
+        run: uv run python evals/scripts/regression_gate.py --current evals/history/gate-eval.json
+
+      # 反向验证之四：门禁必须能拦住劣化。把当前快照的成功率改成 0.5，
+      # 期望退出码非 0。只验"通过"的门禁无法证明它在工作。
+      - name: Regression gate must be able to fail
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          src = Path("evals/history/gate-eval.json")
+          payload = json.loads(src.read_text("utf-8"))
+          payload["pipeline"]["success_rate"] = 0.5
+          Path("evals/history/gate-broken.json").write_text(
+              json.dumps(payload, ensure_ascii=False), "utf-8"
+          )
+          PY
+          if uv run python evals/scripts/regression_gate.py --current evals/history/gate-broken.json; then
+            echo "回归门禁没有变红：阈值是摆设" >&2
+            exit 1
+          fi
+
+      - name: Judge agreement (规则基线，仅证明链路通)
+        run: uv run python evals/scripts/judge_agreement.py --no-write

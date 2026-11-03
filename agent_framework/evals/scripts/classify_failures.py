@@ -28,10 +28,13 @@ from enum import StrEnum
 from evals.metrics import CaseStatus, EvalResult
 
 __all__ = [
+    "CALLER_CODES",
+    "RELIABILITY_CODES",
     "FailureCategory",
     "classify",
     "classify_result",
     "is_quality_failure",
+    "is_reliability_code",
     "summarize",
 ]
 
@@ -46,29 +49,70 @@ class FailureCategory(StrEnum):
     FORMAT = "format"  # 输出结构不合 expect（帧序列、必填字段）
     HALLUCINATION = "hallucination"  # 有 references 但答案缺乏支撑
     RETRIEVAL_MISS = "retrieval_miss"  # W5 接检索后才有输入，先留枚举
+    REQUEST = "request"  # 我们的请求/配置写错了（400/能力不支持），不是模型答错
     ASSERTION = "assertion"  # 断言不成立且无法机械归因 → 交给人
 
     @property
     def is_reliability(self) -> bool:
-        """可靠性类（上游/超时）。不计入"模型质量"结论。"""
+        """厂商侧可靠性（上游/超时）。不计入"模型质量"结论。"""
 
         return self in (FailureCategory.UPSTREAM, FailureCategory.TIMEOUT)
 
+    @property
+    def counts_against_model(self) -> bool:
+        """这条失败该不该算进"模型答得好不好"。
 
-# 上游错误码 → 分类。用 code 而不是异常类型：分类器只读日志，不 import 异常树
+        三档：厂商抖动（UPSTREAM/TIMEOUT）和"我们自己传错了"（REQUEST）
+        都不该算到模型头上。区别很重要——`SERVER_BUSY` 是我们自己的限流器吐的，
+        把它算成模型答错，会让人去调 prompt。
+        """
+
+        return self not in (
+            FailureCategory.UPSTREAM,
+            FailureCategory.TIMEOUT,
+            FailureCategory.REQUEST,
+        )
+
+
+# 错误码 → 分类。用 code 而不是异常类型：分类器只读日志，不 import 异常树
 # （离线档与在线档的错误可能来自不同进程，日志才是唯一共同输入）。
-_UPSTREAM_CODES = {
+#
+# **这里是唯一一份码表**（W4 D5 案例 3）。之前 `run_eval` 与 `classify_failures`
+# 各有一份，10 个已知错误码里有 6 个在两处判定不同：`SERVER_BUSY`（我们自己的
+# 限流器吐的 503）在 run_eval 里被算成"质量失败"，在分类器里是"上游问题"。
+# 结果是一批被限流的请求把 success_rate 拉低，而报告说"模型答错了"。
+RELIABILITY_CODES = {
     "UPSTREAM_AUTH",
     "UPSTREAM_ERROR",
     "UPSTREAM_TIMEOUT",
     "RATE_LIMITED",
     "SERVER_BUSY",
-    "CAPABILITY_UNSUPPORTED",
-    "BAD_REQUEST",
-    "CONTENT_FILTERED",
 }
 
 _TIMEOUT_CODES = {"UPSTREAM_TIMEOUT", "SERVER_BUSY"}
+
+# 我方问题：请求本身不合法、能力不匹配、配置写错。既不是厂商故障，也不是模型答错。
+CALLER_CODES = {
+    "BAD_REQUEST",
+    "CAPABILITY_UNSUPPORTED",
+    "CONFIG_ERROR",
+    "TASK_NOT_FOUND",
+    "CONTENT_FILTERED",
+}
+
+
+def is_reliability_code(code: str | None) -> bool:
+    """这个错误码是否属于"厂商侧故障"（→ `interrupted`，不进成功率分母）。
+
+    未知码返回 `True`（按可靠性处理）：宁可少算一次"模型答错"，
+    也不要把一个新出现的厂商故障记成质量退化。
+    """
+
+    if not code:
+        return False
+
+    return code not in CALLER_CODES
+
 
 # 出现在 failures 文本里的结构性关键词。匹配的是 runner 自己生成的断言文案，
 # 不是模型输出——所以用子串匹配是安全的（文案由本项目控制）。
@@ -95,11 +139,15 @@ def classify(
     categories: list[FailureCategory] = []
 
     if error_code:
-        categories.append(
-            FailureCategory.TIMEOUT
-            if error_code in _TIMEOUT_CODES
-            else FailureCategory.UPSTREAM
-        )
+        if is_reliability_code(error_code):
+            categories.append(
+                FailureCategory.TIMEOUT
+                if error_code in _TIMEOUT_CODES
+                else FailureCategory.UPSTREAM
+            )
+        else:
+            # 我方请求/配置问题：不是厂商故障，也不该算模型答错。
+            categories.append(FailureCategory.REQUEST)
         # 上游失败时，下游断言必然不成立。此时再报 FORMAT/HALLUCINATION 是纯噪声，
         # 而且会让"上游抖动"被误读成"模型编造"。
         return categories
@@ -166,4 +214,4 @@ def is_quality_failure(categories: Sequence[FailureCategory]) -> bool:
     把成功率拉低 20 个点之后，团队跑去改 prompt。
     """
 
-    return bool(categories) and not all(item.is_reliability for item in categories)
+    return bool(categories) and any(item.counts_against_model for item in categories)

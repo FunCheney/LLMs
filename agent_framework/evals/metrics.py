@@ -28,9 +28,11 @@ __all__ = [
     "CaseMetrics",
     "CaseStatus",
     "EvalResult",
+    "RagasScores",
     "TaskMetrics",
     "aggregate",
     "by_difficulty",
+    "by_kind",
     "by_tag",
     "percentile",
 ]
@@ -117,6 +119,51 @@ class CaseMetrics:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class RagasScores:
+    """RAGAS 三指标（W4 D2）。
+
+    **每个字段都可能是 `None`，且 `None` 与 0.0 含义不同**：
+    - `None`：这条 case 根本算不了（没有 references、答案为空）→ 不进均值
+    - `0.0`：算了，结果是一条都没被支撑 → 进均值
+
+    把前者当 0 会让"数据集里有一半 case 没引用"看起来像"faithfulness 掉到 0.5"。
+
+    `method` 记录**计算方式**（`lexical` / `llm`）。同一个数字由 LLM 判定得来
+    还是由词面匹配得来，可信度差一个档；报告里不带这个字段，读者无法判断
+    "0.72 的 faithfulness" 到底值多少。
+    """
+
+    faithfulness: float | None = None
+    answer_relevancy: float | None = None
+    context_precision: float | None = None
+
+    method: str = "lexical"
+    claims: int = 0
+    contexts: int = 0
+
+    @property
+    def has_any(self) -> bool:
+        return any(
+            value is not None
+            for value in (
+                self.faithfulness,
+                self.answer_relevancy,
+                self.context_precision,
+            )
+        )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "faithfulness": self.faithfulness,
+            "answer_relevancy": self.answer_relevancy,
+            "context_precision": self.context_precision,
+            "method": self.method,
+            "claims": self.claims,
+            "contexts": self.contexts,
+        }
+
+
 @dataclass(slots=True)
 class EvalResult:
     """一条 case 的评测结果：状态 + 观测值 + 失败原因。
@@ -134,6 +181,9 @@ class EvalResult:
     failures: tuple[str, ...] = ()
     categories: tuple[str, ...] = ()
     detail: str | None = None
+
+    # W4 D2 起：有 references 的 case 才有值。`None` 表示"这条算不了"。
+    ragas: RagasScores | None = None
 
     @property
     def passed(self) -> bool:
@@ -174,8 +224,15 @@ class TaskMetrics:
 
     total_tokens: int = 0
 
-    # W4 填。本周恒 None。
+    # W4 D1 填：judge 加权均分（1–5）。没开 judge 或全部解析失败时仍是 None。
     judge_score: float | None = None
+    judge_samples: int = 0
+
+    # W4 D2 填：RAGAS 三指标，**只对能算的样本取均值**。
+    faithfulness: float | None = None
+    answer_relevancy: float | None = None
+    context_precision: float | None = None
+    ragas_samples: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         """落盘用的扁平字典。
@@ -208,6 +265,11 @@ class TaskMetrics:
             "usage_estimated_ratio": self.usage_estimated_ratio,
             "total_tokens": self.total_tokens,
             "judge_score": self.judge_score,
+            "judge_samples": self.judge_samples,
+            "faithfulness": self.faithfulness,
+            "answer_relevancy": self.answer_relevancy,
+            "context_precision": self.context_precision,
+            "ragas_samples": self.ragas_samples,
         }
 
 
@@ -262,6 +324,7 @@ def aggregate(results: Iterable[EvalResult]) -> TaskMetrics:
 
     latencies: list[float] = []
     first_tokens: list[float] = []
+    ragas_rows: list[RagasScores] = []
     exact_costs: list[float] = []
     currencies: set[str] = set()
     estimated = 0
@@ -280,6 +343,9 @@ def aggregate(results: Iterable[EvalResult]) -> TaskMetrics:
         metrics.tool_calls += item.metrics.tool_calls
         metrics.tool_errors += item.metrics.tool_errors
         metrics.total_tokens += item.metrics.total_tokens
+
+        if item.ragas is not None and item.ragas.has_any:
+            ragas_rows.append(item.ragas)
 
         if not item.metrics.has_log:
             continue
@@ -333,6 +399,12 @@ def aggregate(results: Iterable[EvalResult]) -> TaskMetrics:
     metrics.currency = next(iter(currencies), None)
     metrics.usage_estimated_ratio = (estimated / logged) if logged else 0.0
 
+    # RAGAS：分母是"算出值的样本数"，不是总数。
+    metrics.ragas_samples = len(ragas_rows)
+    metrics.faithfulness = _mean_of(ragas_rows, "faithfulness")
+    metrics.answer_relevancy = _mean_of(ragas_rows, "answer_relevancy")
+    metrics.context_precision = _mean_of(ragas_rows, "context_precision")
+
     return metrics
 
 
@@ -347,6 +419,22 @@ def by_difficulty(results: Iterable[EvalResult]) -> dict[int, TaskMetrics]:
     return {level: aggregate(group) for level, group in sorted(buckets.items())}
 
 
+def by_kind(results: Iterable[EvalResult]) -> dict[str, TaskMetrics]:
+    """按调用形态（chat / stream / tool_call / error）聚合。
+
+    为什么要分开：`latency_p95` 把"一次性返回"和"逐帧吐字"混在一起算一个 p95，
+    两种形态的延迟本来就不是一个分布（流式的 total latency 天然含整段生成时间）。
+    混算出来的 p95 既不代表流式体验，也不代表同步调用——它只是两个分布的和。
+    """
+
+    buckets: dict[str, list[EvalResult]] = {}
+
+    for item in results:
+        buckets.setdefault(item.kind, []).append(item)
+
+    return {kind: aggregate(group) for kind, group in sorted(buckets.items())}
+
+
 def by_tag(results: Iterable[EvalResult]) -> dict[str, TaskMetrics]:
     """按 tag 聚合。一条 case 有多个 tag 时，会同时计入每个 tag 的分母——
     所以各 tag 的 total 之和大于总 case 数，这是特性不是 bug（报告里要注明）。
@@ -359,6 +447,21 @@ def by_tag(results: Iterable[EvalResult]) -> dict[str, TaskMetrics]:
             buckets.setdefault(tag, []).append(item)
 
     return {tag: aggregate(group) for tag, group in sorted(buckets.items())}
+
+
+def _mean_of(rows: Sequence[RagasScores], field_name: str) -> float | None:
+    """按字段取均值，跳过 None。全 None 时返回 None（不是 0.0）。"""
+
+    values = [
+        value
+        for row in rows
+        if (value := getattr(row, field_name)) is not None
+    ]
+
+    if not values:
+        return None
+
+    return round(sum(values) / len(values), 4)
 
 
 # --------------------------------------------------------------------------- #
