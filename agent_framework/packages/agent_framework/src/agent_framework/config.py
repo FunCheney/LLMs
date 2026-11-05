@@ -276,6 +276,31 @@ class Settings(BaseSettings):
     langfuse_secret_key: SecretStr | None = None
     trace_sample_ratio: float = Field(default=1.0, ge=0.0, le=1.0)
 
+    # -- W5：检索 ---------------------------------------------------- #
+    # 预算**整体一个数**，流水线按剩余时间递减。拆成三个独立超时的话，
+    # 总延迟是三者之和，而配置读起来像"总预算"，压测时会归因错。
+    retrieval_budget_ms: float = Field(default=800.0, gt=0)
+    retrieval_top_k: int = Field(default=8, ge=1)
+    # 召回放大倍数：后面还有 ACL 过滤与去重会砍，只取 top_k 容易给不满。
+    retrieval_recall_multiplier: float = Field(default=3.0, ge=1.0)
+
+    retrieval_mode: Literal["sparse", "dense", "hybrid"] = "hybrid"
+    # 后端选择只影响装配，不影响任何业务代码（都走 Retriever 协议）。
+    vector_store: Literal["local", "milvus", "pgvector"] = "local"
+
+    # 精排默认关：本地 cross-encoder 精排 20 条约 2.5s，默认开会让 p95 直接
+    # 超出门禁。要开必须同时把 retrieval_budget_ms 调大，否则每次都在降级。
+    retrieval_rerank: bool = False
+    retrieval_rerank_candidates: int = Field(default=20, ge=1)
+    retrieval_rerank_timeout_ms: float = Field(default=3000.0, gt=0)
+
+    # 改写默认关：它是一次 LLM 调用，且收益要用 A/B 证明后才该保留。
+    retrieval_rewrite: bool = False
+    retrieval_rewrite_timeout_ms: float = Field(default=2500.0, gt=0)
+
+    # pgvector 连接串。和 redis_url 一样，只走 env，不进代码。
+    pgvector_dsn: SecretStr | None = None
+
     openai_api_key: SecretStr | None = None
     deepseek_api_key: SecretStr | None = None
     dashscope_api_key: SecretStr | None = None

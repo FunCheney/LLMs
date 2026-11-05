@@ -1,6 +1,6 @@
-from retrieval.rrf import reciprocal_rank_fusion
-from retrieval.types import RetrievalResult
-from schemas import DocumentChunk
+from rag_mvp.retrieval.rrf import reciprocal_rank_fusion
+from rag_mvp.retrieval.types import RetrievalResult
+from rag_mvp.schemas import DocumentChunk
 
 
 def _hit(chunk_id: str, source: str = "dense") -> RetrievalResult:

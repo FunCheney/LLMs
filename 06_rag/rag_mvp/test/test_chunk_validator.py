@@ -1,5 +1,5 @@
-from schemas import DocumentChunk
-from validation.chunk_validator import validate_chunks
+from rag_mvp.schemas import DocumentChunk
+from rag_mvp.validation.chunk_validator import validate_chunks
 
 
 def _chunk(**kwargs) -> DocumentChunk:

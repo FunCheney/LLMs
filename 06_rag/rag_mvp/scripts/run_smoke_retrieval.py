@@ -14,7 +14,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from eval.smoke_runner import (
+from rag_mvp.eval.smoke_runner import (
     format_console_report,
     run_smoke_evaluation,
     save_report,

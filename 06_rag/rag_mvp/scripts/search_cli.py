@@ -11,9 +11,9 @@ CLI：检索调试工具，支持 dense / sparse / hybrid 三种模式。
 import argparse
 from pathlib import Path
 
-from pre_query import QueryPreProcessor
-from retrieval.display import print_hits
-from retrieval.factory import RetrieverConfig, create_retriever
+from rag_mvp.pre_query import QueryPreProcessor
+from rag_mvp.retrieval.display import print_hits
+from rag_mvp.retrieval.factory import RetrieverConfig, create_retriever
 
 
 def parse_args() -> argparse.Namespace:

@@ -14,9 +14,9 @@ Milvus 连接参数优先级：CLI 参数 > 环境变量（MILVUS_URI / MILVUS_T
 import argparse
 from pathlib import Path
 
-from embedding import BGEM3EmbeddingProvider
-from indexing.vector_index import build_index
-from vector_store.config import VectorStoreConfig
+from rag_mvp.embedding import BGEM3EmbeddingProvider
+from rag_mvp.indexing.vector_index import build_index
+from rag_mvp.vector_store.config import VectorStoreConfig
 
 
 def parse_args() -> argparse.Namespace:
@@ -50,9 +50,19 @@ def parse_args() -> argparse.Namespace:
         "--store-type",
         "--index-type",  # 兼容旧参数名
         dest="store_type",
-        choices=["local", "milvus"],
+        choices=["local", "milvus", "pgvector"],
         default="local",
         help="Vector store backend (default: local)",
+    )
+    parser.add_argument(
+        "--pgvector-dsn",
+        default=None,
+        help="postgres 连接串（默认 env PGVECTOR_DSN）",
+    )
+    parser.add_argument(
+        "--pgvector-table",
+        default=None,
+        help="pgvector 表名（默认 env PGVECTOR_TABLE 或 rag_chunks）",
     )
     parser.add_argument("--milvus-uri", default=None, help="Milvus URI（默认 env MILVUS_URI 或 http://localhost:19530；Lite 传 .db 文件路径）")
     parser.add_argument("--milvus-token", default=None, help="Milvus token（默认 env MILVUS_TOKEN 或 root:Milvus）")
@@ -87,6 +97,10 @@ def main() -> None:
         kwargs["token"] = args.milvus_token
     if args.collection is not None:
         kwargs["collection"] = args.collection
+    if args.pgvector_dsn is not None:
+        kwargs["dsn"] = args.pgvector_dsn
+    if args.pgvector_table is not None:
+        kwargs["table"] = args.pgvector_table
 
     # 根据参数初始化向量存储配置
     config = VectorStoreConfig(**kwargs)
@@ -101,6 +115,9 @@ def main() -> None:
     print(f"Chunks file: {args.chunks}")
     if args.store_type == "local":
         print(f"Index file: {args.output}")
+    elif args.store_type == "pgvector":
+        # 打印表名而不是 DSN：DSN 里有密码，日志会被收集走。
+        print(f"pgvector table: {config.table}")
     else:
         print(f"Milvus collection: {config.collection} @ {config.uri}")
     print(f"Indexed records: {index.count()}")

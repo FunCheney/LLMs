@@ -14,7 +14,7 @@ CLI：构建 BM25 稀疏索引（data/index/bm25.pkl）。
 import argparse
 from pathlib import Path
 
-from embedding import build_bm25_index
+from rag_mvp.embedding import build_bm25_index
 
 
 def parse_args() -> argparse.Namespace:

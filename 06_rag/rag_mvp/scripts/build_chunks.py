@@ -10,8 +10,8 @@ CLI：把原始文档解析并分块，产出 data/processed/chunks.jsonl。
 
 from pathlib import Path
 
-from ingestion.pipeline import ingest_document
-from ingestion.storage import save_chunks_jsonl
+from rag_mvp.ingestion.pipeline import ingest_document
+from rag_mvp.ingestion.storage import save_chunks_jsonl
 
 
 def main():

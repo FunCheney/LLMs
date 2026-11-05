@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "week": "2026-W46",
+  "mode": "offline",
+  "recorded_at": "2026-11-03T22:26:46+08:00",
+  "commit": "afbded2",
+  "golden": {
+    "path": "evals/golden/golden_v1.jsonl",
+    "sha256": "1c31832c2bbf",
+    "total": 54
+  },
+  "model_snapshot": {
+    "cheap": "qwen3.7-plus",
+    "strong": "claude-sonnet-4-6",
+    "aliases": [
+      "claude-sonnet-4-6",
+      "deepseek-flash",
+      "fixture",
+      "gpt-4o-mini",
+      "qwen3.7-plus"
+    ],
+    "catalog_sha256": "683bc7654b9f"
+  },
+  "metrics": {
+    "total": 54,
+    "passed": 50,
+    "failed": 0,
+    "interrupted": 0,
+    "skipped": 4,
+    "success_rate": 1.0,
+    "interrupted_rate": 0.0,
+    "skip_rate": 0.07407407407407407,
+    "tool_calls": 14,
+    "tool_errors": 0,
+    "tool_error_rate": 0.0,
+    "latency_p50_ms": 0.158,
+    "latency_p95_ms": 2.292399999999993,
+    "latency_samples": 50,
+    "first_token_p50_ms": 0.147,
+    "first_token_p95_ms": null,
+    "first_token_samples": 4,
+    "cost_total": 0.0,
+    "cost_per_task": 0.0,
+    "currency": "CNY",
+    "usage_estimated_ratio": 0.0,
+    "total_tokens": 4588,
+    "judge_score": null
+  },
+  "note": "基线是**离线档**指标：success_rate 只代表执行管道。在线档接入后需要另建一份 baseline-online.json，两者的 success_rate 不可互比。"
+}

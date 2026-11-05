@@ -1,10 +1,10 @@
 from pathlib import Path
 
-from embedding.fake import FakeEmbeddingProvider
-from indexing import build_vector_db_index
-from indexing.vector_index import build_local_index, search_local_index
-from ingestion.storage import save_chunks_jsonl
-from schemas import DocumentChunk
+from rag_mvp.embedding.fake import FakeEmbeddingProvider
+from rag_mvp.indexing import build_vector_db_index
+from rag_mvp.indexing.vector_index import build_local_index, search_local_index
+from rag_mvp.ingestion.storage import save_chunks_jsonl
+from rag_mvp.schemas import DocumentChunk
 
 
 def _sample_chunks() -> list[DocumentChunk]:

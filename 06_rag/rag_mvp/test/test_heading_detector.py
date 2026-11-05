@@ -1,4 +1,4 @@
-from ingestion.heading_detector import (
+from rag_mvp.ingestion.heading_detector import (
     Heading,
     SectionTracker,
     detect_heading,

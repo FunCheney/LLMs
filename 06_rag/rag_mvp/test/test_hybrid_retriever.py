@@ -1,11 +1,11 @@
 from pathlib import Path
 
-from embedding import build_bm25_index
-from embedding.fake import FakeEmbeddingProvider
-from indexing.vector_index import build_local_index
-from ingestion.storage import save_chunks_jsonl
-from retrieval.factory import RetrieverConfig, create_retriever
-from schemas import DocumentChunk
+from rag_mvp.embedding import build_bm25_index
+from rag_mvp.embedding.fake import FakeEmbeddingProvider
+from rag_mvp.indexing.vector_index import build_local_index
+from rag_mvp.ingestion.storage import save_chunks_jsonl
+from rag_mvp.retrieval.factory import RetrieverConfig, create_retriever
+from rag_mvp.schemas import DocumentChunk
 
 
 def _sample_chunks() -> list[DocumentChunk]:
@@ -55,8 +55,12 @@ def test_hybrid_retriever_uses_rrf(tmp_path: Path, monkeypatch):
     def fake_embedder(device=None):
         return provider
 
+    # patch 源模块：factory 里是函数内 `from rag_mvp.embedding import ...`，
+    # 而 rag_mvp.embedding 的该符号由 __getattr__ 惰性导出，模块级并不存在。
+    # 原写法 patch "retrieval.factory.BGEM3EmbeddingProvider" 会直接
+    # AttributeError，等于这条测试从未真正验证过 RRF。
     monkeypatch.setattr(
-        "retrieval.factory.BGEM3EmbeddingProvider",
+        "rag_mvp.embedding.BGEM3EmbeddingProvider",
         fake_embedder,
     )
 

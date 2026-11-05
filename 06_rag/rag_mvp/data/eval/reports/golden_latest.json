@@ -1,0 +1,776 @@
+{
+  "dataset_id": "claude-code-design-guide-golden",
+  "timestamp": "2026-10-18T10:58:41.384905+00:00",
+  "modes": {
+    "dense": {
+      "mode": "dense",
+      "top_k": 10,
+      "total": 28,
+      "negative_count": 2,
+      "recall_at_1": 0.7857142857142857,
+      "recall_at_3": 0.9285714285714286,
+      "recall_at_5": 0.9642857142857143,
+      "recall_at_10": 1.0,
+      "mrr": 0.8627976190476191,
+      "ndcg_at_10": 0.7415775465634956,
+      "results": [
+        {
+          "id": "golden-001",
+          "question": "MCP 是什么？",
+          "gold_count": 2,
+          "hit": true,
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "ndcg_at_10": 1.0,
+          "hits_at_k": {
+            "1": true,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p152-p152-c330",
+            "claude-code-0001-p159-p160-c348",
+            "claude-code-0001-p152-p152-c329",
+            "claude-code-0001-p159-p159-c347",
+            "claude-code-0001-p157-p158-c344",
+            "claude-code-0001-p154-p155-c337",
+            "claude-code-0001-p085-p085-c177",
+            "claude-code-0001-p153-p154-c335",
+            "claude-code-0001-p157-p157-c343",
+            "claude-code-0001-p155-p156-c339"
+          ]
+        },
+        {
+          "id": "golden-002",
+          "question": "CLAUDE.md 配置文件是做什么的？",
+          "gold_count": 3,
+          "hit": true,
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "ndcg_at_10": 0.9469024295259745,
+          "hits_at_k": {
+            "1": true,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p109-p110-c230",
+            "claude-code-0001-p021-p021-c032",
+            "claude-code-0001-p110-p110-c232",
+            "claude-code-0001-p022-p022-c038",
+            "claude-code-0001-p110-p110-c231",
+            "claude-code-0001-p112-p112-c243",
+            "claude-code-0001-p022-p022-c036",
+            "claude-code-0001-p112-p112-c244",
+            "claude-code-0001-p115-p116-c251",
+            "claude-code-0001-p195-p195-c428"
+          ]
+        },
+        {
+          "id": "golden-003",
+          "question": "query 执行循环是怎么工作的？",
+          "gold_count": 7,
+          "hit": true,
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "ndcg_at_10": 0.44830398990253034,
+          "hits_at_k": {
+            "1": true,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p045-p045-c093",
+            "claude-code-0001-p049-p049-c104",
+            "claude-code-0001-p042-p042-c084",
+            "claude-code-0001-p034-p035-c068",
+            "claude-code-0001-p048-p048-c102",
+            "claude-code-0001-p038-p038-c077",
+            "claude-code-0001-p049-p050-c105",
+            "claude-code-0001-p186-p186-c411",
+            "claude-code-0001-p038-p038-c075",
+            "claude-code-0001-p043-p043-c087"
+          ]
+        },
+        {
+          "id": "golden-004",
+          "question": "Auto-Compact 什么时候会触发？",
+          "gold_count": 3,
+          "hit": true,
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "ndcg_at_10": 0.7653606369886217,
+          "hits_at_k": {
+            "1": true,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p126-p127-c273",
+            "claude-code-0001-p133-p133-c289",
+            "claude-code-0001-p130-p130-c282",
+            "claude-code-0001-p133-p133-c288",
+            "claude-code-0001-p132-p132-c286",
+            "claude-code-0001-p198-p199-c435",
+            "claude-code-0001-p128-p129-c278",
+            "claude-code-0001-p037-p038-c074",
+            "claude-code-0001-p167-p168-c367",
+            "claude-code-0001-p141-p142-c310"
+          ]
+        },
+        {
+          "id": "golden-005",
+          "question": "对话历史压缩的核心思路是什么？",
+          "gold_count": 5,
+          "hit": true,
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "ndcg_at_10": 0.615733440277688,
+          "hits_at_k": {
+            "1": true,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p127-p128-c275",
+            "claude-code-0001-p131-p132-c285",
+            "claude-code-0001-p129-p129-c279",
+            "claude-code-0001-p131-p131-c283",
+            "claude-code-0001-p133-p133-c289",
+            "claude-code-0001-p052-p052-c111",
+            "claude-code-0001-p130-p130-c281",
+            "claude-code-0001-p128-p129-c278",
+            "claude-code-0001-p126-p126-c272",
+            "claude-code-0001-p133-p133-c288"
+          ]
+        },
+        {
+          "id": "golden-006",
+          "question": "Claude Code 的权限分几层？",
+          "gold_count": 4,
+          "hit": true,
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "ndcg_at_10": 0.3903800499921017,
+          "hits_at_k": {
+            "1": true,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p172-p173-c376",
+            "claude-code-0001-p177-p177-c390",
+            "claude-code-0001-p093-p093-c194",
+            "claude-code-0001-p041-p041-c082",
+            "claude-code-0001-p074-p074-c157",
+            "claude-code-0001-p098-p098-c204",
+            "claude-code-0001-p088-p088-c183",
+            "claude-code-0001-p094-p094-c196",
+            "claude-code-0001-p088-p089-c184",
+            "claude-code-0001-p016-p016-c016"
+          ]
+        },
+        {
+          "id": "golden-007",
+          "question": "QueryEngine 的 submitMessage 做什么？",
+          "gold_count": 4,
+          "hit": true,
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "ndcg_at_10": 0.3903800499921017,
+          "hits_at_k": {
+            "1": true,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p044-p044-c089",
+            "claude-code-0001-p042-p042-c084",
+            "claude-code-0001-p043-p043-c086",
+            "claude-code-0001-p049-p049-c103",
+            "claude-code-0001-p043-p044-c088",
+            "claude-code-0001-p049-p049-c104",
+            "claude-code-0001-p043-p043-c087",
+            "claude-code-0001-p048-p048-c102",
+            "claude-code-0001-p049-p050-c105",
+            "claude-code-0001-p143-p144-c313"
+          ]
+        },
+        {
+          "id": "golden-008",
+          "question": "流式响应是怎么解析的？",
+          "gold_count": 8,
+          "hit": true,
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "ndcg_at_10": 0.48867512060993706,
+          "hits_at_k": {
+            "1": true,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p059-p059-c128",
+            "claude-code-0001-p061-p062-c134",
+            "claude-code-0001-p059-p059-c127",
+            "claude-code-0001-p066-p066-c145",
+            "claude-code-0001-p059-p060-c129",
+            "claude-code-0001-p067-p067-c146",
+            "claude-code-0001-p046-p046-c097",
+            "claude-code-0001-p045-p045-c094",
+            "claude-code-0001-p060-p061-c131",
+            "claude-code-0001-p065-p065-c142"
+          ]
+        },
+        {
+          "id": "golden-009",
+          "question": "Claude Code 有哪几种代理模式？",
+          "gold_count": 9,
+          "hit": true,
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "ndcg_at_10": 0.14829723057014912,
+          "hits_at_k": {
+            "1": false,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p146-p146-c319",
+            "claude-code-0001-p143-p143-c312",
+            "claude-code-0001-p199-p199-c437",
+            "claude-code-0001-p167-p167-c366",
+            "claude-code-0001-p088-p089-c184",
+            "claude-code-0001-p145-p145-c316",
+            "claude-code-0001-p170-p170-c373",
+            "claude-code-0001-p144-p144-c314",
+            "claude-code-0001-p012-p012-c004",
+            "claude-code-0001-p177-p177-c390"
+          ]
+        },
+        {
+          "id": "golden-011",
+          "question": "什么是 Context Engineering？",
+          "gold_count": 1,
+          "hit": true,
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "ndcg_at_10": 1.0,
+          "hits_at_k": {
+            "1": true,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p096-p097-c200",
+            "claude-code-0001-p096-p096-c199",
+            "claude-code-0001-p100-p101-c212",
+            "claude-code-0001-p096-p096-c198",
+            "claude-code-0001-p095-p095-c197",
+            "claude-code-0001-p100-p100-c211",
+            "claude-code-0001-p099-p100-c209",
+            "claude-code-0001-p010-p010-c002",
+            "claude-code-0001-p094-p094-c196",
+            "claude-code-0001-p198-p199-c435"
+          ]
+        },
+        {
+          "id": "golden-012",
+          "question": "什么是协调器模式？",
+          "gold_count": 1,
+          "hit": true,
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "ndcg_at_10": 1.0,
+          "hits_at_k": {
+            "1": true,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p147-p147-c321",
+            "claude-code-0001-p150-p150-c328",
+            "claude-code-0001-p147-p148-c322",
+            "claude-code-0001-p147-p147-c320",
+            "claude-code-0001-p149-p149-c326",
+            "claude-code-0001-p148-p148-c324",
+            "claude-code-0001-p149-p149-c325",
+            "claude-code-0001-p149-p149-c327",
+            "claude-code-0001-p148-p148-c323",
+            "claude-code-0001-p018-p019-c023"
+          ]
+        },
+        {
+          "id": "golden-013",
+          "question": "Skills 是什么？",
+          "gold_count": 1,
+          "hit": true,
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "ndcg_at_10": 0.6309297535714575,
+          "hits_at_k": {
+            "1": false,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p161-p161-c349",
+            "claude-code-0001-p161-p161-c350",
+            "claude-code-0001-p165-p166-c363",
+            "claude-code-0001-p163-p163-c358",
+            "claude-code-0001-p163-p163-c356",
+            "claude-code-0001-p165-p165-c362",
+            "claude-code-0001-p163-p163-c355",
+            "claude-code-0001-p162-p162-c353",
+            "claude-code-0001-p161-p162-c351",
+            "claude-code-0001-p163-p164-c359"
+          ]
+        },
+        {
+          "id": "golden-014",
+          "question": "系统提示的缓存策略是怎么设计的？",
+          "gold_count": 1,
+          "hit": true,
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "ndcg_at_10": 0.6309297535714575,
+          "hits_at_k": {
+            "1": false,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p185-p186-c410",
+            "claude-code-0001-p106-p106-c222",
+            "claude-code-0001-p108-p108-c227",
+            "claude-code-0001-p072-p073-c155",
+            "claude-code-0001-p133-p133-c288",
+            "claude-code-0001-p115-p115-c250",
+            "claude-code-0001-p102-p102-c214",
+            "claude-code-0001-p184-p184-c406",
+            "claude-code-0001-p186-p186-c412",
+            "claude-code-0001-p113-p113-c246"
+          ]
+        },
+        {
+          "id": "golden-015",
+          "question": "Memory 是怎么自动提取的？",
+          "gold_count": 1,
+          "hit": true,
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "ndcg_at_10": 1.0,
+          "hits_at_k": {
+            "1": true,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p112-p113-c245",
+            "claude-code-0001-p113-p113-c246",
+            "claude-code-0001-p133-p133-c288",
+            "claude-code-0001-p109-p109-c229",
+            "claude-code-0001-p112-p112-c244",
+            "claude-code-0001-p115-p115-c250",
+            "claude-code-0001-p114-p114-c248",
+            "claude-code-0001-p115-p116-c251",
+            "claude-code-0001-p114-p114-c247",
+            "claude-code-0001-p126-p126-c271"
+          ]
+        },
+        {
+          "id": "golden-016",
+          "question": "任务系统的状态机有哪些状态？",
+          "gold_count": 1,
+          "hit": true,
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "ndcg_at_10": 1.0,
+          "hits_at_k": {
+            "1": true,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p135-p135-c293",
+            "claude-code-0001-p138-p139-c301",
+            "claude-code-0001-p134-p135-c292",
+            "claude-code-0001-p054-p054-c117",
+            "claude-code-0001-p051-p051-c107",
+            "claude-code-0001-p054-p054-c116",
+            "claude-code-0001-p072-p072-c154",
+            "claude-code-0001-p018-p019-c023",
+            "claude-code-0001-p072-p073-c155",
+            "claude-code-0001-p071-p072-c153"
+          ]
+        },
+        {
+          "id": "golden-017",
+          "question": "流式处理中如何防止内存溢出？",
+          "gold_count": 1,
+          "hit": true,
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "ndcg_at_10": 1.0,
+          "hits_at_k": {
+            "1": true,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p066-p066-c144",
+            "claude-code-0001-p185-p186-c410",
+            "claude-code-0001-p066-p066-c145",
+            "claude-code-0001-p059-p059-c128",
+            "claude-code-0001-p046-p046-c097",
+            "claude-code-0001-p059-p059-c127",
+            "claude-code-0001-p184-p184-c406",
+            "claude-code-0001-p185-p185-c409",
+            "claude-code-0001-p067-p067-c146",
+            "claude-code-0001-p065-p065-c142"
+          ]
+        },
+        {
+          "id": "golden-018",
+          "question": "如何配置 MCP 服务器？",
+          "gold_count": 1,
+          "hit": true,
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "ndcg_at_10": 1.0,
+          "hits_at_k": {
+            "1": true,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p157-p157-c343",
+            "claude-code-0001-p157-p158-c344",
+            "claude-code-0001-p159-p159-c347",
+            "claude-code-0001-p152-p152-c330",
+            "claude-code-0001-p153-p154-c335",
+            "claude-code-0001-p159-p160-c348",
+            "claude-code-0001-p154-p155-c337",
+            "claude-code-0001-p155-p156-c339",
+            "claude-code-0001-p085-p085-c177",
+            "claude-code-0001-p158-p159-c346"
+          ]
+        },
+        {
+          "id": "golden-019",
+          "question": "Claude Code 有哪几种权限模式？",
+          "gold_count": 1,
+          "hit": true,
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "ndcg_at_10": 1.0,
+          "hits_at_k": {
+            "1": true,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p088-p089-c184",
+            "claude-code-0001-p177-p177-c390",
+            "claude-code-0001-p172-p173-c376",
+            "claude-code-0001-p093-p093-c194",
+            "claude-code-0001-p088-p088-c183",
+            "claude-code-0001-p094-p094-c196",
+            "claude-code-0001-p174-p174-c381",
+            "claude-code-0001-p167-p167-c366",
+            "claude-code-0001-p195-p195-c428",
+            "claude-code-0001-p016-p016-c016"
+          ]
+        },
+        {
+          "id": "golden-020",
+          "question": "Snip Compact 是什么？",
+          "gold_count": 1,
+          "hit": true,
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "ndcg_at_10": 1.0,
+          "hits_at_k": {
+            "1": true,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p131-p131-c283",
+            "claude-code-0001-p111-p111-c233",
+            "claude-code-0001-p133-p133-c289",
+            "claude-code-0001-p133-p133-c288",
+            "claude-code-0001-p126-p126-c271",
+            "claude-code-0001-p152-p152-c330",
+            "claude-code-0001-p128-p129-c278",
+            "claude-code-0001-p165-p166-c363",
+            "claude-code-0001-p148-p148-c324",
+            "claude-code-0001-p161-p161-c350"
+          ]
+        },
+        {
+          "id": "golden-021",
+          "question": "CLAUDE.md 的 @ 引用语法有什么用？",
+          "gold_count": 4,
+          "hit": true,
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "ndcg_at_10": 0.6366824387328317,
+          "hits_at_k": {
+            "1": true,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p111-p111-c240",
+            "claude-code-0001-p112-p112-c243",
+            "claude-code-0001-p110-p110-c232",
+            "claude-code-0001-p115-p115-c249",
+            "claude-code-0001-p112-p113-c245",
+            "claude-code-0001-p021-p021-c032",
+            "claude-code-0001-p109-p109-c228",
+            "claude-code-0001-p109-p110-c230",
+            "claude-code-0001-p107-p108-c225",
+            "claude-code-0001-p015-p015-c013"
+          ]
+        },
+        {
+          "id": "golden-022",
+          "question": "CLAUDE.md 和 Memory 该如何选择？",
+          "gold_count": 1,
+          "hit": true,
+          "first_rank": 8,
+          "reciprocal_rank": 0.125,
+          "ndcg_at_10": 0.31546487678572877,
+          "hits_at_k": {
+            "1": false,
+            "3": false,
+            "5": false,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p109-p109-c228",
+            "claude-code-0001-p112-p112-c244",
+            "claude-code-0001-p115-p116-c251",
+            "claude-code-0001-p114-p114-c248",
+            "claude-code-0001-p110-p110-c232",
+            "claude-code-0001-p109-p109-c229",
+            "claude-code-0001-p109-p110-c230",
+            "claude-code-0001-p115-p115-c249",
+            "claude-code-0001-p112-p112-c243",
+            "claude-code-0001-p115-p115-c250"
+          ]
+        },
+        {
+          "id": "golden-023",
+          "question": "插件、MCP 和 Skills 三种扩展机制有什么区别？",
+          "gold_count": 1,
+          "hit": true,
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "ndcg_at_10": 1.0,
+          "hits_at_k": {
+            "1": true,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p170-p170-c372",
+            "claude-code-0001-p165-p166-c363",
+            "claude-code-0001-p170-p170-c373",
+            "claude-code-0001-p163-p164-c359",
+            "claude-code-0001-p159-p160-c348",
+            "claude-code-0001-p152-p152-c330",
+            "claude-code-0001-p167-p167-c364",
+            "claude-code-0001-p015-p015-c009",
+            "claude-code-0001-p153-p153-c334",
+            "claude-code-0001-p163-p163-c358"
+          ]
+        },
+        {
+          "id": "golden-024",
+          "question": "Context Engineering 和 Prompt Engineering 有什么区别？",
+          "gold_count": 1,
+          "hit": true,
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "ndcg_at_10": 1.0,
+          "hits_at_k": {
+            "1": true,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p100-p100-c211",
+            "claude-code-0001-p096-p097-c200",
+            "claude-code-0001-p096-p096-c199",
+            "claude-code-0001-p100-p101-c212",
+            "claude-code-0001-p095-p095-c197",
+            "claude-code-0001-p099-p100-c209",
+            "claude-code-0001-p106-p107-c223",
+            "claude-code-0001-p096-p096-c198",
+            "claude-code-0001-p010-p010-c002",
+            "claude-code-0001-p186-p186-c411"
+          ]
+        },
+        {
+          "id": "golden-025",
+          "question": "聊天机器人和 Agent 有什么关键差异？",
+          "gold_count": 1,
+          "hit": true,
+          "first_rank": 5,
+          "reciprocal_rank": 0.2,
+          "ndcg_at_10": 0.38685280723454163,
+          "hits_at_k": {
+            "1": false,
+            "3": false,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p013-p014-c007",
+            "claude-code-0001-p036-p036-c070",
+            "claude-code-0001-p040-p040-c081",
+            "claude-code-0001-p134-p134-c290",
+            "claude-code-0001-p039-p039-c078",
+            "claude-code-0001-p068-p068-c147",
+            "claude-code-0001-p037-p037-c073",
+            "claude-code-0001-p200-p200-c439",
+            "claude-code-0001-p035-p035-c069",
+            "claude-code-0001-p198-p198-c433"
+          ]
+        },
+        {
+          "id": "golden-026",
+          "question": "怎么让 Claude Code 执行命令时不用每次都问我确认？",
+          "gold_count": 3,
+          "hit": true,
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "ndcg_at_10": 0.46927872602275644,
+          "hits_at_k": {
+            "1": true,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p022-p022-c037",
+            "claude-code-0001-p091-p092-c191",
+            "claude-code-0001-p015-p015-c010",
+            "claude-code-0001-p034-p035-c068",
+            "claude-code-0001-p064-p064-c141",
+            "claude-code-0001-p021-p021-c032",
+            "claude-code-0001-p178-p179-c394",
+            "claude-code-0001-p104-p105-c220",
+            "claude-code-0001-p088-p089-c184",
+            "claude-code-0001-p188-p189-c417"
+          ]
+        },
+        {
+          "id": "golden-027",
+          "question": "Claude Code 的内置工具分为几大类？",
+          "gold_count": 1,
+          "hit": true,
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "ndcg_at_10": 1.0,
+          "hits_at_k": {
+            "1": true,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p078-p078-c166",
+            "claude-code-0001-p077-p077-c164",
+            "claude-code-0001-p098-p098-c204",
+            "claude-code-0001-p074-p074-c157",
+            "claude-code-0001-p167-p167-c366",
+            "claude-code-0001-p163-p163-c355",
+            "claude-code-0001-p087-p087-c181",
+            "claude-code-0001-p169-p169-c371",
+            "claude-code-0001-p041-p041-c082",
+            "claude-code-0001-p033-p034-c066"
+          ]
+        },
+        {
+          "id": "golden-028",
+          "question": "Claude Code 如何防御提示注入攻击？",
+          "gold_count": 1,
+          "hit": true,
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "ndcg_at_10": 1.0,
+          "hits_at_k": {
+            "1": true,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p178-p179-c394",
+            "claude-code-0001-p178-p178-c392",
+            "claude-code-0001-p022-p022-c037",
+            "claude-code-0001-p183-p183-c405",
+            "claude-code-0001-p180-p180-c399",
+            "claude-code-0001-p106-p106-c222",
+            "claude-code-0001-p015-p015-c010",
+            "claude-code-0001-p182-p182-c404",
+            "claude-code-0001-p107-p108-c225",
+            "claude-code-0001-p104-p105-c220"
+          ]
+        },
+        {
+          "id": "golden-029",
+          "question": "什么场景适合用协调器模式？",
+          "gold_count": 1,
+          "hit": true,
+          "first_rank": 3,
+          "reciprocal_rank": 0.3333333333333333,
+          "ndcg_at_10": 0.5,
+          "hits_at_k": {
+            "1": false,
+            "3": true,
+            "5": true,
+            "10": true
+          },
+          "top_chunk_ids": [
+            "claude-code-0001-p150-p150-c328",
+            "claude-code-0001-p147-p147-c321",
+            "claude-code-0001-p149-p149-c327",
+            "claude-code-0001-p147-p148-c322",
+            "claude-code-0001-p149-p149-c326",
+            "claude-code-0001-p147-p147-c320",
+            "claude-code-0001-p148-p148-c324",
+            "claude-code-0001-p149-p149-c325",
+            "claude-code-0001-p174-p174-c381",
+            "claude-code-0001-p018-p019-c023"
+          ]
+        }
+      ]
+    }
+  }
+}

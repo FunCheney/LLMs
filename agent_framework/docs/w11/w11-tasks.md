@@ -30,11 +30,15 @@
 |---|---|---|---|
 | D1 | `ops/slo.py` + 告警规则（成功率/延迟/成本三张图） | RequestLog/trace | 可观测、可用性 |
 | D2 | `resilience/{circuit_breaker,degradation}.py` + 混沌演练 | client 重试、fallback | 可靠性 |
-| D3 | 幂等键 + 断点续跑 + 灰度/回滚演练 | /v1/tasks、workflow | 可靠性 |
-| D4 | 真实反馈修 bug（≥5 条） | 反馈渠道、trace 归因 | 可用性、真实使用 |
-| D5 | 成本优化冲刺 + DoD 逐条自评 + 合流 | pricing、history 曲线 | 成本、证据包 |
+| D3 | `runtime/{model,timeline}.py`（**统一执行模型**）+ 幂等 + 断点续跑 | /v1/tasks、workflow、W9 Plan | 可靠性、可解释 |
+| D4 | 真实反馈修 bug（≥5 条）+ **Fork/Ablation 对照实验** | 反馈渠道、trace 归因 | 可用性、根因可证明 |
+| D5 | **受控进化**（Feature Flag / 资产版本 / Kill Switch）+ 成本冲刺 + DoD 自评 | pricing、history 曲线 | 成本、可回退、证据包 |
 
 **唯一主线**：用"故障注入 + 真实反馈 + 量化指标"证明 DoD 九条。本周的产出大多是**报告与证据**，不是新功能——这正是"生产硬化"区别于"堆功能"的地方。
+
+> 本周从"抗故障"扩成"**抗故障 + 受控进化**"：D3 收敛执行状态（Run/Step/Attempt/Event + 9 态），
+> D4 用对照实验证明根因，D5 让行为可灰度可一键回退。灰度从 D3 挪到 D5——D3 是运行时状态，D5 是资产版本。
+> 见 `docs/plan-review-course-outline-gap.md` §6.2。
 
 ---
 
@@ -139,42 +143,110 @@ chaos-report、CircuitBreaker、自愈断言输出。我会看：**熔断器有�
 
 ---
 
-## Day 3（3h）· 幂等、断点续跑、灰度与回滚
+## Day 3（3h）· 统一执行模型 + 幂等 + 断点续跑 + Run Timeline
 
-**目标**：长任务可断点续跑、请求幂等（DoD 可靠性项），并演练灰度与回滚。
+**目标**：长任务可断点续跑、请求幂等（DoD 可靠性项），并且**任意一次执行都能被完整解释**。
+今天不是"加一个断点续跑"，而是把散落在 W2/W9/W10 的执行状态收敛成**一套对象模型**。
 
 ### 你要做的事
+- [ ] `runtime/model.py`：**`Run` / `Step` / `Attempt` / `Event`** 四个对象 + 9 态状态机
+- [ ] `runtime/timeline.py`：`RunTimeline`（一次执行的时间线，能回答"第几步、哪个工具、为什么重试"）
 - [ ] `resilience/idempotency.py`：幂等键（请求/任务级）
-- [ ] workflow 断点续跑：Temporal activity 完成态持久化，中途重启不重跑已完成步
-- [ ] 灰度：按 principal/比例切新老逻辑（复用 W6 `Principal`）
-- [ ] 回滚演练：镜像 tag 回退 + 配置回退（复用 W10 runbook）
-- [ ] `docs/w11/reliability-report.md`：幂等/续跑/灰度/回滚四项证据
-- [ ] 单测：重复请求幂等、续跑跳过已完成步、回滚后可用
+- [ ] 断点续跑：activity 完成态持久化，重启后跳过已完成步
+- [ ] `docs/w11/reliability-report.md`：执行模型 + 幂等 + 续跑 + Timeline 四项证据
+- [ ] 单测：状态机非法迁移被拒、重复请求幂等、续跑跳过已完成步、Timeline 可重建
 
 ### 引导框架
 
+**为什么要统一执行模型：现在有四个"状态"互相对不上**
+
+W2 的 `/v1/tasks` 有自己的 task 状态，W9 的 `PlanStep` 有 `pending|running|done|failed|skipped`，
+W10 的审批有 `pending|approved`，Temporal 自己还有一套。**四套状态机都不可能覆盖对方**，
+结果就是"任务显示 running，但某一步其实卡在等审批"这类问题只能靠人肉看日志。
+
 ```python
-# resilience/idempotency.py
-class IdempotencyStore:
-    async def check_and_reserve(self, key: str, ttl_s: int) -> IdempotencyRecord:
-        # 同 key 首次 -> 新记录；重复 -> 返回既有结果，不重复执行（对齐 W2/W6 幂等主线）
-        ...
+# runtime/model.py
+class RunState(StrEnum):
+    CREATED = "created"
+    PLANNING = "planning"
+    RUNNING = "running"
+    WAITING_TOOL = "waiting_tool"          # 正在等工具返回
+    WAITING_APPROVAL = "waiting_approval"  # 等人（W10 HITL）—— 最容易被漏的一个状态
+    TOOL_FAILED = "tool_failed"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+@dataclass
+class Run:
+    run_id: str
+    state: RunState
+    steps: list[Step]
+    events: list[Event]      # 追加式，不改写历史
+
+@dataclass
+class Step:
+    step_id: str
+    goal: str
+    attempts: list[Attempt]  # 一步可以试多次
+    state: RunState
+
+@dataclass(frozen=True)
+class Attempt:
+    n: int
+    started_at: datetime
+    error_code: str | None   # 复用 W4 RELIABILITY_CODES，不新造码表
 ```
+
+**三层对象的分工（面试高频追问）**
+| 层 | 回答什么 | 粒度 |
+|---|---|---|
+| `Run` | 这次任务整体怎么样 | 一次用户请求 |
+| `Step` | 任务分几步、每步干什么 | 一个子目标 |
+| `Attempt` | 为什么这一步试了 3 次 | 一次工具/模型调用 |
+| `Event` | 过程中发生了什么（只追加） | 状态迁移、错误、审批 |
+
+**关键**：`Attempt.error_code` 直接复用 W4 的 `RELIABILITY_CODES` / `is_reliability_code()`。
+W4 刚刚把两份漂移的码表收敛成一份（10 个码里 6 个判定相反那次），**这里再抄一份必然重演**。
+
+**Run Timeline：让"解释一次失败"变成查表**
+
+```python
+# runtime/timeline.py
+class RunTimeline:
+    def render(self, run: Run) -> str:
+        """形如：
+        00:00 step-1  attempt 1  search_web   ok     412ms
+        00:02 step-2  attempt 1  fetch_page   timeout 30000ms  [UPSTREAM_TIMEOUT]
+        00:32 step-2  attempt 2  fetch_page   ok     890ms   (重试，参数未变)
+        00:33 step-3  --         publish      waiting_approval
+        """
+```
+
+**判据**：拿任何一条失败 trace，**不打开日志文件**、只看 Timeline 就能说出"哪一步、什么错、重试了几次、现在卡在哪"。
+做不到就说明状态没收敛，还是四套并存。
 
 **算法步骤（今天最容易写错的地方）**
 1. 幂等键用 `(principal, 请求内容规范化哈希)`；**参数顺序不同要算同一条**（对齐 W8 回放哈希思路）
 2. 断点续跑靠 Temporal：每个 activity 完成时持久化状态，重启后**跳过已完成步**——别让已花钱的检索重跑（成本）
-3. 灰度开关用配置驱动（不是改代码重新发版）；回滚要验证"回退后 `make eval` 仍绿"
-4. 幂等与 HITL（W10）联动：审批过的危险动作重复请求不再执行第二次
-5. 续跑/回滚演练都记进 `reliability-report`，带时间戳与证据
+3. **状态机必须拒绝非法迁移**（`COMPLETED` 不能再回 `RUNNING`），并且非法迁移要抛错而不是静默忽略；
+   否则"状态对不上"会变成最难查的一类 bug
+4. `WAITING_APPROVAL` 是独立状态，不是 `RUNNING` 的子状态——**否则监控会把"等人"算成"卡住"**，
+   D1 的 SLO 图直接失真
+5. `Event` 只追加不改写：续跑时靠重放 Event 恢复内存态，不依赖某张表的当前值
+6. 幂等与 HITL（W10）联动：审批过的危险动作重复请求不再执行第二次
+7. 续跑/Timeline 演练都记进 `reliability-report`，带时间戳与证据
 
 **自检**
 - [ ] 重复提交同一 `POST /v1/tasks` → 只执行一次，返回同一 task_id
 - [ ] 长任务跑到第 3 步时"重启" → 从第 4 步续跑，前 3 步不重跑（反向验证）
-- [ ] 回滚到上一镜像 tag → `/health` 与端到端仍可用
+- [ ] 构造非法迁移（`COMPLETED` → `RUNNING`）→ 抛错，不是静默
+- [ ] 一条失败 trace 只凭 Timeline 能讲清全过程（不打开原始日志）
+- [ ] `WAITING_APPROVAL` 在 SLO 图里单列，不计入"卡住"
 
 ### 🔍 交给我的锚点
-idempotency、续跑测试、reliability-report。我会看：幂等键规范化是否正确、续跑是否真跳过已完成步、回滚是否验证过可用。
+`runtime/{model,timeline}.py`、idempotency、续跑与非法迁移测试、reliability-report。
+我会看：状态机是否真收敛（不是又加第五套）、码表是否复用 W4、`WAITING_APPROVAL` 是否独立、Timeline 能否独立解释失败。
 
 ---
 
@@ -185,6 +257,7 @@ idempotency、续跑测试、reliability-report。我会看：幂等键规范化
 ### 你要做的事
 - [ ] 从反馈渠道整理 ≥5 个真实问题
 - [ ] 每个用 W4 `root-cause-playbook` 定位根因（检索/提示词/工具/模型四层）
+- [ ] **至少 1 条用 Fork/Ablation 证明根因**（不是"我觉得是这个原因"）
 - [ ] 逐个修复 + `make eval` 验证；补一条回归用例防止复发
 - [ ] `docs/w11/incidents/incident-{1..5}.md`：五篇记录
 - [ ] 更新 `docs/log.md`
@@ -197,33 +270,63 @@ idempotency、续跑测试、reliability-report。我会看：幂等键规范化
 真实用户怎么触发的、复现命令、当时的指标/trace 链接
 ## 根因
 W4 playbook 定位到哪层，证据字段（span/日志值）
+## 对照实验（至少一篇必须有）
+Fork 的是哪一步、只改了什么、另一条路径指标有无变化
 ## 修复
 改了哪个文件、引用哪个 ADR
 ## 验证
 修复前后指标 + 新增的回归用例（make eval 通过）
 ```
 
+**Replay / Fork / Ablation：三个词必须分清**
+
+W4 做的是**规则归因**（看证据字段判层），它能给出"怀疑对象"，但不能证明。
+证明需要对照实验，而这三个词在面试里最容易被连在一起说糊：
+
+| 手段 | 是什么 | 回答什么问题 | 我们靠什么做 |
+|---|---|---|---|
+| **Replay** | 拿失败任务的原始输入+上下文+工具结果，重跑一遍 | "还能复现吗" | W11 D3 的 `Event` 重放 |
+| **Fork** | 从某一步分叉，只改一个变量继续跑 | "是不是这一步的错" | 复用 W9 `Plan` 的步骤 + 改单点 |
+| **Ablation** | 关掉某个能力整体对比 | "这个能力有没有贡献" | W7 的 `MEMORY=off`、W8 的 `FEATURE_X=off` |
+
+**判据（这就是"根因被证明"的样子）**：
+Fork 出两条路径，**只改 A**，如果 B 路径指标不变、A 路径变好 → 根因是 A；
+如果两边一起变 → 说明改的是共同上游，第一次归因就错了，回去重判层。
+
 **算法步骤**
 1. **只记真实问题**，别把 W1–W10 的内部调试凑数——ROADEMAP §3.3 要的是"上线后遇到的最难的三个问题"
 2. 每条修复必须补回归用例并过门禁，否则等于没修
 3. 优先修"影响成功率/成本/安全"的，按 SLO 误差预算（D1）排序
 4. 至少挑 3 条整理成"最难的三个问题"叙述（W12 模拟面试素材）
+5. **对照实验挑最贵的那一条做**（不是最容易的）：成本高的 bug 才值得花 40 分钟做 Fork，
+   便宜的 bug 用规则归因就够——这个取舍本身也是面试可讲的判断力
 
 **自检**
 - [ ] ≥5 篇 incident 各有复现、根因、修复、验证四段
+- [ ] 至少 1 篇有 Fork/Ablation 对照实验，且写清了"只改了什么、另一条没变"
 - [ ] 每篇对应的回归用例在 `make eval` 中通过
 - [ ] 修复后 history 曲线的成功率/成本有可见改善
 
 ### 🔍 交给我的锚点
-5 篇 incident、回归用例、修复前后指标。我会看：是否真实、根因是否用 playbook 归因、有没有补回归用例。
+5 篇 incident、对照实验、回归用例、修复前后指标。我会看：是否真实、根因是否用 playbook 归因、
+对照实验有没有做到"只改一个变量"、有没有补回归用例。
 
 ---
 
-## Day 5（2.5h）· 成本优化冲刺 + DoD 逐条自评 + 合流
+## Day 5（2.5h）· 受控进化：Feature Flag / 灰度 / Kill Switch + 成本冲刺 + DoD 自评
 
-**目标**：成本优化（语义缓存/模型分流/批处理）+ **DoD 九条逐条自评**，周五合流 + W11 末 P3 决策。
+**目标**：让"改坏了"能**只影响 1% 用户、并且一键退回**；成本优化可量化；**DoD 九条逐条自评**；
+周五合流 + W11 末 P3 决策。
+
+> 灰度与回滚从 D3 挪到这里，是因为它们和 Feature Flag 是同一件事的三个面：
+> **D3 解决"能不能恢复执行"，D5 解决"能不能退回行为"**。前者是运行时状态，后者是资产版本。
 
 ### 你要做的事
+- [ ] `runtime/flags.py`：Feature Flag（配置驱动，不改代码不发版）
+- [ ] **资产版本清单**：六类资产各自有版本号且可回滚
+- [ ] 灰度：按 principal/比例切新老逻辑（复用 W6 `Principal`）
+- [ ] **Kill Switch**：一条命令让某能力回到旧行为（演练并计时）
+- [ ] 回滚演练：镜像 tag 回退 + 配置回退（复用 W10 runbook）
 - [ ] `resilience/semantic_cache.py`：语义缓存（相似 query 复用结果）
 - [ ] 模型分流：按难度把简单任务路由到 cheap（实现 architecture §8 的 Router 策略）
 - [ ] 批处理：可并行的改写/检索合并
@@ -232,6 +335,28 @@ W4 playbook 定位到哪层，证据字段（span/日志值）
 - [ ] **W11 末 P3 决策**：余量 ≥15h 才解锁一个深入档（前端/多语言最佳挂载点）
 
 ### 引导框架
+
+**资产版本清单：只回滚代码是不够的**
+
+我们的行为由六样东西共同决定，**任何一样变了，系统行为就变了**。只给代码打 tag，等于只能回滚 1/6。
+
+| 资产 | 版本载体 | 回滚方式 | 已经有的 |
+|---|---|---|---|
+| 代码 | 镜像 tag / commit | 回退 tag | ✅ W10 runbook |
+| 模型 | `catalog` 里的 alias 指向 | 改 alias → cheap/strong 换回 | ✅ W1（`model_snapshot` 已进 baseline） |
+| Prompt | prompt 模板版本号 | 切版本 | ❌ 现在模板没版本号 |
+| 工具/Skill | `SkillSpec` 的 version | 切 version | ❌ 今天只在 spec 里有 name |
+| RAG 策略 | chunk 参数 + 检索参数 + rerank 模型 | 切配置组 | ❌ 参数散在配置里 |
+| 记忆策略 | `MEMORY=off\|governed`（W7 D5 建的） | 切 env | ✅ W7 |
+
+**结论**：本周只需补 **Prompt / Skill / RAG 策略**三样版本号 + 一张"当前生效版本快照"，
+写进 `evals/history` 的 snapshot（W4 已有 `model_snapshot`，扩成 `asset_snapshot`）。
+**不建版本管理平台**——六个字符串 + 一个环境变量就够，多了就是过度设计。
+
+**Kill Switch 的判据（必须可计时）**
+1. 触发方式：`FEATURE_X=off` 重启 或 配置中心热更新（本周做 env + 重启，够用）
+2. **判据：从决定回退到行为生效 ≤ 5 分钟**，且 `make eval` 仍绿
+3. 演练要记录：开始时间、生效时间、期间错过的请求数、回退后第一次成功的 trace
 
 **成本优化三手段（都要可量化、可关闭）**
 | 手段 | 做法 | 度量 | 风险 |
@@ -252,8 +377,9 @@ class SemanticCache:
 1. 每个优化**单变量 A/B**，用 `make eval` 证明成本下降且质量过门禁（W4/W5/W7 一贯方法）
 2. 语义缓存命中/回放松记 `cache_hit`/`replayed`，**成本记 0 但要在报告里区分**（W11 成本看板，W8 已强调）
 3. 模型分流实现 `Router` 协议（architecture §8 预留），按任务难度/预算选 alias，不改业务代码
-4. **DoD 自评表**：九条逐项写「达标 / 部分达标 / 缺口 + 证据链接」，**缺口如实标注**（ROADEMAP 检查点原话："达标或明确标注缺口"）
-5. 合流：合 main → `make eval` 过门禁 → 写 history json → `docs/log.md` → P3 决策
+4. **每个 Flag 必须有"关掉它"的默认值 = 旧行为**——默认值是新行为，等于回滚时要改代码，就没意义了
+5. **DoD 自评表**：九条逐项写「达标 / 部分达标 / 缺口 + 证据链接」，**缺口如实标注**（ROADEMAP 检查点原话："达标或明确标注缺口"）
+6. 合流：合 main → `make eval` 过门禁 → 写 history json → `docs/log.md` → P3 决策
 
 ### 🔍 Gate 11 · 周末验收（全绿才算过 W11）
 
@@ -262,17 +388,20 @@ class SemanticCache:
 | 1 | SLO | 三张图可告警，延迟用 p95，成本区分 estimated |
 | 2 | 混沌 | 三类故障注入可复现且自愈，≥90% 不崩 |
 | 3 | 不重复重试 | 熔断器未与 client 重试叠加（ADR-003） |
-| 4 | 幂等续跑 | 重复请求幂等，续跑跳过已完成步 |
-| 5 | 回滚演练 | 回退后端到端仍可用 |
-| 6 | 真实修 bug | ≥5 篇 incident，各带根因与回归用例 |
-| 7 | 成本优化 | 三手段单变量 A/B，成本下降且过门禁 |
-| 8 | DoD 自评 | 九条逐条达标/缺口 + 证据链接 |
-| 9 | P3 已判定 | 按余量明确解锁/不解锁，写进 log |
-| 10 | 合流 | history 接上，端到端仍可跑 |
+| 4 | 执行模型 | Run/Step/Attempt/Event 统一，非法迁移抛错，码表复用 W4 |
+| 5 | 幂等续跑 | 重复请求幂等，续跑跳过已完成步 |
+| 6 | 可解释 | 任一失败 trace 只凭 Run Timeline 能讲清全过程 |
+| 7 | 真实修 bug | ≥5 篇 incident，各带根因与回归用例 |
+| 8 | 根因被证明 | ≥1 条有 Fork/Ablation 对照实验，只改一个变量 |
+| 9 | 可回退 | 六类资产版本齐全，Kill Switch 生效 ≤5 分钟且回退后 eval 仍绿 |
+| 10 | 成本优化 | 三手段单变量 A/B，成本下降且过门禁 |
+| 11 | DoD 自评 | 九条逐条达标/缺口 + 证据链接 |
+| 12 | P3 已判定 | 按余量明确解锁/不解锁，写进 log |
+| 13 | 合流 | history 接上，端到端仍可跑 |
 
 ---
 
-## 本周最容易返工的 6 处
+## 本周最容易返工的 8 处
 
 1. **熔断器又造了一次重试** → 与 ADR-003 叠加，故障时流量放大（本周头号坑）
 2. **延迟 SLO 用均值不用 p95** → 与 DoD 原话不符，长尾问题被掩盖
@@ -280,6 +409,8 @@ class SemanticCache:
 4. **断点续跑重跑已完成步** → 已花钱的检索重复执行，成本失控
 5. **incident 拿内部调试凑数** → 不是"上线后真实问题"，证据包第 7 件不成立
 6. **DoD 自评报喜不报缺口** → 检查点要求"达标或明确标注缺口"，注水会被一眼看穿
+7. **统一执行模型变成"第五套状态机"** → 不删旧的、只加新的，问题更严重；必须替换而非并存
+8. **Flag 默认值设成新行为** → 回滚时还得改代码发版，Kill Switch 等于没有
 
 ---
 
@@ -289,8 +420,10 @@ class SemanticCache:
 |---|---|
 | SLO/告警 | `ops/{slo.py,alerts.yml}`、`docs/w11/slo-spec.md` |
 | 混沌/容灾 | `resilience/{circuit_breaker,degradation}.py`、`evals/scripts/chaos.py`、`docs/w11/chaos-report.md` |
-| 可靠性 | `resilience/idempotency.py`、`docs/w11/reliability-report.md` |
-| 真实反馈 | `docs/w11/incidents/incident-{1..5}.md` |
+| 执行模型 | `runtime/{model,timeline}.py`、`docs/w11/reliability-report.md`（含 Run Timeline 样例） |
+| 可靠性 | `resilience/idempotency.py` |
+| 真实反馈 | `docs/w11/incidents/incident-{1..5}.md`（≥1 篇含 Fork/Ablation） |
+| 受控进化 | `runtime/flags.py`、`docs/w11/asset-versions.md`（六类资产版本快照 + Kill Switch 演练记录） |
 | 成本优化 | `resilience/semantic_cache.py`、Router 新策略、`docs/w11/dod-self-assessment.md` |
 | 记录 | `evals/history/YYYY-Www.json`、`docs/log.md`（W11 条目 + P3 决策） |
 

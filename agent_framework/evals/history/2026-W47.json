@@ -1,0 +1,152 @@
+{
+  "week": "2026-W47",
+  "period": {
+    "from": "2026-11-16",
+    "to": "2026-11-20"
+  },
+  "gate": "W4",
+  "status": "code-complete-live-pending",
+  "note": "记录于 2026-11-03 本地预跑；judge 一致性来自规则基线（无 key），LLM judge 与在线档待凭证",
+  "summary": "评测体系收口：rubric 锚定的 Judge（走 gateway、温度 0、解析失败不补分）→ RAGAS 三指标（无 context 返回 None）→ 回归门禁（相对劣化 + 绝对下限、UPSTREAM 只告警）→ 四层根因归因（证据不足不硬猜）→ 3 篇「现象/根因/改动/前后指标」案例。离线档 50 passed / 4 skipped，judge 规则基线 kappa 0.20（未达 0.40，明确记为未通过）。",
+  "metrics": {
+    "tests": {
+      "offline_passed": 496,
+      "offline_collected": 512,
+      "live_defined": 16,
+      "live_skipped_reason": "无 API 凭证；显式 `-m live` 且 .env.local 就绪后执行",
+      "static_checks": {
+        "ruff": "pass",
+        "mypy_files": 45,
+        "mypy": "pass"
+      },
+      "new_this_week": {
+        "judge": 24,
+        "ragas": 20,
+        "regression_gate": 17,
+        "attribute_failure": 15,
+        "classify_invariants": 4
+      }
+    },
+    "golden": {
+      "path": "evals/golden/golden_v1.jsonl",
+      "sha256": "1c31832c2bbf",
+      "total": 54,
+      "changed": false,
+      "note": "W4 未改数据集；只改 context 解析与指标口径，保证前后可比"
+    },
+    "eval": {
+      "command": "make run-eval-judge WEEK=2026-W47",
+      "mode": "offline",
+      "total": 54,
+      "passed": 50,
+      "failed": 0,
+      "interrupted": 0,
+      "skipped": 4,
+      "pipeline_success_rate": 1.0,
+      "elapsed_s": 2.12,
+      "source": "evals/history/2026-W47-eval.json（pipeline 块）"
+    },
+    "latency": {
+      "latency_p50_ms": 0.1845,
+      "latency_p95_ms": 2.4515,
+      "latency_samples": 50,
+      "first_token_p50_ms": 0.368,
+      "first_token_p95_ms": null,
+      "first_token_samples": 4,
+      "by_kind_p95_ms": {
+        "chat": 0.474,
+        "tool_call": 0.744,
+        "draft": 0.208,
+        "research": 0.183,
+        "stream": null,
+        "error": null,
+        "adversarial": null
+      },
+      "caveat": "混合 p95 = 2.45ms 是 chat p95（0.47ms）的 5.2 倍，主要由 4 条 error case 的重试退避抬起（p50 3.95ms）。W4 新增 by_kind 分栏，见 docs/w4/cases/case-2.md"
+    },
+    "judge": {
+      "alias": "heuristic-keyword",
+      "rubric": "answer-quality@w4-v1",
+      "samples": 50,
+      "score": 1.922,
+      "scale": "1-5",
+      "status": "rule-baseline-only",
+      "note": "离线档没有 key，跑的是关键词规则基线；1.922 不代表答案质量，只代表夹具文本与问题几乎不相干（预期）"
+    },
+    "judge_agreement": {
+      "annotations": 24,
+      "quadratic_weighted_kappa": 0.3429,
+      "nominal_kappa": 0.2,
+      "spearman": 0.4368,
+      "mae": 1.1667,
+      "threshold": 0.4,
+      "verdict": "fail",
+      "source": "evals/history/2026-W47-judge-agreement.md",
+      "note": "规则基线达不到门禁是**预期结论**：它从不给 1–2 分，因为关键词匹配判不了事实错误。LLM judge 的一致性需要 --live"
+    },
+    "ragas": {
+      "samples": 9,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.0543,
+      "context_precision": 1.0,
+      "method": "lexical",
+      "note": "修正 context 解析（repo 引用读正文）后 context_precision 由结构性 0 变 1.0；faithfulness 仍为 0，因夹具答案与引用无关，属真实读数（case-1）"
+    },
+    "regression_gate": {
+      "baseline_week": "2026-W46",
+      "baseline_commit": "afbded2",
+      "compared": ["success_rate", "latency_p95_ms"],
+      "skipped": ["cost_per_task", "judge_score", "faithfulness", "tool_error_rate"],
+      "violations": 0,
+      "warnings": 0,
+      "verdict": "pass",
+      "source": "evals/history/baseline.json + evals/scripts/regression_gate.py"
+    },
+    "quality": {
+      "success_rate": null,
+      "judge_score": 1.922,
+      "status": "pending-online",
+      "note": "离线档仍不写 quality.success_rate；judge_score 单列在 judge 块，标 alias=heuristic-keyword，防止被当成质量结论"
+    }
+  },
+  "gate_checklist": {
+    "1_judge_trustworthy": "fail-offline（rubric 有 1/3/5 文字锚、走 strong 路由、温度 0、解析失败不补分；但一致性 0.20 < 0.40，规则基线未达标，LLM judge 待 --live）",
+    "2_ragas": "pass（三指标可算；无 context/空答案返回 None 不抛错；单测覆盖三种边界 + 悬空引用反向验证）",
+    "3_gate": "pass（相对阈值 + 延迟绝对下限；劣化 10% 触发、±2% 不触发、基线缺失退出 2；CI 内含「改坏成功率必须变红」反向验证）",
+    "4_attribution": "pass（四类样本各命中一层；tool_error 无 span / hallucination 无 retrieval span 均判证据不足，不误判成模型问题）",
+    "5_cases": "pass（3 篇，各含改动前后真实数字；分别落在引用层、指标口径层、可靠性层）",
+    "6_trend": "pass（history 已接 W2/W3/W4；W47 快照含 by_kind/ragas/judge 新字段，旧字段保持兼容）",
+    "7_p3_decision": "not-unlocked（余量 < 15h：本周 12h 全部用于默认档；按 ROADEMAP §7 不解锁深入档，时间留给 W5 的 RAG）",
+    "8_merge": "pass（end-to-end 仍可跑：ruff / mypy / pytest 496 passed / make eval 链路全绿）"
+  },
+  "decisions": [
+    "judge 默认关闭（--judge 显式打开）：一次 judge 调用比被测模型还贵，报告里必须单列 judge_alias 与 samples",
+    "别名从 catalog.routes['strong'].primary 读，不写死模型名：写死会在换模型后让分数整体漂移而报告只写「质量下降」",
+    "解析失败 → overall=None，绝不补中间分：「评不了」与「评了 3 分」是两件事",
+    "RAGAS 无 context 返回 None 而非 0：把「算不了」当 0 会让 faithfulness 随数据集构成漂移",
+    "词面支撑用二元组而非单字：单字口径下 context 一长就恒为 1.0（实测把 9 条全顶满）",
+    "门禁阈值用相对劣化 + 延迟绝对下限：绝对阈值在不同机器上天天误报，最后没人看红叉",
+    "UPSTREAM/interrupted 只告警不阻断：可靠性退化要看状态页，不该阻断合并，也不该污染质量结论",
+    "错误码收敛为唯一码表 + REQUEST 类：两处判定曾让 6/10 个码不一致，限流被记成「模型答错」",
+    "归因证据不足时判 unknown：把「埋点缺失」判成「某层坏了」，团队会去改一个没坏的模块"
+  ],
+  "discovered": [
+    "references 只存 target 时，RAGAS 指标结构性为 0（context 是路径/URL 字符串）；repo 引用必须读正文",
+    "把整篇文档当 context 会让单字覆盖率的 faithfulness 恒为 1.0 —— 词面判定的口径要按「精确 vs 召回」分开",
+    "同一批样本混算 p95 会把四种调用形态搅在一起：混合 2.45ms vs chat 0.47ms，误差量级 420%",
+    "错误码表写两遍必然漂移，且漂移不报错，只让两个数字互相矛盾",
+    "报告里 judge 的 alias 不写出来，读者无法判断打分模型与被评模型是否同源（self-preference）"
+  ],
+  "risks": [
+    "judge 一致性尚未被真人校验：24 条标注 labeler=impl-draft，需负责人逐条复核后改 human，否则 kappa 只能证明流程通",
+    "离线档 success_rate 恒 100%，门禁目前只能拦「管道坏了」，拦不住「答得差了」",
+    "faithfulness 在离线档不可能有意义（夹具答案是固定文本），需在线档才有读数",
+    "gate 阈值基于两期数据拍定，样本不足；连续 3 期无一次误报才维持"
+  ],
+  "next": [
+    "填 .env.local → `uv run python evals/scripts/judge_agreement.py --live` 拿 LLM judge 的 kappa",
+    "在线档 `make run-eval-judge WEEK=2026-W48` + `--write-baseline` 建 baseline-online.json",
+    "W5 接检索后，把 context_precision 从「引用质量代理」换成真实检索 chunk 的前 k 条",
+    "W5 起每期评测回填「归因 → 改动 → 指标变化」，让案例库持续增长"
+  ]
+}

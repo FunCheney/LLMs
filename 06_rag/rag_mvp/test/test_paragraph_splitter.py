@@ -1,6 +1,6 @@
 import pytest
 
-from ingestion.paragraph_splitter import (
+from rag_mvp.ingestion.paragraph_splitter import (
     split_paragraphs,
     split_text_by_paragraphs,
 )

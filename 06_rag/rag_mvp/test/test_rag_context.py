@@ -1,11 +1,11 @@
-from generation.context import (
+from rag_mvp.generation.context import (
     build_context_blocks,
     citations_referenced_in_answer,
     hits_to_citations,
 )
-from generation.pipeline import answer_question
-from retrieval.types import RetrievalResult
-from schemas import DocumentChunk
+from rag_mvp.generation.pipeline import answer_question
+from rag_mvp.retrieval.types import RetrievalResult
+from rag_mvp.schemas import DocumentChunk
 
 
 def _hit(chunk_id: str, section: str, content: str, rank: int) -> RetrievalResult:

@@ -1,4 +1,4 @@
-from ingestion.page_aware_splitter import (
+from rag_mvp.ingestion.page_aware_splitter import (
     build_page_aware_chunks,
     combine_pages,
     split_paragraph_units,

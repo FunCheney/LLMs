@@ -13,9 +13,9 @@ import argparse
 import json
 from pathlib import Path
 
-from generation.display import print_rag_response
-from generation.pipeline import answer_question
-from retrieval.factory import RetrieverConfig, create_retriever
+from rag_mvp.generation.display import print_rag_response
+from rag_mvp.generation.pipeline import answer_question
+from rag_mvp.retrieval.factory import RetrieverConfig, create_retriever
 
 
 def parse_args() -> argparse.Namespace:

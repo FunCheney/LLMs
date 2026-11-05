@@ -82,6 +82,32 @@ services:
       timeout: 3s
       retries: 10
 
+  # -- 向量库（VECTOR_STORE=pgvector 才需要；local/sparse 完全不碰它） -------- #
+  #
+  # 用 postgres + pgvector 而不是 Milvus：项目里已经有 postgres（Temporal 用），
+  # 同库不同表，少一份常驻服务、少一套备份策略。端口用 5433，避开本机 5432 上
+  # 可能已经跑着的 postgres——两者连错库的现象是"表不存在"，排查成本很高。
+  #
+  # 故意不给 growth-agent 加 depends_on：sparse/local 模式不需要它，
+  # 硬依赖会让"只想跑通对话链路"的人被迫先起数据库。
+  pgvector:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: rag
+      POSTGRES_PASSWORD: rag
+      POSTGRES_DB: rag
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgvector-data:/var/lib/postgresql/data
+      # 只在数据卷为空时执行一次（装扩展需要超级用户，应用层做不到）
+      - ./pgvector/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag -d rag"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   # -- 可选：长任务工作流（W9 才真正用上；这里先保证"要起就能起"） ---------- #
   temporal:
     image: temporalio/auto-setup:1.28.1
@@ -115,3 +141,4 @@ services:
 volumes:
   redis-data:
   temporal-data:
+  pgvector-data:

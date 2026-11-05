@@ -1,6 +1,6 @@
 import pytest
 
-from embedding.fake import FakeEmbeddingProvider
+from rag_mvp.embedding.fake import FakeEmbeddingProvider
 
 
 def test_embed_text_should_return_fixed_dimension():

@@ -1,4 +1,4 @@
-from embedding import BGEM3EmbeddingProvider
+from rag_mvp.embedding import BGEM3EmbeddingProvider
 
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:

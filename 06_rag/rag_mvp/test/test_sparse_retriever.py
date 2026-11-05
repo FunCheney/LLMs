@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from embedding import build_bm25_index
-from ingestion.storage import save_chunks_jsonl
-from retrieval.spare_retriever import SparseRetriever
-from schemas import DocumentChunk
+from rag_mvp.embedding import build_bm25_index
+from rag_mvp.ingestion.storage import save_chunks_jsonl
+from rag_mvp.retrieval.spare_retriever import SparseRetriever
+from rag_mvp.schemas import DocumentChunk
 
 
 def _sample_chunks() -> list[DocumentChunk]:

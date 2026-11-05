@@ -1,5 +1,5 @@
-from ingestion.html_parser import html_to_text, parse_html
-from ingestion.pipeline import ingest_document
+from rag_mvp.ingestion.html_parser import html_to_text, parse_html
+from rag_mvp.ingestion.pipeline import ingest_document
 
 
 def test_html_to_text_keeps_markdown_headings(tmp_path):

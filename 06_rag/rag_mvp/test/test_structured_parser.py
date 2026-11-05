@@ -1,4 +1,4 @@
-from ingestion.structured_parser import parse_structured_paragraphs
+from rag_mvp.ingestion.structured_parser import parse_structured_paragraphs
 
 
 def test_attaches_section_metadata():

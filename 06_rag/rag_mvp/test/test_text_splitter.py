@@ -1,6 +1,6 @@
 import pytest
 
-from ingestion.text_splitter import split_text
+from rag_mvp.ingestion.text_splitter import split_text
 
 
 def test_split_text_without_overlap():

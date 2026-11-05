@@ -1,4 +1,4 @@
-from ingestion.chunker import build_chunks
+from rag_mvp.ingestion.chunker import build_chunks
 
 
 def test_build_chunks_keeps_section_and_cross_page_range():

@@ -6,7 +6,24 @@ requires-python = ">=3.12"
 dependencies = [
     "agent-framework",
     "fastapi[standard]>=0.156.4",
+    # 检索层。只取 core（4 个纯 Python 依赖），**不含 torch**——
+    # 本地模型在 local extra 里，由 `uv sync --extra local` 显式开启。
+    # 这样 CI 与"只跑检索测试"的机器都不必下载 2GB 权重。
+    "rag-mvp",
     "uvicorn[standard]>=0.54.0",
+]
+
+[project.optional-dependencies]
+# 本地 embedding / 精排（bge-m3 + bge-reranker，连带 torch）。
+# 不装它时检索走 FakeEmbeddingProvider，逻辑可测但结果无意义。
+local = [
+    "rag-mvp[local]",
+]
+# pgvector 后端：只装 psycopg（约 3MB），不连带 torch。
+# 与 local 分开是刻意的——"连数据库"和"跑本地模型"是两件独立的部署决策：
+# 只做 dense 检索的机器需要它但不需要 GPU，CI 两者都不要（跑 sparse）。
+pgvector = [
+    "rag-mvp[pgvector]",
 ]
 
 [project.scripts]
@@ -14,6 +31,9 @@ growth-agent = "growth_agent.app:main"
 
 [tool.uv.sources]
 agent-framework = { workspace = true }
+# rag_mvp 在 workspace 之外（同仓库的另一个子目录）。
+# 用相对路径而不是绝对路径：换机器或换 clone 目录时不会断。
+rag-mvp = { path = "../../../06_rag/rag_mvp", editable = true }
 
 [build-system]
 requires = ["uv_build>=0.12.0,<0.13.0"]

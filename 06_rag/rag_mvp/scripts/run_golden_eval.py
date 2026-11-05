@@ -14,7 +14,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from eval.golden_runner import (
+from rag_mvp.eval.golden_runner import (
     format_console_report,
     run_golden_evaluation,
     save_report,

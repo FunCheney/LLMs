@@ -39,11 +39,11 @@ from typing import Any
 
 import yaml
 
-from eval.matchers import find_first_matching_rank, hit_matches_rules
-from eval.smoke_schema import SmokeMatchRules
-from generation.pipeline import answer_question
-from retrieval.factory import RetrieverConfig, create_retriever
-from retrieval.types import RetrievalResult
+from rag_mvp.eval.matchers import find_first_matching_rank, hit_matches_rules
+from rag_mvp.eval.smoke_schema import SmokeMatchRules
+from rag_mvp.generation.pipeline import answer_question
+from rag_mvp.retrieval.factory import RetrieverConfig, create_retriever
+from rag_mvp.retrieval.types import RetrievalResult
 
 # 答案中引用标记的格式：[1] [2] ...
 CITATION_MARKER_PATTERN = re.compile(r"\[(\d+)\]")

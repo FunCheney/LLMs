@@ -31,11 +31,15 @@
 |---|---|---|---|
 | D1 | 提取框架公共接口 + 依赖注入 | 全部框架包 | 工程（可复用） |
 | D2 | `agent create` 脚手架 + 单测补全 + 本地打包 + 独立仓库 | 框架包 | 检查点"1 天跑通"、证据包1 |
-| D3 | 架构图 + ADR≥5 独立文件 + README（指标/截图/demo） | 12 周记录 | DoD 文档项、证据包8 |
-| D4 | 前沿调研笔记 + 可落地评估 | W9 A2A 笔记 | 文档、面试深度 |
+| D3 | 架构图 + **Decision Matrix** + ADR≥5 独立文件 + README（指标/截图/demo） | 12 周记录 | DoD 文档项、证据包8 |
+| D4 | 前沿笔记（**固定四节**）+ **五层归属表** + 可落地评估 | W9 A2A 笔记 | 文档、面试深度 |
 | D5 | 模拟面试：按两份 JD 十条职责逐条讲 | 全部证据 | 收官验收 |
 
 **唯一主线**：把"我做了一个项目"变成"我能证明这个项目生产级，且能对着岗位讲清楚每一步的量化取舍"。**证据 > 功能，量化 > 形容**。
+
+> 本周 2 处按《课程大纲对齐评审》§4/§6.3 调整：D3 补 Decision Matrix（把 12 周取舍收进一张表）、
+> D4 固定成 4 节 + 五层归属表（回答"你在哪一层做了什么"）。共 2.5h，都是文档，不碰代码。
+> 见 `docs/plan-review-course-outline-gap.md`。
 
 ---
 
@@ -136,6 +140,7 @@ def create_project(name: str, target: Path) -> None:
 
 ### 你要做的事
 - [ ] `docs/architecture-diagram.md`（或图片）：五层架构 + 依赖方向（ADR-004）
+- [ ] **`docs/w12/decision-matrix.md`**：一张表汇总全部关键取舍（候选/约束/证据/结论/ADR）
 - [ ] 把 ADR-001~012 拆成 `docs/adr/ADR-0NN.md` 独立文件（≥5 篇，DoD 要求）
 - [ ] README 重写：一句话目标 + 12 周指标 + 截图 + 快速开始 + 证据包索引
 - [ ] **12 周指标趋势图**：成功率 / p95 / 单任务成本 / judge 分（从 `evals/history` 生成）
@@ -143,6 +148,28 @@ def create_project(name: str, target: Path) -> None:
 - [ ] `docs/w12/evidence-index.md`：证据包 8 件的索引链接
 
 ### 引导框架
+
+**Decision Matrix：把 12 周的取舍收进一张表**
+
+ADR 是一篇篇的，读起来要花时间；评审和面试需要的是**一张能横向对比的表**。
+更重要的是——**填表时会发现有些"决策"其实没证据**，那些正是需要补或该降级表述的地方。
+
+| 决策点 | 候选方案 | 关键约束 | 证据 | 结论 | ADR |
+|---|---|---|---|---|---|
+| 编排范式 | ReAct / Plan-and-Execute / Workflow / 多 Agent | 目标明确但路径不定 | W9 三层对比 | 调研用 Plan-and-Execute，其余四格用 Workflow | ADR-w9 |
+| 向量库 | pgvector / Qdrant / FAISS | 已有 PG，量级小 | W5 延迟与运维成本 | pgvector（少一个组件） | ADR-w5 |
+| 检索融合 | RRF / 加权求和 / 单路 | 两种召回分数量纲不同 | W5 Recall@K | RRF（免调权重） | ADR-w5 |
+| 重排 | bge-reranker / LLM rerank / 不重排 | 延迟预算 | W5 p95 增量 | 先 bge，LLM 只用于离线 | ADR-w5 |
+| 状态存储 | Redis / PG / Temporal | 长任务需可恢复 | W11 续跑 | Redis 热态 + PG 冷态 + Temporal 编排 | ADR-w11 |
+| 记忆载体 | pgvector namespace / 独立库 | 与知识库边界 | W7 边界判据 | 同库不同 namespace | ADR-w7 |
+| 评测口径 | 纯规则 / 纯 judge / 混合 | judge 需一致性证明 | W4 kappa 0.343 | 混合：规则兜底，judge 只在有 kappa 时采信 | ADR-w4 |
+| 框架 | 自研 / LangGraph | 可控性 vs 迭代速度 | W9 对照实现 | 自研主实现，LangGraph 仅对照 | ADR-w9 |
+| 部署 | compose / K8s | 单机够用 | W2 压测 | compose + 单机，K8s 写进缺口 | ADR-w10 |
+
+**填表规则**：
+1. "证据"一栏**必须指向一个真实数字或文档**，写"经验"的格子说明这个决策没有依据，要么补测要么降级表述
+2. "结论"要写**选了什么 + 放弃了什么**，只写选了什么等于没做取舍
+3. 行的数量不必多（8–12 行足够），**但每个决策点都要能被追问三层**
 
 **证据包 8 件索引（逐条给链接）**
 | # | 证据 | 位置 |
@@ -152,7 +179,7 @@ def create_project(name: str, target: Path) -> None:
 | 3 | `evals/history` 原始数据 | `evals/history/` |
 | 4 | 3 篇根因归因案例 | `docs/w4/cases/` |
 | 5 | 压测+混沌+安全红队三报告 | 各周文档 |
-| 6 | 单/多 Agent 对比实验 | `docs/w9/single-vs-multi-ab.md` |
+| 6 | 单/多 Agent 对比实验（三层指标） | `docs/w9/single-vs-multi-ab.md` |
 | 7 | 真实上线记录（≥5 条修复）+ runbook | `docs/w11/incidents/`、`ops/runbook.md` |
 | 8 | 架构图 + ADR + demo 视频 | `docs/architecture-diagram.md`、`docs/adr/`、视频 |
 
@@ -162,33 +189,63 @@ def create_project(name: str, target: Path) -> None:
 3. README 的指标**用真实数字**（引用 history），不写"显著提升"这种没有证据的形容词
 4. demo 视频重点演示"全程有 trace"和"多智能体调研"两大稀缺能力，不是功能流水账
 5. `evidence-index.md` 让评审/面试官能一键定位每件证据
+6. **Decision Matrix 先写"证据"列再写"结论"列**——顺序反了会变成"先有结论再找理由"
 
 **自检**
 - [ ] `plot_trends.py` 从 history 生成四张趋势图，数据点连续
 - [ ] `docs/adr/` ≥5 篇独立文件，编号无重复
 - [ ] README 每个数字都能在 history 找到出处
 - [ ] evidence-index 8 条链接全部可达
+- [ ] Decision Matrix ≥8 行，每行"证据"列都有具体数字或文档，无"经验"字样
+- [ ] 至少 3 行能当场讲出"放弃了什么、代价是什么"
 
 ### 🔍 交给我的锚点
-趋势图、README、ADR 目录、evidence-index。我会看：趋势图是否来自真实数据、README 数字是否可溯源、8 件证据是否齐全可达。
+趋势图、README、ADR 目录、evidence-index、Decision Matrix。
+我会看：趋势图是否来自真实数据、README 数字是否可溯源、8 件证据是否齐全可达、Matrix 里有没有没证据的决策。
 
 ---
 
-## Day 4（2h）· 前沿调研笔记 + 可落地评估
+## Day 4（2h）· 前沿笔记（固定四节）+ 五层归属表 + 可落地评估
 
-**目标**：写前沿笔记（MCP/A2A/AG-UI、多智能体、Computer Use、上下文工程），并给出"可落地评估"——展示判断力而非追热点。
+**目标**：把"读过的东西"变成**能被追问的认知**。四个固定小节 + 一张归属表，避免写成资料堆砌。
+
+> 这一天的定位在 W4 大纲对齐评审里调整过：原来只写"前沿方向现状"，现在固定成 4 节结构。
+> 原因很实际——面试里被问"为什么长上下文贵""你这些工作属于哪一层技术"时，
+> 能不能 30 秒答上来，取决于有没有提前把**自己的模块挂到公共坐标系**上。
 
 ### 你要做的事
-- [ ] `docs/w12/frontier-notes.md`：各前沿方向的现状 + 与本项目的关系
-- [ ] 每个方向给"是否值得本项目落地 + 理由 + 成本估算"
-- [ ] 与 ROADEMAP §7 的 P3 决策呼应（哪些深入档解锁了/没解锁，为什么）
-- [ ] Computer Use 按 §7 默认档：**只写笔记，不实现**
+- [ ] `docs/w12/frontier-notes.md`：**4 个固定小节**（见下，不要增减）
+- [ ] **五层归属表**：我们的模块 → PE/CE/HE/LE/GE 五层，一格一格填
+- [ ] 各前沿方向（MCP / A2A / AG-UI / 多智能体 / Computer Use）的落地评估
+- [ ] 与 ROADEMAP §7 的 P3 决策呼应（哪些解锁了/没解锁，为什么）
 
 ### 引导框架
 
-**每个方向的评估模板**
+**固定四节（每节 ≤ 400 字，写结论不写综述）**
+
+| # | 节 | 必须回答的问题 | 为什么面试会问 |
+|---|---|---|---|
+| 1 | 采样与推理 | prefill/decode 分别贵在哪、kvcache 为什么让长上下文成本非线性、temperature/top_p 我们怎么用的 | "为什么长上下文这么贵"是最常见的开场题；答不出说明只会调 API |
+| 2 | 五层技术体系 | PE/CE/HE/LE/GE 各是什么、递进还是取代、我们的模块分别落在哪层 | 让面试官 30 秒定位你的深度；没有坐标系就只能一件件事罗列 |
+| 3 | 人与 AI 的关系 | 工具/依附/导学/内观四种关系、什么风险等级必须留人在环 | 考的是"你敢让 Agent 自己做什么"，比技术题更能分辨判断力 |
+| 4 | Harness 架构对照 | DSH vs Claude Code vs 我们的自研，三者取舍差在哪 | 证明你看过真实实现，不是只看过框架文档 |
+
+**五层归属表（本节最重要的产出）**
+
+| 层 | 全称 | 我们的对应物 | 证据 |
+|---|---|---|---|
+| **PE** | Prompt Engineering | W1 prompt 模板、W10 品牌调性约束 | `prompts/`、`docs/w10/` |
+| **CE** | Context Engineering | W7 `ContextItem`/预算分配/Debug Report、W5–W6 检索 | `context/`、`retrieval/` |
+| **HE** | Harness Engineering | W8 Skill/工具治理、W9 planner、W11 执行模型 | `skills/`、`planner/`、`runtime/` |
+| **LE** | Loop Engineering | W9 重规划 + 三道上限、W11 断点续跑 | `planner/controls.py` |
+| **GE** | Graph Engineering | W9 多 Agent 图 + handoff、W11 Run Timeline | `multi_agent/` |
+
+**填这张表的价值**：面试官问"你做过 Context Engineering 吗"，如果只答"我做过 RAG"，
+听起来像调库；答"我做了 Context 的预算/信任级/排除原因三件事，在 CE 层"——**同一件事，可信度完全不同**。
+
+**各方向落地评估模板**
 ```
-## 方向（如 A2A / AG-UI / Computer Use / 上下文工程）
+## 方向（如 A2A / AG-UI / Computer Use）
 - 现状：一句话 + 关键规范/版本
 - 与本项目的关系：已在 W? 做过默认档 / 尚未涉及
 - 是否值得落地：是/否 + 理由（对齐目标岗位 JD）
@@ -200,14 +257,19 @@ def create_project(name: str, target: Path) -> None:
 2. 明确回答"为什么本项目 12 周内没深入 X"——用 §7 的 ROI/解锁规则支撑，不是"没时间"
 3. 前沿调研要能支撑面试追问："你了解 XX 吗？为什么没做？"
 4. Computer Use 明确标注"通用岗性价比低，只进笔记"（§7 默认档）
+5. **五层归属表必须每格都有证据链接**——没有证据的归属就是自我美化，宁可写"这层我们没做"
+6. 第 1 节（采样/推理）只写与本项目成本有关的结论，**不抄教材**：我们要的是"为什么我们的 p95 和成本长这样"
 
 **自检**
+- [ ] 四个固定小节齐全，每节都回答了表里那个问题
+- [ ] 五层归属表每格有证据链接（或明确写"未涉及"）
 - [ ] 每个方向都有"是否值得落地"的明确结论
 - [ ] 与 §7 的 P3 决策一致（解锁了什么/为什么没解锁）
-- [ ] 能口头回答"为什么没做 X"
+- [ ] 能口头回答"为什么没做 X"和"你在哪一层做了什么"
 
 ### 🔍 交给我的锚点
-frontier-notes.md。我会看：有没有明确判断（不是资料堆砌）、与 §7 决策是否一致、能否支撑面试追问。
+frontier-notes.md（四节 + 归属表）。我会看：有没有明确判断（不是资料堆砌）、五层归属是否有证据、
+第 1 节是否落到我们自己的成本曲线、能否支撑面试追问。
 
 ---
 
@@ -253,12 +315,14 @@ frontier-notes.md。我会看：有没有明确判断（不是资料堆砌）、
 | 6 | 证据包 | 8 件齐全且索引可达 |
 | 7 | 趋势图 | 12 周数据点连续，来自真实 history |
 | 8 | DoD 自评 | 九条逐条达标/缺口 + 证据链接 |
-| 9 | 面试准备 | 十条职责逐条有数字 + 取舍 + 最难问题 |
-| 10 | 合流 | 第 12 个数据点闭合，`docs/log.md` 收官 |
+| 9 | 决策可追溯 | Decision Matrix ≥8 行，每行有证据，能讲出"放弃了什么" |
+| 10 | 认知有坐标 | 五层归属表每格有证据，能 30 秒答"你在哪一层做了什么" |
+| 11 | 面试准备 | 十条职责逐条有数字 + 取舍 + 最难问题 |
+| 12 | 合流 | 第 12 个数据点闭合，`docs/log.md` 收官 |
 
 ---
 
-## 本周最容易返工的 6 处
+## 本周最容易返工的 7 处
 
 1. **提取了没被产品用过的抽象** → 违反 §8 反过度设计纪律，面试被问"这个谁在用"答不上
 2. **脚手架生成但跑不通** → 检查点直接挂；必须实跑验证
@@ -266,6 +330,8 @@ frontier-notes.md。我会看：有没有明确判断（不是资料堆砌）、
 4. **README 写"显著提升"没有数字** → 违反"证据 > 形容"，面试减分
 5. **新仓库带出 `.env.local`/密钥** → 安全事故，W1 Gate 0 老规矩
 6. **面试准备只讲功能不讲取舍** → "最难的三个问题"和 ADR 才是区分度所在
+7. **Decision Matrix 先写结论再找证据** → 会写成自我美化；必须"证据列在前，结论列在后"
+8. **五层归属表硬凑** → 没做过的层要写"未涉及"，硬凑一填就被追问穿
 
 ---
 
@@ -275,8 +341,9 @@ frontier-notes.md。我会看：有没有明确判断（不是资料堆砌）、
 |---|---|
 | 框架 API/脚手架 | `src/agent_framework/{__init__.py,cli.py}`、`docs/w12/{framework-api,scaffold-guide}.md` |
 | 文档/证据 | `docs/architecture-diagram.md`、`docs/adr/ADR-0NN.md`、README、`docs/w12/{evidence-index,trends.png}` |
+| 决策总表 | `docs/w12/decision-matrix.md` |
 | 趋势脚本 | `evals/scripts/plot_trends.py` |
-| 前沿/面试 | `docs/w12/{frontier-notes,interview-prep}.md` |
+| 前沿/面试 | `docs/w12/{frontier-notes,interview-prep}.md`（frontier 含固定四节 + 五层归属表） |
 | DoD 复核 | `docs/w11/dod-self-assessment.md`（最终版） |
 | 收官记录 | `evals/history/YYYY-Www.json`（第 12 点）、`docs/log.md`（收官条目） |
 
