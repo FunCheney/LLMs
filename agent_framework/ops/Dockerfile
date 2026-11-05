@@ -10,6 +10,18 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 WORKDIR /app
 
+# rag-mvp 是 workspace 之外的路径依赖：apps/growth_agent 里写的是
+# `path = "../../../06_rag/rag_mvp"`。三件事必须同时成立，否则构建会挂在
+# "Distribution not found" 或 "failed to open file .../README.md"：
+#
+#   1. 构建上下文在 agent_framework 内，够不到 06_rag → 由 compose 的
+#      `additional_contexts: ragmvp` 单独传进来；
+#   2. 落点必须是 /06_rag/rag_mvp —— 这个绝对路径是从容器内
+#      /app/apps/growth_agent 往上三级算出来的，换个位置就对不上；
+#   3. README.md 不能漏 —— uv_build 要读它，缺了报的错跟依赖毫无关系。
+COPY --from=ragmvp pyproject.toml README.md /06_rag/rag_mvp/
+COPY --from=ragmvp src /06_rag/rag_mvp/src
+
 # 先只拷依赖描述：源码变了不必重装依赖，构建缓存才有意义。
 COPY pyproject.toml uv.lock ./
 COPY packages/agent_framework/pyproject.toml packages/agent_framework/pyproject.toml
@@ -43,6 +55,9 @@ COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/packages /app/packages
 COPY --from=builder /app/apps /app/apps
 COPY --from=builder /app/pyproject.toml /app/uv.lock /app/
+# editable 安装会把 /06_rag/rag_mvp/src 写进 .pth，运行镜像不拷这份源码
+# 就会在 import 时报 "No module named 'rag_mvp'"，而构建阶段完全正常。
+COPY --from=builder /06_rag /06_rag
 
 # 非 root 运行：容器里跑 root，一旦有目录穿越就是一个完整的写权限。
 RUN useradd --create-home --uid 10001 appuser && chown -R appuser:appuser /app

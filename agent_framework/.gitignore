@@ -13,6 +13,10 @@ build/
 # 受限环境（容器/沙箱）下把 pytest tmp 落在仓库内时用：--basetemp=.pytest_tmp
 .pytest_tmp/
 
+# 本地临时产物：服务日志、构建模拟目录、沙箱内的 docker/buildx 配置
+# （RUNBOOK §3.4 会把 BUILDX_CONFIG 指到这里）
+.tmp/
+
 # 密钥与环境（绝不入库）
 .env
 .env.*

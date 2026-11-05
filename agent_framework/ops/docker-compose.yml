@@ -13,6 +13,12 @@ services:
     build:
       context: ..
       dockerfile: ops/Dockerfile
+      # rag-mvp 在构建上下文之外（同仓库的 06_rag/rag_mvp）。不给这个具名上下文，
+      # `uv sync` 会在 "Distribution not found .../06_rag/rag_mvp" 处失败——
+      # 而这条错误看上去像网络或缓存问题，实际是文件根本没进镜像。
+      # 相对路径以本文件所在目录（ops/）为基准，不是以 build.context 为基准。
+      additional_contexts:
+        ragmvp: ../../06_rag/rag_mvp
     command:
       - uvicorn
       - agent_framework.server.app:app
@@ -43,6 +49,8 @@ services:
     build:
       context: ..
       dockerfile: ops/Dockerfile
+      additional_contexts:
+        ragmvp: ../../06_rag/rag_mvp
     command:
       - uvicorn
       - growth_agent.app:app

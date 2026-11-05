@@ -24,7 +24,7 @@
 ├── packages/agent_framework/     # 框架库：llm / knowledge / memory / skills / planner / eval / resilience
 ├── apps/growth_agent/            # 产品应用（capstone），依赖框架，反向不成立
 ├── evals/                        # golden / history / scripts（W2 起填充）
-├── ops/                          # Dockerfile / compose / runbook（W2 起）
+├── ops/                          # Dockerfile / compose / RUNBOOK / pgvector init.sql
 ├── docs/                         # architecture / w1-tasks / llm-api-matrix / adr
 └── legacy/temporal_demo/         # 旧 Temporal demo，仅作 W2 长任务参考，不参与构建
 ```
@@ -43,6 +43,9 @@ uv run growth-agent              # 产品服务  http://127.0.0.1:8100/health
 ```
 
 > 受限环境（容器/沙箱）里 `pytest` 建不了系统临时目录时，加 `--basetemp=.pytest_tmp`。
+
+起不来、要跑容器、要跑检索，看 [`ops/RUNBOOK.md`](./ops/RUNBOOK.md)：分「本机裸进程 / 容器全套 /
+只跑检索」三种形态，含端口表、三份 env 文件的职责边界、排障速查表与清理方式。
 
 ## 如何切模型（改 yaml 即切换，代码零改动）
 
