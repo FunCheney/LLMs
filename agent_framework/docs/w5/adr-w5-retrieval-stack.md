@@ -1,4 +1,4 @@
-# ADR-W5-01 · 检索栈：pgvector + bge-m3 本地 + 按实测数据关掉混合与精排
+# ADR-W5-01 · 检索栈：pgvector + bge-m3 本地 + 混合默认关、精排保留开关
 
 - 状态：已采纳（2026-W45）
 - 影响范围：`knowledge/base.py`、`retrieval/{fusion,pipeline,query_rewrite}.py`、`apps/growth_agent/src/growth_agent/rag.py`、`ops/{docker-compose.yml,pgvector/init.sql}`、`Settings` 的 `retrieval_*` / `vector_store` / `pgvector_*`
@@ -148,11 +148,12 @@ R@1 直接翻倍——所以"sparse 很差"有一半是分词器的锅，不是 
 
 **这个结论在两套口径下都成立**（框架 pipeline 实测，28 正例）：
 
-| 口径 | 候选池 | R@1 | R@10 | MRR | 检索 p95 |
+| 口径 | 候选池 | R@1 | R@10 | MRR | 检索 p50 / p95 |
+|---|---|---|---|---|---|
 |---|---|---|---|---|---|
 | dense 单路 | 30 召回 | **.7857** | **1.0000** | **.8628** | 175ms |
 | dense+rerank | 100 条全局重排 | .7143 | .9643 | .8146 | **20.9s** |
-| dense+rerank | 20 条（生产口径） | .7143 | .9643 | .8146 | 5.4s |
+| dense+rerank | 20 条（生产口径） | .7143 | .9643 | .8146 | 4.7s / 5.4s |
 
 **两行精排的数字一模一样（四位小数全同、连 miss 的题都一样）**，这一点比指标本身
 更有信息量：它否掉了我原先的猜测——"负收益是因为 `candidate_k=100` 把 top10 打乱了"。
@@ -173,9 +174,30 @@ R@1 直接翻倍——所以"sparse 很差"有一半是分词器的锅，不是 
 这是 cross-encoder 的典型失效模式：它按"问题与段落的语义贴合度"打分，
 而"贴合度"和"这段是不是答案"在对比型/操作型问题上不是一回事。
 
-结论：`retrieval_rerank` 保持默认 `False`，**不留"以后可能有用"的模糊地带**。
-真要翻盘得换模型或换训练目标（例如用本语料做 hard negative 微调），
-仅仅"开起来"已经被两次独立口径证否。
+结论：**能力保留，默认关**（`retrieval_rerank=False`）。
+
+"保留"和"关掉"要分清：在这批语料上它是负收益，不代表在别的语料上也一样。换语料、
+换模型（例如拿本语料做 hard negative 微调 cross-encoder）都可能翻盘——删掉代码等于
+删掉实验入口。而"默认关"是因为开着的代价是确定的（+5s p95、−7pp R@1、多一个 top10
+miss），收益是零。
+
+**打开它必须三个值一起给**，少一个都会静默失效：
+
+```bash
+RETRIEVAL_RERANK=true
+RETRIEVAL_BUDGET_MS=8500     # ≥ rerank_timeout(8000) + 500ms 召回余量
+RETRIEVAL_DEVICE=cpu         # macOS 必设；不设则 MPS 多线程断言直接杀进程
+```
+
+为什么这么苛刻：精排的超时取 `min(rerank_timeout, 剩余预算)`，预算给 800 时剩余只有
+约 500ms，精排 20 条要 4.7s → 每次都在 `asyncio.wait_for` 里被掐掉 → 降级回召回顺序。
+指标看起来和"没开精排"一模一样，人就会得出"精排无效"的结论，而真相是参数没给够。
+（2026-11-05 第一轮精排档就是 28/28 全降级，靠评测脚本的 `deg` 列才发现。）
+
+所以 `growth_agent/rag.py` 里加了 `rerank_preflight()`：启动时检查预算与设备，
+不自洽就打 `retrieval.rerank_misconfigured` 警告，文案直接写出该改成多少。
+`retrieval_rerank_timeout_ms` 的默认值也从 3000 改成 8000——3000 在 CPU 上等于
+"强制不生效"，那不是一个保守的默认值，是一个假的默认值。
 
 ### D8 **默认关查询改写**（`retrieval_rewrite=False`）
 

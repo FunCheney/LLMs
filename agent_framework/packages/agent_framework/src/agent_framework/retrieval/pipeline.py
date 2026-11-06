@@ -33,7 +33,10 @@ logger = logging.getLogger(__name__)
 DEFAULT_BUDGET_MS = 800.0
 
 # 精排单独的上限。整链路预算再大，单个精排也不该吃掉超过这个数。
-DEFAULT_RERANK_TIMEOUT_MS = 3000.0
+# 8000：本机 CPU 上 20 条 cross-encoder p50 4.7s / p95 5.4s。给 3000 的后果
+# 不是"慢一点"，而是**每一次都超时降级**——精排代码一行没执行，日志里全是
+# rerank_degraded，看起来像"精排没用"。这是配置问题伪装成算法结论。
+DEFAULT_RERANK_TIMEOUT_MS = 8000.0
 
 # 改写单独的上限。改写是一次 LLM 调用，比本地模型更容易抖。
 DEFAULT_REWRITE_TIMEOUT_MS = 2500.0

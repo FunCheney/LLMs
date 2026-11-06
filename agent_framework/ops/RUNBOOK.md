@@ -311,15 +311,41 @@ p95 被一次冷启动污染，之后所有延迟结论都不可信。
 
 | 变量 | 取值 | 默认 | 说明 |
 |---|---|---|---|
-| `RETRIEVAL_MODE` | sparse / dense / hybrid | `hybrid` | 默认值需要 torch，裸机不装会 `ImportError` 并给出提示 |
+| `RETRIEVAL_MODE` | sparse / dense / hybrid | `dense` | dense 需要 torch；容器镜像里没有，所以要显式写 `sparse`。hybrid 实测负收益，别当折中开 |
 | `VECTOR_STORE` | local / pgvector / milvus | `local` | 只影响装配 |
 | `PGVECTOR_DSN` | 连接串 | 空 | 本机 `localhost:5433`；容器 `pgvector:5432` |
 | `RETRIEVAL_TOP_K` | int | 8 | |
 | `RETRIEVAL_BUDGET_MS` | float | 800 | 整链路预算，不是单段超时 |
-| `RETRIEVAL_RERANK` | true / false | false | 开精排必须同时调大预算，否则每次都在降级 |
+| `RETRIEVAL_RERANK` | true / false | `false` | 能力保留、默认关。要开见下方「开精排」 |
+| `RETRIEVAL_DEVICE` | cpu / mps / cuda | 自动 | **macOS 开精排必须 `cpu`** |
 | `RAG_ROOT` | 路径 | 自动推导 | 装成 wheel 后推导失效，必须显式指定 |
 | `SESSION_BACKEND` | memory / redis | memory | 裸进程用 memory，别为跑通对话去起 redis |
 | `LOG_LEVEL` | INFO / DEBUG | INFO | |
+
+### 开精排：三个值缺一不可
+
+精排（cross-encoder）保留成了真开关，默认关。但**只改 `RETRIEVAL_RERANK=true` 是没用的**——
+精排超时取 `min(rerank_timeout, 剩余预算)`，预算 800ms 时剩余约 500ms，而 20 条精排要 4.7s，
+于是每次都在 `asyncio.wait_for` 里被掐掉、静默降级回召回顺序。现象是"开了，指标一模一样"。
+
+```bash
+export RETRIEVAL_RERANK=true
+export RETRIEVAL_BUDGET_MS=8500    # ≥ rerank_timeout(8000) + 500ms 召回余量
+export RETRIEVAL_DEVICE=cpu        # macOS 必设；不设会让进程直接退出（MPS 多线程断言）
+```
+
+启动时会看到：
+
+```
+retrieval.rerank_misconfigured: 检索预算 800ms 不够精排用：……
+```
+
+配置自洽时这行不会出现。运行时每次降级都会打 `retrieval.degraded stages=rerank_degraded`，
+用它判断"精排到底有没有真跑"。
+
+**值不值得开**：这批语料上实测是负收益（R@1 .7857→.7143、MRR .8628→.8146、p95 +5s，
+两套口径结论一致），所以默认关。换语料或换模型后要重新跑一次 A/B 再决定——
+命令见 `docs/w5/rag-ab-report.md`。
 
 ---
 
@@ -338,7 +364,9 @@ p95 被一次冷启动污染，之后所有延迟结论都不可信。
 | `connection refused ... :5433` | pgvector 容器没起 | `docker compose -f ops/docker-compose.yml up -d pgvector` |
 | `relation "rag_chunks" does not exist` | `init.sql` 只在**空数据卷**时执行 | `down -v` 重建，或手工 `psql -f ops/pgvector/init.sql` |
 | 连上了但表在别的地方 | 连到了本机 5432 的另一个 postgres | 连接串端口写 5433；`select current_database()` 确认 |
-| 每次都 `budget_exhausted` 降级 | 精排 ~2.5s 装不进 800ms 预算 | 调大 `RETRIEVAL_BUDGET_MS`，或关掉 `RETRIEVAL_RERANK` |
+| 精排"开了"但指标和没开一样 | 预算或超时不够，每次在 `wait_for` 里被掐断 | 启动日志搜 `rerank_misconfigured`，按它给出的值改；或看 `retrieval.degraded stages=rerank_degraded` |
+| `budget_exhausted` 频繁出现 | 整链路预算装不下精排（20 条要 4.7s） | 见 §5「开精排：三个值缺一不可」 |
+| Mac 上开精排后进程直接退出 | 没设 `RETRIEVAL_DEVICE=cpu`，MPS 多线程断言 | `export RETRIEVAL_DEVICE=cpu` |
 | `docker compose build` 报权限/`~/.docker` | 沙箱限制 buildx 写家目录 | `BUILDX_CONFIG=$PWD/.tmp/buildx` |
 | 拉基础镜像 502 | 镜像仓库网络问题 | 换网络重试；`ghcr.io` 那个 uv 镜像通常正常 |
 | `pytest` 报建不了临时目录 | 受限环境 | `--basetemp=.pytest_tmp` |

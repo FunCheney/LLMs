@@ -9,11 +9,12 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
 from agent_framework.config import Settings
-from growth_agent.rag import retriever_config
+from growth_agent.rag import rerank_preflight, retriever_config
 from rag_mvp.retrieval.factory import _vector_store_config
 
 
@@ -61,6 +62,71 @@ def test_rerank_flag_maps_to_bge(rag_root: Path, monkeypatch: pytest.MonkeyPatch
     config = retriever_config(Settings())
 
     assert config.reranker == "bge"
+
+
+def test_rerank_preflight_silent_when_off() -> None:
+    """精排关着就没什么可自检的——默认档不能因为"可能配错"而在启动时刷警告。"""
+
+    assert rerank_preflight(Settings(retrieval_rerank=False)) == []
+
+
+def test_rerank_preflight_flags_budget_too_small() -> None:
+    """预算不够时报错文案必须点出**哪个环境变量**该改成多少。
+
+    只说"预算不足"是没用的：读日志的人不知道 800 和 8000 该改哪一个，
+    也不知道改到多少。精排历史上就吃过这个亏——28/28 全降级，
+    报告看起来像"精排无效"。
+    """
+
+    problems = rerank_preflight(
+        Settings(
+            retrieval_rerank=True,
+            retrieval_budget_ms=800.0,
+            retrieval_rerank_timeout_ms=8000.0,
+            retrieval_device="cpu",
+        )
+    )
+
+    assert len(problems) == 1
+    assert "RETRIEVAL_BUDGET_MS=8500" in problems[0]
+
+
+def test_rerank_preflight_passes_when_budget_covers_timeout() -> None:
+    """预算 ≥ 超时 + 召回余量时闭嘴。多吵一句就会让人忽略真正的警告。"""
+
+    problems = rerank_preflight(
+        Settings(
+            retrieval_rerank=True,
+            retrieval_budget_ms=8500.0,
+            retrieval_rerank_timeout_ms=8000.0,
+            retrieval_device="cpu",
+        )
+    )
+
+    assert problems == []
+
+
+def test_rerank_preflight_flags_mps_only_on_macos(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """MPS 那条只在 macOS 上成立，且 device 显式设了 cpu 就不该再提。
+
+    这是"进程直接退出"级别的问题（torch 的 MPS 后端在多线程各持 encoder 时
+    断言失败），不是降级——Linux 容器里提醒它是纯噪声。
+    """
+
+    settings = Settings(
+        retrieval_rerank=True,
+        retrieval_budget_ms=8500.0,
+        retrieval_rerank_timeout_ms=8000.0,
+        retrieval_device=None,
+    )
+
+    monkeypatch.setattr(sys, "platform", "darwin")
+    assert any("RETRIEVAL_DEVICE" in p for p in rerank_preflight(settings))
+
+    monkeypatch.setattr(sys, "platform", "linux")
+    assert rerank_preflight(settings) == []
 
 
 def test_dsn_is_carried_into_vector_store_config(

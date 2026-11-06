@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -118,6 +119,43 @@ def build_pipeline(
     )
 
 
+# 精排的预算自洽线：召回 + ACL + 组装在本机实测 150–300ms，留 500ms 才是
+# "明显够"。这不是精确阈值，是报警线——低于它就不用再猜为什么指标没变化。
+RERANK_RECALL_HEADROOM_MS = 500.0
+
+
+def rerank_preflight(settings: Settings) -> list[str]:
+    """开了精排但配置不配套时，返回可执行的修复提示（空列表 = 没问题）。
+
+    精排是**唯一一个"开了也可能一行都没执行"的开关**：它的超时取
+    `min(rerank_timeout, 剩余预算)`，所以预算给小、超时给短，都会让它在
+    `asyncio.wait_for` 里被掐掉，然后静默降级回召回顺序。指标看起来等于
+    "没开精排"，很容易被读成"精排无效"——真实原因是参数没给够。
+
+    宁可启动时吵一句，也不要让人对着一份 28/28 全降级的报告猜。
+    """
+    if not settings.retrieval_rerank:
+        return []
+
+    problems: list[str] = []
+    needed = settings.retrieval_rerank_timeout_ms + RERANK_RECALL_HEADROOM_MS
+    if settings.retrieval_budget_ms < needed:
+        problems.append(
+            f"检索预算 {settings.retrieval_budget_ms:.0f}ms 不够精排用："
+            f"精排超时 {settings.retrieval_rerank_timeout_ms:.0f}ms + 召回余量 "
+            f"{RERANK_RECALL_HEADROOM_MS:.0f}ms = 至少 {needed:.0f}ms。"
+            f"设 RETRIEVAL_BUDGET_MS={needed:.0f}，否则每次精排都会被预算掐断"
+        )
+
+    if settings.retrieval_device is None and sys.platform == "darwin":
+        problems.append(
+            "macOS 上开精排必须设 RETRIEVAL_DEVICE=cpu：cross-encoder 跑在"
+            "工作线程里，torch 的 MPS 后端在多个线程各持一个 encoder 时会断言"
+            "失败，进程直接退出（不是异常，抓不到也降不了级）"
+        )
+    return problems
+
+
 @dataclass
 class RagRuntime:
     """装配结果。持有需要显式释放的资源（线程池、gateway 的连接池）。
@@ -180,6 +218,11 @@ def build_runtime(settings: Settings | None = None) -> RagRuntime:
 
     reranker: AsyncReranker | None = None
     if resolved.retrieval_rerank:
+        # 配置不自洽时先把话说清楚：精排"配了但不生效"和"没配"在指标上长得
+        # 一模一样，只有启动日志能区分这两件事。
+        for problem in rerank_preflight(resolved):
+            logger.warning("retrieval.rerank_misconfigured: %s", problem)
+
         sync_reranker = create_reranker(config)
         if sync_reranker is not None:
             reranker = AsyncReranker(sync_reranker)
@@ -202,7 +245,13 @@ def build_runtime(settings: Settings | None = None) -> RagRuntime:
         "retrieval ready: mode=%s store=%s rerank=%s rewrite=%s budget=%.0fms",
         resolved.retrieval_mode,
         resolved.vector_store,
-        resolved.retrieval_rerank,
+        # 开精排时直接打出超时值：`rerank=True budget=800ms` 这种组合本身就是
+        # 矛盾（预算装不下精排），让日志一眼可见，比多一行 WARNING 更省事。
+        (
+            f"on/{resolved.retrieval_rerank_timeout_ms:.0f}ms"
+            if resolved.retrieval_rerank
+            else "off"
+        ),
         resolved.retrieval_rewrite,
         resolved.retrieval_budget_ms,
     )

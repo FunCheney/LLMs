@@ -296,11 +296,25 @@ class Settings(BaseSettings):
     # 后端选择只影响装配，不影响任何业务代码（都走 Retriever 协议）。
     vector_store: Literal["local", "milvus", "pgvector"] = "local"
 
-    # 精排默认关：本地 cross-encoder 精排 20 条约 2.5s，默认开会让 p95 直接
-    # 超出门禁。要开必须同时把 retrieval_budget_ms 调大，否则每次都在降级。
+    # 精排**保留为可配置能力，默认关**。不是"没做完"，是实测结论：
+    # 2026-11-05 两套口径各测一遍，框架口径（recall×3 → 24 候选，只重排前 20）
+    # 与 rag_mvp 口径（100 候选全局重排）逐位一致，都是负收益：
+    #   dense          R@1 .7857 / R@10 1.0000 / MRR .8628 / nDCG .7416
+    #   dense + rerank R@1 .7143 / R@10 .9643 / MRR .8146 / nDCG .7233
+    # 机制：cross-encoder 偏好"主题邻近的段落"，而 golden 要的是"恰好回答
+    # 那一个问题的那一段"，于是把排第一的 chunk 换成了同页邻居
+    # （golden-022 是最干净的证据，见 docs/w5/rag-ab-report.md）。
+    #
+    # 要开就**同时**设两个值，缺一个都会静默降级（启动时 rerank_preflight()
+    # 会把这些不自洽报出来，见 growth_agent/rag.py）：
+    #   RETRIEVAL_RERANK=true
+    #   RETRIEVAL_BUDGET_MS=8500        # ≥ rerank_timeout + 500ms 召回余量
     retrieval_rerank: bool = False
     retrieval_rerank_candidates: int = Field(default=20, ge=1)
-    retrieval_rerank_timeout_ms: float = Field(default=3000.0, gt=0)
+    # 8000 而不是 3000：本机 CPU 上 20 条 cross-encoder 是 p50 4.7s / p95 5.4s
+    # （实测，同上报告），3000 会让**每一次**精排都超时降级。那种"配了但没
+    # 生效"比不做更坏——它让人得出"精排无效"的结论，而真相是参数没给够。
+    retrieval_rerank_timeout_ms: float = Field(default=8000.0, gt=0)
 
     # 本地模型跑在哪：None = 交给 sentence-transformers 自动选（macOS 上会挑 mps）。
     # **开精排的 macOS 机器必须设 cpu**：cross-encoder 跑在 pipeline 的工作线程里，
