@@ -13,6 +13,7 @@ dev = [
     "mypy>=1.13.0",
     "types-pyyaml>=6.0.12.20260906",
     "locust>=2.47.0",
+    "openai>=3.45.0",
 ]
 
 [tool.pytest.ini_options]

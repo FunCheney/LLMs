@@ -450,7 +450,7 @@ async def _ragas(case: GoldenCase, answer: str) -> RagasScores | None:
 
     contexts = _contexts(case)
 
-    if not contexts:
+    if not contexts: # 如果没有检索到任何 references，直接返回 NONE
         return None
 
     scores = await score_case(

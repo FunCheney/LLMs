@@ -122,6 +122,9 @@ class CaseMetrics:
 @dataclass(frozen=True, slots=True)
 class RagasScores:
     """RAGAS 三指标（W4 D2）。
+        - faithfulness（忠实度）
+        - answer_relevancy（答案相关性）
+        - context_precision（上下文精确度）三个指标
 
     **每个字段都可能是 `None`，且 `None` 与 0.0 含义不同**：
     - `None`：这条 case 根本算不了（没有 references、答案为空）→ 不进均值
