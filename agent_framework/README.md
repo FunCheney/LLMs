@@ -2,6 +2,7 @@
 
 > 12 周产出的**一个**生产级 Agent 项目：从「主题」到「深度调研 → SEO 文章 → 多平台文案」，全链路可评测、可观测、可降级。
 > 学习计划见 [`ROADEMAP.md`](./ROADEMAP.md)，架构契约见 [`docs/architecture.md`](./docs/architecture.md)，本周任务见 [`docs/w1/w1-tasks.md`](./docs/w1/w1-tasks.md)，各厂商 API 差异见 [`docs/w1/`](./docs/w1/)。
+> 评测体系（W3/W4）看不懂从哪下手时，读 [`docs/notes/w3-w4-reading-guide.md`](./docs/notes/w3-w4-reading-guide.md)；起服务与排障见 [`ops/RUNBOOK.md`](./ops/RUNBOOK.md)。
 
 ## 生产级 DoD（12 周后逐条自评）
 

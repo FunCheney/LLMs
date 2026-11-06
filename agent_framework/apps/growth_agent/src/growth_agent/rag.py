@@ -24,8 +24,10 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from agent_framework.bootstrap import build_gateway
 from agent_framework.config import Settings
-from agent_framework.retrieval import RetrievalPipeline
+from agent_framework.llm.client import LLMGateway
+from agent_framework.retrieval import MultiQueryRewriter, QueryRewriter, RetrievalPipeline
 from rag_mvp.contrib.agent_framework import (
     DEFAULT_MAX_WORKERS,
     AsyncReranker,
@@ -81,27 +83,73 @@ def retriever_config(settings: Settings | None = None) -> RetrieverConfig:
         bm25_index_path=root / "data" / "index" / "bm25.pkl",
         store_type=resolved.vector_store,
         pgvector_dsn=dsn,
+        # None = 让 sentence-transformers 自动选设备；Mac 上开精排必须显式 cpu，
+        # 否则 MPS 在两个线程各持一个 encoder 时会断言失败（见 Settings 注释）。
+        device=resolved.retrieval_device,
         # 精排模型只在这里决定"用不用"；是否真的精排由 pipeline 的预算决定。
         reranker="bge" if resolved.retrieval_rerank else None,
     )
 
 
+def build_pipeline(
+    retriever: AsyncRetriever,
+    *,
+    reranker: AsyncReranker | None = None,
+    rewriter: QueryRewriter | None = None,
+    settings: Settings | None = None,
+) -> RetrievalPipeline:
+    """把 `Settings` 的检索段翻译成 `RetrievalPipeline` 参数。
+
+    **唯一一处**做这个翻译。评测脚本（`evals/scripts/retrieval_metrics.py`）要跑
+    "同样口径、不同配置"的 A/B，如果它自己再写一遍 `budget_ms=...` 这串参数，
+    那是两份可能漂移的真相：改了这里忘了那里，报告上的数字就不再是生产数字。
+    所以评测只允许改 `Settings`，装配走同一个函数。
+    """
+    resolved = settings or Settings()
+    return RetrievalPipeline(
+        retriever,
+        reranker=reranker,
+        rewriter=rewriter,
+        budget_ms=resolved.retrieval_budget_ms,
+        rerank_timeout_ms=resolved.retrieval_rerank_timeout_ms,
+        rewrite_timeout_ms=resolved.retrieval_rewrite_timeout_ms,
+        rerank_candidates=resolved.retrieval_rerank_candidates,
+        recall_multiplier=resolved.retrieval_recall_multiplier,
+    )
+
+
 @dataclass
 class RagRuntime:
-    """装配结果。持有需要显式释放的资源（线程池）。
+    """装配结果。持有需要显式释放的资源（线程池、gateway 的连接池）。
 
     `close()` 必须在 lifespan 里调用：`ThreadPoolExecutor` 不关会让进程
     在退出时挂住（等待线程池空闲），容器里表现为"优雅停止超时"。
+
+    `gateway` 只在开了改写时存在。它有自己的 httpx client，所以另给一个
+    `aclose()`：`httpx.AsyncClient.aclose()` 是协程，塞不进同步的 `close()`
+    里（`asyncio.run` 在已有事件循环中会直接抛 RuntimeError）。
     """
 
     pipeline: RetrievalPipeline
     retriever: AsyncRetriever
     reranker: AsyncReranker | None = None
+    gateway: LLMGateway | None = None
+    rewriter: QueryRewriter | None = None
 
     def close(self) -> None:
+        """同步释放。gateway 的连接池由 `aclose()` 负责。"""
+
         if self.reranker is not None:
             self.reranker.close()
         self.retriever.close()
+
+    async def aclose(self) -> None:
+        """异步释放：先关 gateway 的连接池，再走同步那部分。"""
+
+        if self.gateway is not None:
+            await self.gateway.aclose()
+            self.gateway = None
+        self.close()
 
 
 def build_runtime(settings: Settings | None = None) -> RagRuntime:
@@ -136,24 +184,35 @@ def build_runtime(settings: Settings | None = None) -> RagRuntime:
         if sync_reranker is not None:
             reranker = AsyncReranker(sync_reranker)
 
-    pipeline = RetrievalPipeline(
-        retriever,
-        reranker=reranker,
-        budget_ms=resolved.retrieval_budget_ms,
-        rerank_timeout_ms=resolved.retrieval_rerank_timeout_ms,
-        rewrite_timeout_ms=resolved.retrieval_rewrite_timeout_ms,
-        rerank_candidates=resolved.retrieval_rerank_candidates,
-        recall_multiplier=resolved.retrieval_recall_multiplier,
+    # 改写是**唯一需要 LLM 的检索环节**，所以它带一个 gateway 进来。
+    # 没开改写就不建 gateway：启动期不实例化 adapter 是 bootstrap 的纪律，
+    # 但没必要时连 gateway 对象都不该存在（否则有人会拿它去打别的调用）。
+    gateway: LLMGateway | None = None
+    rewriter: QueryRewriter | None = None
+    if resolved.retrieval_rewrite:
+        gateway = build_gateway(resolved)
+        rewriter = MultiQueryRewriter(gateway)
+        logger.info("retrieval rewrite enabled: alias=%s", rewriter.alias)
+
+    pipeline = build_pipeline(
+        retriever, reranker=reranker, rewriter=rewriter, settings=resolved
     )
 
     logger.info(
-        "retrieval ready: mode=%s store=%s rerank=%s budget=%.0fms",
+        "retrieval ready: mode=%s store=%s rerank=%s rewrite=%s budget=%.0fms",
         resolved.retrieval_mode,
         resolved.vector_store,
         resolved.retrieval_rerank,
+        resolved.retrieval_rewrite,
         resolved.retrieval_budget_ms,
     )
-    return RagRuntime(pipeline=pipeline, retriever=retriever, reranker=reranker)
+    return RagRuntime(
+        pipeline=pipeline,
+        retriever=retriever,
+        reranker=reranker,
+        gateway=gateway,
+        rewriter=rewriter,
+    )
 
 
 def build_retriever(

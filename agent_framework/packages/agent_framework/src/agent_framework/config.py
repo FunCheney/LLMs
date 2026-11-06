@@ -284,7 +284,15 @@ class Settings(BaseSettings):
     # 召回放大倍数：后面还有 ACL 过滤与去重会砍，只取 top_k 容易给不满。
     retrieval_recall_multiplier: float = Field(default=3.0, ge=1.0)
 
-    retrieval_mode: Literal["sparse", "dense", "hybrid"] = "hybrid"
+    # 默认 dense，不是 hybrid——这一条是**实测选出来的，不是拍的**。
+    # 2026-11-05 在 28 条正例 / 425 chunk 上跑六档（见 docs/w5/rag-ab-report.md）：
+    # dense R@1 .786 / R@5 .964 / R@10 1.000 / MRR .863 全场最优；
+    # hybrid 是 .571 / .893 / .964 / .706。R@1 差 6 条、MRR 差 15.7pp。
+    # 原因不在 RRF 本身，而在本语料的中文 BM25 分词质量太差（sparse 单独跑
+    # R@1 只有 .250），RRF 用 1/(k+rank) 把一路噪声等权融进了正确结果，
+    # 把原本排第一的 chunk 挤下去了。RRF 的假设是"两路各有独立信息"，
+    # 这里不成立——所以关掉，而不是调 k 或加权（没有证据支持某个权重）。
+    retrieval_mode: Literal["sparse", "dense", "hybrid"] = "dense"
     # 后端选择只影响装配，不影响任何业务代码（都走 Retriever 协议）。
     vector_store: Literal["local", "milvus", "pgvector"] = "local"
 
@@ -293,6 +301,14 @@ class Settings(BaseSettings):
     retrieval_rerank: bool = False
     retrieval_rerank_candidates: int = Field(default=20, ge=1)
     retrieval_rerank_timeout_ms: float = Field(default=3000.0, gt=0)
+
+    # 本地模型跑在哪：None = 交给 sentence-transformers 自动选（macOS 上会挑 mps）。
+    # **开精排的 macOS 机器必须设 cpu**：cross-encoder 跑在 pipeline 的工作线程里，
+    # 而 torch 2.14 的 MPS 后端不支持"一个进程里两个线程各持一个 encoder"，
+    # 表现为 `AGXG13XFamilyCommandBuffer ... A command encoder is already encoding`
+    # 断言失败（进程直接死，不是异常，抓不到也降级不了）。
+    # 容器/Linux 是 CPU，不设也没事；这条只在"Mac 上开精排"时是必须的。
+    retrieval_device: Literal["cpu", "mps", "cuda"] | None = None
 
     # 改写默认关：它是一次 LLM 调用，且收益要用 A/B 证明后才该保留。
     retrieval_rewrite: bool = False

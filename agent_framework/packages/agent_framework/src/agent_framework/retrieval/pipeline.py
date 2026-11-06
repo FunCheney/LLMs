@@ -61,6 +61,9 @@ class RetrievalDiagnostics:
     filtered_out: int
     reranked: bool
     degraded: tuple[str, ...] = ()
+    # 改写耗时单独记：它是一次 LLM 调用，比另外两段贵一个量级。
+    # 不记的话，"总耗时长"只能归因到"检索慢"，而真实原因可能是上游在抖。
+    rewrite_ms: float = 0.0
     recall_ms: float = 0.0
     rerank_ms: float = 0.0
     total_ms: float = 0.0
@@ -138,7 +141,9 @@ class RetrievalPipeline:
         deadline = started + self._budget_ms / 1000.0
         degraded: list[str] = []
 
+        rewrite_started = time.perf_counter()
         queries = await self._rewrite(query, deadline=deadline, degraded=degraded)
+        rewrite_ms = (time.perf_counter() - rewrite_started) * 1000.0
 
         recall_started = time.perf_counter()
         # 多取一些：后面还有 ACL 过滤与去重会砍掉一部分，
@@ -193,6 +198,7 @@ class RetrievalPipeline:
             filtered_out=filtered_out,
             reranked=reranked,
             degraded=tuple(degraded),
+            rewrite_ms=round(rewrite_ms, 2),
             recall_ms=round(recall_ms, 2),
             rerank_ms=round(rerank_ms, 2),
             total_ms=round((time.perf_counter() - started) * 1000.0, 2),

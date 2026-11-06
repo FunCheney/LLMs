@@ -272,6 +272,49 @@ async def test_rewrite_always_keeps_original_query_first() -> None:
     assert len(retriever.calls) == 2
 
 
+async def test_rewrite_timeout_marks_degraded_and_keeps_original() -> None:
+    """改写超时（一次真实 LLM 调用的典型失败）必须降级，不能拖死请求。
+
+    2026-11-05 实测：默认 `rewrite_timeout_ms=2500` 在本机跑 qwen 是每次超时，
+    整条链路 28/28 全走降级。降级本身是对的，但**报告里必须看出来**——否则
+    "改写档"测出来的数字其实等于"不改写档"，会被读成"改写没用"。
+    """
+
+    class _SlowRewriter:
+        name = "slow"
+
+        async def rewrite(self, query: str, *, n: int = 3) -> list[str]:
+            await asyncio.sleep(5)
+            return [query, "迟到的改写"]
+
+    retriever = FakeRetriever([_scored("a")])
+    pipeline = RetrievalPipeline(
+        retriever,
+        rewriter=_SlowRewriter(),
+        budget_ms=5000,
+        rewrite_timeout_ms=50,
+    )
+
+    outcome = await pipeline.run("原查询", top_k=1)
+
+    assert outcome.diagnostics is not None
+    assert DEGRADE_REWRITE in outcome.diagnostics.degraded
+    assert outcome.diagnostics.queries == ("原查询",)
+    # 改写耗时单独可读：没有这个字段，"总耗时长"只能归因到"检索慢"
+    assert outcome.diagnostics.rewrite_ms >= 50
+    assert [s.chunk.chunk_id for s in outcome.chunks] == ["a"]
+
+
+async def test_rewrite_ms_is_zero_when_rewrite_disabled() -> None:
+    """没开改写时不能记成"很快"，要记 0——否则均值里混进一批不存在的样本。"""
+
+    pipeline = RetrievalPipeline(FakeRetriever([_scored("a")]), budget_ms=500)
+    outcome = await pipeline.run("原查询", top_k=1)
+
+    assert outcome.diagnostics is not None
+    assert outcome.diagnostics.rewrite_ms == 0.0
+
+
 async def test_multi_query_results_are_fused_and_deduped() -> None:
     retriever = FakeRetriever(
         [],

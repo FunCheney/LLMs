@@ -109,14 +109,29 @@ curl -s --noproxy '*' -X POST localhost:8100/v1/draft \
 
 ### 2.4 停止
 
-前台启动的直接 `Ctrl-C`。后台起的话：
+前台启动的 `Ctrl-C` 即可。后台起的、或者找不到终端时，**按端口找 PID 再 kill**：
 
 ```bash
-pkill -f "agent_framework.server.app"
-pkill -f "growth_agent.app"
+# 看谁占着
+lsof -nP -iTCP:8000 -iTCP:8100 -sTCP:LISTEN
+
+# 停框架服务（8000）
+kill $(lsof -nP -iTCP:8000 -sTCP:LISTEN -t)
+# 停产品服务（8100）
+kill $(lsof -nP -iTCP:8100 -sTCP:LISTEN -t)
+
+# 确认停干净：无输出 = 已停
+lsof -nP -iTCP:8000 -iTCP:8100 -sTCP:LISTEN
 ```
 
-> 别用 `sh -c 'uv run agent-server &'` 这种写法：子 shell 退出时进程会被一起回收，
+**不要写 `pkill -f "agent_framework.server.app"`**：这两个服务的入口是 console script
+（`agent-server` / `growth-agent`），进程命令行是 `.venv/bin/agent-server`，**不含模块名**。
+这条命令实测匹配到 **0 个进程**——它会静默成功，让人以为已经停了，实际端口还占着。
+
+`pkill -f "agent-server"` 能匹配到，但它同时会匹配命令行里含这个字符串的**其他进程**，
+包括正在执行这条命令的 shell 本身。按 PID 停是唯一不会误伤的方式。
+
+> 也别用 `sh -c 'uv run agent-server &'` 这类写法起服务：子 shell 退出时进程会被一起回收，
 > 表现是"刚起就没了、端口没人监听"，很容易误判成启动失败。
 
 ---
@@ -315,6 +330,8 @@ p95 被一次冷启动污染，之后所有延迟结论都不可信。
 | `upstream connect failed: Connection refused (os error 61)` | shell 里有指向死端口的 `HTTP_PROXY` | `env -u HTTP_PROXY -u HTTPS_PROXY uv run ...` |
 | curl 连 localhost 也超时 / 返回奇怪页面 | curl 也走代理 | 加 `--noproxy '*'` |
 | 服务刚起就没了，端口没人监听 | 用 `&` 起在子 shell 里，随 shell 退出被回收 | 独立终端，或 `nohup` |
+| `pkill -f "agent_framework.server.app"` 执行了，端口还占着 | 入口是 console script，命令行里没有模块名；这条 pkill 匹配 0 个进程 | `kill $(lsof -nP -iTCP:8000 -sTCP:LISTEN -t)` |
+| `docker compose down` 之后 `5433` 仍在监听 | 是引擎在代理端口映射，不是漏停的进程 | 看 `docker ps` 是否还有 `agent-platform-pgvector-1` |
 | `No module named 'torch'` | 框架 venv 没装 `local` extra | `uv sync --package growth-agent --extra local`；或 `RETRIEVAL_MODE=sparse` |
 | `Distribution not found at .../06_rag/rag_mvp` | 容器构建没带 ragmvp 上下文 | 见 §3.3，检查 `additional_contexts` 的相对层级 |
 | 容器里 `No module named 'rag_mvp'` | runtime 阶段没拷 `/06_rag` | 见 §3.3 |
@@ -328,7 +345,88 @@ p95 被一次冷启动污染，之后所有延迟结论都不可信。
 
 ---
 
-## 7. 数据与清理
+## 7. 停止与清理
+
+按"影响范围"分四档，从轻到重。**先看第 1 档够不够，别一上来就 `down -v`。**
+
+### 7.1 四档停法
+
+| 档 | 命令 | 停什么 | 数据 | 常用场景 |
+|---|---|---|---|---|
+| 1 | 见 §2.4 | 本机两个服务进程 | 不涉及 | 收工、改完代码重起 |
+| 2 | `make down` | 全部容器（保卷） | **保留** | 不用容器了，但想保住向量 |
+| 3 | `docker compose -f ops/docker-compose.yml down -v` | 容器 + 数据卷 | **删** | 重建索引、清干净环境 |
+| 4 | 退出 OrbStack / Docker Desktop | 整个引擎 | 保留 | 释放内存与 CPU |
+
+**第 1 档：停本机进程**
+
+一条命令停两个，端口本就空闲时也不会报错：
+
+```bash
+for p in 8000 8100; do
+  pid=$(lsof -nP -iTCP:$p -sTCP:LISTEN -t 2>/dev/null)
+  if [ -n "$pid" ]; then kill $pid && echo "已停 $p (pid $pid)"; else echo "$p 本就空闲"; fi
+done
+
+lsof -nP -iTCP:8000 -iTCP:8100 -sTCP:LISTEN   # 无输出 = 已停干净
+```
+
+只停一个的话：
+
+```bash
+kill $(lsof -nP -iTCP:8000 -sTCP:LISTEN -t)   # 框架
+kill $(lsof -nP -iTCP:8100 -sTCP:LISTEN -t)   # 产品
+```
+
+**第 2 档：停容器、留数据** `[实测]`
+
+```bash
+make down                                        # 移除容器与网络，保留数据卷
+docker compose -f ops/docker-compose.yml stop    # 只停不删，下次 start 更快
+```
+
+两条都实测过：
+
+- `stop → start` 后 `select count(*) from rag_chunks` 仍是 **425**；
+- `down → up` 后同样仍是 **425**（容器和网络重建了，卷没动）。
+
+停完之后应该是这个状态：
+
+```bash
+docker ps -a                                     # 空
+lsof -nP -iTCP:8000 -iTCP:8100 -iTCP:5433 -sTCP:LISTEN   # 空
+docker volume ls                                 # agent-platform_pgvector-data 还在
+```
+
+要重开会话继续做，`docker compose -f ops/docker-compose.yml up -d pgvector` 约 6 秒到 healthy。
+想临时腾资源又不想等重建，用 `stop`；想彻底收干净，用 `make down`。
+
+**第 3 档：连数据一起删**
+
+```bash
+docker compose -f ops/docker-compose.yml down -v
+```
+
+删掉 `agent-platform_pgvector-data` 与 `agent-platform_redis-data`。**向量没了，要按 §4.2 重建**（425 条约 47s）。
+只有这两种情况该用它：`init.sql` 改了需要重跑，或者索引数据已经脏了想从零重建。
+
+**第 4 档：退掉整个 Docker 引擎**
+
+macOS 上先用 `docker ps` 确认没有别的容器在跑，再从菜单栏退出 OrbStack / Docker Desktop。
+引擎一停，5433 也一并释放——有时"端口还被占着"就是它，不是我们的进程。
+
+### 7.2 各停法之后怎么确认
+
+```bash
+lsof -nP -iTCP:8000 -iTCP:8100 -sTCP:LISTEN     # 服务：无输出
+lsof -nP -iTCP:5433 -sTCP:LISTEN                # 向量库：无输出（或只剩 OrbStack）
+docker ps                                       # 容器：无相关条目
+```
+
+**`5433` 上显示 `OrbStack` 是正常的**：那是容器的端口映射在代理，不是漏停的进程。
+判断标准是 `docker ps` 里还有没有 `agent-platform-pgvector-1`。
+
+### 7.3 数据在哪
 
 | 东西 | 位置 | 删了会怎样 |
 |---|---|---|
@@ -339,9 +437,7 @@ p95 被一次冷启动污染，之后所有延迟结论都不可信。
 | redis 会话 | docker 卷 `agent-platform_redis-data` | 会话全丢，无影响 |
 
 ```bash
-make down                                              # 停容器，数据保留
-docker compose -f ops/docker-compose.yml down -v       # 连数据卷一起删（会丢向量）
-make clean                                             # 只删缓存，不碰 .venv 与 .env*
+make clean          # 只删 .pytest_tmp / 各工具缓存，不碰 .venv 与 .env*
 ```
 
 ---
