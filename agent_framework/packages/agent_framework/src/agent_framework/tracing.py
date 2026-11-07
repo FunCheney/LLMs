@@ -55,9 +55,19 @@ def new_span_id() -> str:
 class Span:
     """一个工作单元。字段刻意少：属性进 `attributes`，不在这里加列。"""
 
+    # 同一次任务的全部 span 共享一个 id，导出时靠它聚成一条 trace。
+    # 由 contextvar 传递，所以跨多次 LLM/工具调用是同一个值（W3 D4）。
     trace_id: str
+
+    # 本 span 自己的标识，全局唯一。
     span_id: str
+
+    # 父 span 的 id。None = 这条是根 span。导出端靠它还原调用树，
+    # 丢了它整条 trace 会变成一堆并列的兄弟节点。
     parent_span_id: str | None
+
+    # 操作名，固定几类：`llm.call` / `tool.execute` / `task.step`。
+    # 归因脚本（W4 D4）按名字找"有没有 retrieval/tool span"。
     name: str
 
     # 墙钟时间（epoch 秒）用于和日志对齐；`latency_ms` 用 monotonic 算，不受校时影响。
@@ -92,6 +102,8 @@ class InMemoryExporter:
     """测试与本地排查用：收进列表，进程退出即丢。"""
 
     def __init__(self) -> None:
+        # 收到的全部 span，按导出顺序追加。测试里用 `by_name` 过滤，不要按下标取——
+        # 下标依赖执行顺序，改一处埋点就会让断言莫名其妙地红。
         self.spans: list[Span] = []
 
     async def export(self, spans: list[Span]) -> None:

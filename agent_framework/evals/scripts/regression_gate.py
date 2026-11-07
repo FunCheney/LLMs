@@ -61,17 +61,26 @@ LOWER = "lower_is_better"
 
 @dataclass(frozen=True, slots=True)
 class GateRule:
-    """一条门禁规则。
+    """一条门禁规则。字段含义见下，阈值怎么来的见 `DEFAULT_RULES` 上方注释。"""
 
-    `max_regression` 是**相对**比例：0.05 表示"不许比基线差 5%"。
-    `min_absolute` 只对"越低越好"的指标有意义（延迟、成本），避免小基数过敏。
-    `required=False` 表示"基线里没有这个指标就不判"（如离线档的 judge_score）。
-    """
-
+    # 被比较的指标名，必须与 `TaskMetrics.as_dict()` 的键一致（拼错不会报错，
+    # 只会静默变成"基线里没有这个指标 → 跳过"）。
     metric: str
+
+    # `higher_is_better` / `lower_is_better`。方向写反会让"变好"被判成劣化，
+    # 这是这门禁最安静的一种失效。
     direction: str
+
+    # **相对**劣化上限：0.05 = 不许比基线差 5%。刻意不用绝对值——
+    # 不同机器跑 p95 天然有波动，绝对阈值会天天误报，最后大家学会忽略红叉。
     max_regression: float
+
+    # 绝对劣化下限，只对"越低越好"的指标有意义（延迟、成本）：
+    # 基线本身很小时（如 2ms），5% 只有 0.1ms，纯噪声就会触发。默认 0 表示不设。
     min_absolute: float = 0.0
+
+    # False = 基线里没有这个指标就不判。离线档没有 `judge_score`，
+    # 强制要求它存在等于让门禁在离线档永远红。
     required: bool = True
 
     @property
@@ -100,11 +109,23 @@ WARNING_RULES: tuple[GateRule, ...] = (
 
 @dataclass(slots=True)
 class Violation:
+    """一次越线。字段全部保留原始数字，让读 CI 日志的人能自己复算判定过程。"""
+
+    # 越线的指标名。
     metric: str
+
+    # 基线值与当前值（原始单位：秒数、比例或毫秒）。
     baseline: float
     current: float
+
+    # 相对变化比例，带符号：正数 = 变大。方向解释取决于规则，
+    # 所以它单独存而不是只存"劣化了多少"——后者会让人看不出是涨是跌。
     change_ratio: float
+
+    # 当时生效的阈值。与 `change_ratio` 一起写进报告，才说得清"差多少被判红"。
     max_regression: float
+
+    # 人读解释（"延迟 p95 从 2.29ms 涨到 30.81ms，超出 20%"）。CI 日志直接打这个。
     detail: str
 
     def as_dict(self) -> dict[str, Any]:
@@ -120,10 +141,23 @@ class Violation:
 
 @dataclass(slots=True)
 class GateVerdict:
+    """门禁结论。落盘进 CI 日志与 PR 评论，所以每个字段都要能独立解释。"""
+
+    # 是否有 `violations`。只看这一个字段决定 CI 退出码。
     passed: bool = True
+
+    # 越线项。非空即 `passed=False`。
     violations: list[Violation] = field(default_factory=list)
+
+    # 只告警不阻断的项（如 `interrupted_rate` 激增）。可靠性问题该被看见，
+    # 但不该拦住一次内容改进的合并。
     warnings: list[str] = field(default_factory=list)
+
+    # 实际比较过的指标名。**必须记**：`passed=True` 但 `compared=[]`
+    # 意味着"一个都没比"，那和"全部通过"是两件完全不同的事。
     compared: list[str] = field(default_factory=list)
+
+    # 跳过的指标及原因（基线里没有 / `required=False`）。同样是防"假绿"。
     skipped: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:

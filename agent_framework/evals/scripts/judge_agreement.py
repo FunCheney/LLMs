@@ -74,11 +74,31 @@ MIN_ANNOTATIONS = 20
 
 @dataclass(slots=True)
 class Row:
+    """一条配对记录：同一条 case 的"人工分"与"judge 分"。
+
+    一次性存三种形态的分数是刻意的：一致性系数对"用哪个"极其敏感，
+    而汇总表里只留一个数字，评审过程就不可复核了。
+    """
+
+    # 标注记录自己的 id（不是 case id）。一条 case 可能被标注多次时靠它区分。
     annotation_id: str
+
+    # 指向 golden 的 case id。用它把 golden 里的问题与引用取出来送审。
     case_id: str
+
+    # 人工标注的总体分（1–5 整数）。**这是基准**，judge 的漂移都相对它来判断。
     human: int
+
+    # judge 的加权总分（1–5 的浮点，如 4.25）。给 spearman 用——相关系数
+    # 需要连续值，把它先取整会丢掉"4.1 和 4.9 都算 4"这一层信息。
     judge: float | None
+
+    # `judge` 四舍五入到整数。给 kappa 与 MAE 用：人工标注只有整数，
+    # 不取整就等于拿两把不同刻度的尺子比。
     judge_rounded: int | None
+
+    # 判定依据（`parse_error` 或 "fact=4; grounding=3; ..."）。人工复核
+    # 那些不一致的条目时，先看的就是它。
     rationale: str
 
 

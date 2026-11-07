@@ -56,11 +56,20 @@ class LangfuseExporter:
     def __init__(
         self,
         *,
+        # Langfuse 服务地址（含 scheme）。这里会拼成 `{host}/api/public/ingestion`，
+        # 自建实例也能用，所以不从配置里硬编码 SaaS 域名。
         host: str,
+        # 项目级 API key。与 secret_key 一起 base64 成 Basic 认证头。
         public_key: str,
         secret_key: str,
+        # True = 上报 prompt / 回答**全文**。默认 False 时这些字段只上报
+        # `{len, sha256[:8]}`。打开它等于把用户输入送到第三方，属于合规决定，
+        # 必须在 ADR 里写清依据（W10 会回来查）。
         capture_content: bool = False,
+        # 单次上报超时（秒）。3s 是"比后端快一点点"的取值：再长会让主链路
+        # 在后端宕机时跟着变慢，再短会把正常的大批量上报判成失败。
         timeout_s: float = 3.0,
+        # 注入用传输层（测试里塞 `httpx.MockTransport`）。生产留 None 走默认连接池。
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self._endpoint = host.rstrip("/") + "/api/public/ingestion"

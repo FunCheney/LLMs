@@ -83,7 +83,12 @@ class LexicalSupport:
     只能横向比（同一批 case 之间），不能对外宣称"faithfulness 0.72"这种绝对结论。
     """
 
+    # 实现标识，写进 `RagasScores.method`。`lexical` 与 `llm` 的同一个数字
+    # 可信度差一个档，报告里必须显示。
     name: str = "lexical"
+
+    # 二元组覆盖率阈值：claim 的连续二字有这么大比例出现在 context 里才算支撑。
+    # 调高会更严格（漏判增加），调低会放过改写结论（误判增加）。默认 0.6。
     threshold: float = _SUPPORT_THRESHOLD
 
     async def supported(self, claim: str, contexts: Sequence[str]) -> bool:
@@ -102,8 +107,15 @@ class LLMSupport:
     要带上调用次数。
     """
 
+    # 走哪种 gateway。判蕴含这件事本身也要计成本，所以它必须是同一个网关，
+    # 不能绕过路由表裸发 HTTP（ADR-004）。
     gateway: LLMGateway
+
+    # 判定模型 alias。`None` 时在 `__post_init__` 里取 `routes["strong"].primary`——
+    # 从路由表取而不是写死模型名，换模型时这里自动跟着走。
     alias: str | None = None
+
+    # 实现标识，写进 `RagasScores.method`，用于说明这个 faithfulness 是 LLM 判的。
     name: str = "llm"
 
     def __post_init__(self) -> None:

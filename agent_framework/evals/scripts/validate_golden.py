@@ -73,8 +73,18 @@ MIN_ADVERSARIAL = 3
 
 @dataclass
 class Report:
+    """校验结果。分三桶而不是只留一个 bool：`errors` 决定退出码，`warnings` 决定
+    "这周要不要补标注"，`cases` 留给下游算难度分布。"""
+
+    # 硬错（重复 id、悬空引用、未知 kind）。任一非空即退出码 1。
     errors: list[str] = field(default_factory=list)
+
+    # 软错（难度分布不足、引用指向占位符）。不阻断合并，但要在 CI 日志里被看见——
+    # 它们不修，W4 的 faithfulness 就永远只能在一部分 case 上算。
     warnings: list[str] = field(default_factory=list)
+
+    # 解析成功的原始 case（未校验的 dict）。用来算难度/kind/tag 分布，
+    # 也用来回答"这条 id 到底存不存在"。
     cases: list[dict[str, Any]] = field(default_factory=list)
 
     def error(self, case_id: str, message: str) -> None:

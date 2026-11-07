@@ -138,17 +138,45 @@ TOOL_SYMBOLS: dict[str, tuple[str, ...]] = {
 
 @dataclass(slots=True)
 class GoldenCase:
+    """一条 golden 用例，从 jsonl 的一行还原而来。字段名与 `evals/golden/schema.md` 对齐。"""
+
+    # 用例标识，全局唯一。趋势对比、失败回查、judge 标注都靠它对上同一条。
     id: str
+
+    # 调用形态：chat / stream / tool_call / error。延迟与成功率按它分组看。
     kind: str
+
+    # 难度 1/2/3（1=单轮直答，2=需一次检索或工具，3=多步或多源引用）。
     difficulty: int
+
+    # 自由标签（research / citation / adversarial ...），用于切片统计。
     tags: tuple[str, ...]
+
+    # 路由任务名（对应 `models.yaml` 的 `tasks`），决定走哪条路由档位。
     task: str
+
+    # 离线档使用的 alias（通常是夹具模型）。**必须钉死**，否则两次跑不可比。
     model: str
+
+    # 在线档使用的 alias。离线与在线分开是因为同一 task 在两档下模型不同，
+    # 混成一个字段就必然有一档是错的。
     online_model: str
+
+    # 送进 gateway 的完整消息序列。角色与内容一起还原，不在 runner 里拼 prompt。
     messages: list[Message]
+
+    # 断言集合（text_contains / must_not_include / finish_reason / tool_calls ...）。
+    # 原样保留 dict 而不建强类型：判据种类会随周增加，建类型等于每周改一次结构。
     expect: dict[str, Any]
+
+    # 离线档的夹具段落（`fixture` + `expect`）。为 None 表示这条只能在线跑。
     offline: dict[str, Any] | None = None
+
+    # 工具声明。为 None 表示这条 case 不挂工具；空列表与 None 含义不同（后者是"没声明"）。
     tools: list[ToolSpec] | None = None
+
+    # 标注来源（`{kind, target}` 列表），供 RAGAS 与 judge 的 grounding 使用。
+    # 空元组 = 这条没有可核的出处，`faithfulness` 会返回 None 而不是 0。
     references: tuple[dict[str, Any], ...] = ()
 
     @property
@@ -239,13 +267,31 @@ def _build_case(payload: dict[str, Any]) -> GoldenCase:
 class Observation:
     """一次调用能看到的所有东西。断言只读它，不再回头改 runner。"""
 
+    # 模型最终吐出的文本。断言 `text_contains` / `must_not_include` 读它；
+    # 流式档是拼帧后的全文，不是首帧。
     text: str = ""
+
+    # 结束原因（STOP / LENGTH / TOOL_CALLS ...）。`LENGTH` 是"被截断"，
+    # 不是"答完了"，用它区分 `BUDGET` 与 `FORMAT` 两类失败。
     finish_reason: str | None = None
+
+    # 本次调用用到的工具名（按调用顺序，含重复）。用来核 `tool_calls` 断言。
     tool_names: list[str] = field(default_factory=list)
+
+    # 流式档收到的帧类型序列（delta / tool_call / done ...）。用来核帧结构断言——
+    # "内容对但帧顺序乱"在客户端就是渲染错位，`text` 看不出这个问题。
     frame_types: list[str] = field(default_factory=list)
+
+    # 上游是否声明 token 为估算值。`None` = 这条没走到计费路径（夹具/跳过）。
+    # 用它而不是直接信 `RequestLog`：断言要能在"没有日志"时也判出来。
     usage_estimated: bool | None = None
+
+    # 归一化错误码与 HTTP 状态。两者分开是因为 `error_code` 会被人为归一
+    # （`SERVER_BUSY`），而原始状态码保留现场，排查时先看它。
     error_code: str | None = None
     http_status: int | None = None
+
+    # 工具调用计数：`tool_calls` 含失败，`tool_errors` 是其中报错的子集。
     tool_calls: int = 0
     tool_errors: int = 0
 

@@ -59,10 +59,23 @@ class JudgeCase:
     一致性会很好看而毫无意义。
     """
 
+    # case 标识，只用于日志与告警定位。**不进 prompt**：模型知道"这是 golden-007"
+    # 没有任何好处，反而给了它按编号猜难度的机会。
     id: str
+
+    # 用户原始问题。judge 靠它判 `coverage`（有没有答到点上）与 `concision`
+    # （铺陈是否与问题无关）。
     question: str
+
+    # 待评审的答案正文。为空时判 1 分（空答案），不判 `parse_error`——
+    # "模型没答"是质量问题，"judge 没评成"才是链路问题。
     answer: str
+
+    # 允许引用的来源（golden 的 `references[].target`）。judge 用它判 `grounding`：
+    # 结论能不能在这些来源里找到。**不是**答案里已经引了什么。
     references: tuple[str, ...] = ()
+
+    # case 标签，随评审结果一起带出，用于"哪类题最差"的切片。不影响打分。
     tags: tuple[str, ...] = ()
 
 
@@ -70,6 +83,9 @@ class JudgeCase:
 class Judge(Protocol):
     """评审器协议。`cost`/`latency` 是协议的一部分——W11 成本看板要按 judge 分账。"""
 
+    # 实现标识（`llm` / `heuristic-keyword`）。它决定了报告里 `judge_alias` 写什么，
+    # 所以**不允许**规则基线伪装成 LLM judge——否则读者会把关键词匹配的分数
+    # 当成模型评审的结论。
     name: str
 
     async def score(self, case: JudgeCase) -> JudgeResult: ...

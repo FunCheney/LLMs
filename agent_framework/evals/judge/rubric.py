@@ -53,13 +53,23 @@ class RubricParseError(ValueError):
 class Dimension:
     """一个评分维度。
 
-    `key` 是进 JSON 与落盘的稳定标识（ASCII，改它等于改历史数据格式）；
-    `label` 只出现在 prompt 里，可以随时改文案。
+    五个字段里只有 `anchors` 真正约束模型——`key`/`label`/`question` 是容器，
+    换了它们分数不会变，但数据格式或 prompt 会变。逐个含义见字段注释。
     """
 
+    # 进 JSON 与落盘的稳定标识（ASCII）。改它等于改历史数据格式：
+    # 上一周的 `{"fact": 4}` 在新版本里会变成"未知维度"直接解析失败。
     key: str
+
+    # 只出现在 prompt 里的人读名字（"事实准确"）。可以随时改文案，不影响数据。
     label: str
+
+    # 权重，所有维度之和必须为 1.0。不是"重要性排序"：它直接乘进 overall，
+    # 和不为 1 会让总分落到 1–5 之外，报告里看着像 bug。
     weight: float
+
+    # 这个维度"评什么"的一句话说明，渲染进 prompt。必须是可判断的提问，
+    # 不能是"是否优秀"这类形容词——模型对形容词的回答就是给 4 分。
     question: str
 
     # 1/3/5 三档锚定。2/4 分由"介于两档之间"隐含，不单独写——
@@ -83,8 +93,14 @@ class Dimension:
 class Rubric:
     """一组维度 + 权重。`version` 进报告，用于解释"分数为什么变了"。"""
 
+    # 人读名字（"answer-quality"）。进报告标题，不进解析逻辑。
     name: str
+
+    # 版本号（如 `w4-v1`），随每条 `JudgeResult` 落盘。它的唯一用途是回答
+    # "这两周的 judge_score 为什么不可比"——因为中间改过 rubric。
     version: str
+
+    # 维度列表。顺序即 prompt 里的编号顺序，`overall` 按权重求和与顺序无关。
     dimensions: tuple[Dimension, ...] = field(default_factory=tuple)
 
     # 分值域固定：换成 1–10 会让历史数据不可比，且人工标注更难对齐。
@@ -161,8 +177,15 @@ class Rubric:
 class JudgeScore:
     """单个维度的得分。`rationale` 为空视为不合格：无法核对的分数不可审计。"""
 
+    # 与 `Dimension.key` 对应，用来把分数映射回维度与权重。
     key: str
+
+    # 1–5 的整数。小数被 `parse_judge_payload` 直接判为解析失败，
+    # 因为人工标注做不到小数点后一位，kappa 也就无从计算。
     score: int
+
+    # 打分依据，必须指向答案里的具体内容。为空视为不合格：
+    # 无法核对的分数不可审计，事后没人能说清"这个 3 分是怎么来的"。
     rationale: str = ""
 
 
@@ -175,11 +198,23 @@ class JudgeResult:
     后者说明答案一般。混同会让 judge 的故障伪装成质量下降。
     """
 
+    # 各维度得分。解析成功时长度恒等于 `Rubric.dimensions`（缺一个就整条失败，
+    # 不做"按已有维度重归一"）。
     scores: tuple[JudgeScore, ...] = ()
+
+    # 这次评审用的模型 alias。**必须落盘**：judge 与被评模型同源时会系统性
+    # 偏好自己的措辞风格（self-preference bias），读者要靠这个字段自己判断。
     judge_alias: str = ""
+
+    # 评审时的 rubric 版本。与当前常量不同时，说明这条分数来自旧口径。
     rubric_version: str = RUBRIC_VERSION
+
+    # 非空即"这次没评成"：模型没按 JSON 答、缺维度、分数越界、或调用直接失败。
+    # 此时 `scores` 为空、`overall()` 返回 None，**绝不补一个中间分**。
     parse_error: str | None = None
 
+    # 评审自身的开销（ms / token / 成本 / 币种）。与"被评答案"的成本分开记，
+    # W11 成本看板要能回答"judge 吃掉了多少预算"。
     latency_ms: float | None = None
     prompt_tokens: int = 0
     completion_tokens: int = 0

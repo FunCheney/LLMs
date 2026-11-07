@@ -75,21 +75,38 @@ class Signals:
     归因必须是可复核的，否则它只是换了个说法的猜测。
     """
 
+    # 归一化错误码。命中 `_UPSTREAM_CODES` / `_BUSY_CODES` 即直接归模型层（置信 0.9），
+    # 不必再看别的信号——这是唯一"看一眼就能定性"的入口。
     error_code: str | None = None
+
+    # 结束原因。`length` 指向预算/截断，`content_filter` 指向上游策略，
+    # 都不是"模型不会答"。
     finish_reason: str | None = None
 
+    # 检索层：看到几个检索 span、召回了哪些 chunk、答案实际引了哪些。
+    # 三个一起看才能区分"没检索"（spans=0）、"召回了但没用"（有 ids 无 cited）、
+    # 和"引了别的段"（cited 与 retrieved 不一致）。
     retrieval_spans: int = 0
     retrieved_ids: tuple[str, ...] = ()
     cited_ids: tuple[str, ...] = ()
 
+    # 工具层：工具 span 数量、其中参数错误次数、HTTP 错误次数。
+    # 参数错误指向 schema 描述（工具层），HTTP 错误指向工具服务本身。
     tool_spans: int = 0
     tool_arguments_error: int = 0
     tool_http_error: int = 0
 
+    # 可靠性层：重试次数与从哪个 alias fallback 过来。非 0 说明这次"答对了"
+    # 也可能是备用模型的功劳，不能把结论记到主模型头上。
     retry_count: int = 0
     fallback_from: str | None = None
+
+    # 答案长度（字符）。极短（空答案/一句拒答）与 `finish_reason=length`
+    # 一起构成"没答出来"的最强组合信号。
     answer_chars: int = 0
 
+    # 逃生口：新增信号先放这里，等某一层真的靠它判定时再提升成正式字段。
+    # 加正式字段的门槛是"至少有一个归因分支在用"。
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -103,9 +120,18 @@ class Attribution:
     - 0.0：证据不足（此时 `layer=UNKNOWN`）
     """
 
+    # 归到哪一层。`UNKNOWN` 是"证据不足"的显式表达，不是第五层：
+    # 它的存在是为了让"没查清"不被写成"查出来是模型的问题"。
     layer: Layer
+
+    # 判定依据：每条都是一个具体字段名 + 实际值（"tool_arguments_error=2"）。
+    # 不接受"看起来像"这类描述——归因必须能被别人拿着同一条 trace 复核。
     evidence: tuple[str, ...]
+
+    # 证据强度（0.0–1.0），不是主观概率。0.9=直接信号，0.6=间接推断，0.0=证据不足。
     confidence: float
+
+    # 该层的典型修法（取自 `Layer.fix_hint`）。写进报告，避免归完因没人知道下一步。
     fix: str
 
     @property
