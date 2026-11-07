@@ -40,12 +40,16 @@ DEFAULT_MAX_TOKENS = 512
 
 
 class DraftRequest(BaseModel):
+    # 一句话需求，直接作为用户消息送进模型（/v1/draft 目前不接检索）。
     brief: str = Field(min_length=1, max_length=2000, description="一句话需求")
+    # 路由用的 task 名，决定 models.yaml 里走哪个候选链（cheap / strong ...）。
     task: str = Field(default="chat", description="路由用的 task（见 models.yaml 的 tasks）")
+    # 仅调试/评测用：钉住模型 alias 跳过路由；生产环境不要传。
     model: str | None = Field(
         default=None,
         description="仅调试/评测用：钉住模型 alias；生产环境不要传",
     )
+    # 输出上限（token）。默认 512，防止一次草稿占满上下文窗口。
     max_tokens: int = Field(default=DEFAULT_MAX_TOKENS, ge=1, le=4096)
 
 
@@ -56,12 +60,20 @@ class DraftResponse(BaseModel):
     与 Day4 禁止的"直接 dump `LLMResponse`"是两件事。
     """
 
+    # 与响应头 X-Request-ID 同源，用于对账与串日志。
     request_id: str
+    # 生成的草稿正文。
     text: str
+    # 实际命中的模型 alias（我方别名，不是厂商原始模型名）。
     model: str
+    # 归一化后的结束原因（stop / length / tool_calls ...）。
     finish_reason: str
+    # 输入 token 数；与 output_tokens 一起给调用方算这次草稿的成本。
     input_tokens: int
+    # 输出 token 数。
     output_tokens: int
+    # 上游没给 usage、由 adapter 估算时为 True。
+    # 必须显式标出来：估算值混进成本报表会让数字看起来比实际精确。
     usage_estimated: bool
     latency_ms: float
 

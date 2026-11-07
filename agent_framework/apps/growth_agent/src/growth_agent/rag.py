@@ -179,10 +179,16 @@ class RagRuntime:
     里（`asyncio.run` 在已有事件循环中会直接抛 RuntimeError）。
     """
 
+    # 装配好的检索流水线，整个进程复用一份（主体按请求从 run() 传入）。
     pipeline: RetrievalPipeline
+    # 底层召回器，持有线程池 / BM25 索引，close() 里必须显式释放。
     retriever: AsyncRetriever
+    # 精排器，也持有线程池；未开精排时为 None，close() 里跳过。
     reranker: AsyncReranker | None = None
+    # 只在开了查询改写时存在：改写要打 LLM，所以另带一个 httpx 连接池，
+    # 必须由异步的 aclose() 释放（同步的 close() 里跑不了协程）。
     gateway: LLMGateway | None = None
+    # 挂在 pipeline 上的改写器（multi_query / hyde），与 gateway 成对出现。
     rewriter: QueryRewriter | None = None
 
     def close(self) -> None:

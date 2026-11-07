@@ -7,9 +7,12 @@
    默认放行意味着"忘了打标签的文档就是公开的"，而漏打标签是新文档最常见的状态。
    W6 当前语料全部没有 acl 字段，所以**运行时默认不启用 ACL**（不传 principal），
    一旦启用就按拒绝走——"没开"和"开了但谁都能看"是两件事，不能混。
-2. **过滤发生在精排之后、进 context 之前。** 放在精排之前有两个后果：
-   白花精排算力在无权内容上；以及过滤后顺序与精排名次对不上，
-   引用编号会指向"被过滤过但没重排"的位置。
+2. **过滤发生在精排之前（W6 修）。** 两个理由，第二个比第一个重要：
+   精排 20 条 cross-encoder 在本机约 4.7s，白花一半算力在无权内容上；
+   更重要的是，精排耗时随"无权限块数量"变化会形成侧信道——一个没有任何
+   权限的调用方也能从 p95 推断库里有多少他看不到的文档。过滤在前，
+   后面所有环节只看得见可见数据。精排池变小由 pipeline 的 over-fetch 补偿，
+   名次由 renumber 重编，引用编号不会错位。
 3. **判定留在应用层，不下推成 SQL。** 权限是"组集合求交"，下推成 jsonb 包含会把
    策略拆到两处（SQL 一处、Python 一处），审计时看不全。代价是向量库会多取一些
    ——pipeline 的 over-fetch 就是为这个准备的。
@@ -41,7 +44,11 @@ REASON_DENIED_NOT_MEMBER = "denied_not_member"
 class Principal:
     """调用方主体。W10 之前只有"是谁 + 属于哪些组"，不做角色与继承。"""
 
+    # 主体唯一标识（用户 id / 服务名）。用于匹配 chunk 的 acl.subjects 白名单；
+    # 不做角色解析，W10 接真鉴权后再扩展。
     subject_id: str
+    # 主体所属组集合，与 chunk 的 acl.groups 求交判定可见性。
+    # 用 frozenset：整个请求期间主体身份不该变，且判定只做集合运算。
     groups: frozenset[str] = frozenset()
 
     @classmethod
@@ -59,7 +66,11 @@ class Principal:
 class ACLDecision:
     """一次判定的结果。`reason` 让"为什么看不到"可归因，不带任何正文。"""
 
+    # 是否允许进入 context。False 时该块被丢弃，只累加 filtered_out 计数。
     allowed: bool
+    # 判定原因码（allowed_public / denied_no_acl / denied_not_member ...）。
+    # 用于审计"为什么这段没出现"，且**不含任何正文或 chunk 文本**——
+    # 把无权内容写进日志等于用日志绕过权限。
     reason: str
 
 
@@ -71,6 +82,9 @@ class ACLPolicy:
     "未标注"，按拒绝处理。要放行必须显式配置，并在 ADR 里写明理由。
     """
 
+    # 是否放行**完全没有 acl 字段**的块。False = 默认拒绝（安全默认）：
+    # 漏打标签是新文档最常见的状态，放行等于"忘打的文档自动公开"。
+    # 由 Settings.retrieval_acl_allow_unlabeled 显式传入，不在代码里改默认值。
     allow_unlabeled: bool = False
 
     def labels(self, chunk: Chunk) -> tuple[frozenset[str], frozenset[str]]:

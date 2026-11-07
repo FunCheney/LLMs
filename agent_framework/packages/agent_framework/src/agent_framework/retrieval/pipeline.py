@@ -54,6 +54,7 @@ class RetrievalDiagnostics:
     而不是笼统地记一笔"检索失败"。
     """
 
+    # 用户原始查询（改写前）。报告里靠它定位"是哪一问出了问题"。
     query: str
     # 实际用于召回的查询（第一条永远是原查询）。改写没生效时长度为 1。
     queries: tuple[str, ...]
@@ -62,7 +63,11 @@ class RetrievalDiagnostics:
     # ACL 过滤掉的条数。**只记数量不记内容**：被滤掉的正是无权查看的文本，
     # 把它写进日志等于用日志绕过权限。
     filtered_out: int
+    # 精排是否真的跑成功了。False 有两种含义（没配 reranker / 超时降级回退），
+    # 要靠 `degraded` 区分——只看这个布尔值会把"没开精排"误读成"精排失败"。
     reranked: bool
+    # 降级标记集合（rewrite_degraded / rerank_degraded / budget_exhausted）。
+    # 非空即"本次结果不是完整链路产出的"，A/B 对比时必须先把这些样本剔掉或单列。
     degraded: tuple[str, ...] = ()
     # 本次是否真的执行了 ACL 过滤。`filtered_out=0` 有两种可能（"全都有权限"与
     # "根本没过滤"），只靠条数分不出来，而这两件事在安全审计里差别巨大。
@@ -70,8 +75,12 @@ class RetrievalDiagnostics:
     # 改写耗时单独记：它是一次 LLM 调用，比另外两段贵一个量级。
     # 不记的话，"总耗时长"只能归因到"检索慢"，而真实原因可能是上游在抖。
     rewrite_ms: float = 0.0
+    # 召回耗时。多路改写时是并发执行的墙钟时间，不是各路之和。
     recall_ms: float = 0.0
+    # 精排耗时。降级时为已消耗的时间（到超时为止），不是 0——
+    # "超时花掉的 8 秒"也是延迟的一部分，藏掉它会让 p95 对不上。
     rerank_ms: float = 0.0
+    # 整链路墙钟耗时（含预算等待外的所有环节），与 budget_ms 对照看是否超支。
     total_ms: float = 0.0
 
     @property
@@ -81,7 +90,11 @@ class RetrievalDiagnostics:
 
 @dataclass(frozen=True)
 class RetrievalOutcome:
+    # 最终交给上层组装 context 的块，名次已由 renumber 重编为 1..n。
+    # 空列表是**合法结果**（没召回 / 全被 ACL 拦住），不是异常，见模块头约定。
     chunks: list[ScoredChunk] = field(default_factory=list)
+    # 本次链路诊断。为 None 只用于测试桩；正常 run() 一定带，
+    # 因为"降级了但没记录"会让 A/B 报告把低质量答案误归因到算法。
     diagnostics: RetrievalDiagnostics | None = None
 
 
@@ -116,17 +129,32 @@ class RetrievalPipeline:
     ) -> None:
         if budget_ms <= 0:
             raise ValueError("budget_ms 必须大于 0；不要用 0 表示'不限'，用一个大数")
+        # 必需：唯一真正碰向量库/BM25 的对象，失败要抛（空结果 ≠ 失败）。
         self._retriever = retriever
+        # 可选精排器。None = 不开精排，用召回/RRF 顺序；超时或报错只降级不抛。
         self._reranker = reranker
+        # 可选改写器。None = 只用原查询；它的成本与降级单独记在 diagnostics。
         self._rewriter = rewriter
+        # 构造期的 ACL 过滤器（默认 None）。真正的主体按请求从 run(acl_check=)
+        # 传入，因为 pipeline 是单例而每个请求的用户不同。
         self._acl_check = acl_check
         # 治理（质量降权 / 过期降权 / 冲突标记）在精排之后应用：
         # 精排会用 logit 覆盖 score，任何在它之前乘的权重都会被抹掉。
         self._governance = governance
+        # 整条链路的总墙钟预算（ms）。所有分段共用同一个递减的 deadline，
+        # 不是每步各给一份——否则配置写 800ms、实际可能跑 2.4s。
         self._budget_ms = budget_ms
+        # 精排单步上限（默认 8000ms）。本机 CPU 上 20 条 cross-encoder
+        # p50≈4.7s，给小了会 100% 超时降级，看起来像"精排没用"。
         self._rerank_timeout_ms = rerank_timeout_ms
+        # 改写单步上限（默认 2500ms）。一次 LLM 调用，比本地模型更容易抖；
+        # 超时就用原查询继续，绝不让整个请求失败。
         self._rewrite_timeout_ms = rewrite_timeout_ms
+        # 召回放大倍数：多取一些补偿 ACL 过滤与去重造成的损耗，
+        # 避免"有权限的结果太少、context 填不满"。
         self._recall_multiplier = recall_multiplier
+        # 送进精排的候选上限（默认 20）。它直接决定精排耗时，
+        # 调大前先看本机 p95，不要只看召回指标。
         self._rerank_candidates = rerank_candidates
 
     @property

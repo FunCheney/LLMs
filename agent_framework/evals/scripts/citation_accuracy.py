@@ -85,11 +85,20 @@ class Sample:
     准确率会恒等于 100%——那是最典型的"指标看起来很好，因为它什么都没测"。
     """
 
+    # 样本唯一 id，落盘报告与 replay 都按它对齐，不能用数组下标（顺序会变）。
     id: str
+    # 送进检索与生成的原始问题；不改写成"更适合检索"的版本——
+    # 抽样要测的正是线上真实输入，改了就等于给自己放水。
     question: str
+    # 标注的正确答案 chunk_id 集合。**部分标注**：425 块里只有 69 块有标，
+    # 所以判据是"至少一条命中"，未命中的引用走 precision 而不是直接判错。
     gold_chunk_ids: tuple[str, ...] = ()
+    # "answerable" / "should_refuse"。应拒答题 gold_chunk_ids 为空，
+    # 通过条件是"答案承认资料未覆盖且没编引用"，靠 answerable 区分两套判据。
     kind: str = "answerable"
+    # 能力切片标签（如 boundary / cross_page），报告按 tag 分组看哪类题最弱。
     tags: tuple[str, ...] = ()
+    # 人工备注：标注时发现的边界情况，不参与任何计算，只供复核时读。
     notes: str = ""
 
     @property
@@ -127,24 +136,48 @@ def load_sample(path: Path) -> list[Sample]:
 
 @dataclass
 class CaseResult:
+    """一条抽样题的实跑结果。纯数据、不依赖模型，replay 时逐位复现。"""
+
+    # 对应 Sample.id。报告按 id 与标注集 join，不用运行序号。
     id: str
+    # 本条实际问出去的原问题（与 Sample.question 相同，落盘便于单条复核）。
     question: str
+    # 模型生成的答案全文。--record 落盘时存它，replay 才不必再调模型。
     answer: str
+    # audit_citations 的结论：ok / no_citation / unknown_index /
+    # source_missing / off_target。只保留第一个失败原因，全量原因在 reasons。
     verdict: str
+    # 人类可读的失败/噪声说明（如"另有 3 条引用不在标注集内"）。
     reasons: list[str] = field(default_factory=list)
+    # 归因分类（classify_failure）：retrieval_miss / citation_miss /
+    # hallucinated_index / source_missing / off_target / blanket_citation。
+    # None 表示通过；报告按它分组回答"该修哪一层"。
     failure_kind: str | None = None
+    # 答案里 [n] 实际映射到的 chunk_id（解析成功且存在于 context 的那些）。
     cited_chunk_ids: list[str] = field(default_factory=list)
+    # 本次 context 里全部块的 chunk_id，用于区分"根本没召回"与"召回了没引"。
     context_chunk_ids: list[str] = field(default_factory=list)
+    # 标注答案的 chunk_id。与 cited 求交得 matched，与 context 求交得 gold_in_context。
     gold_chunk_ids: list[str] = field(default_factory=list)
+    # 标注段是否进入了 context。False 时失败归因到检索层，不该去改 prompt。
     gold_in_context: bool = False
+    # 检索 + 组装耗时（ms）。与 answer_ms 分开，才能看出慢在检索还是生成。
     context_ms: float = 0.0
+    # 生成耗时（ms），含 LLM 往返；p50/p95 主要由它决定。
     answer_ms: float = 0.0
+    # 生成的输入 token 数，用于汇总单次抽样成本（改写另算，见 RewriteUsage）。
     input_tokens: int = 0
+    # 生成的输出 token 数。
     output_tokens: int = 0
+    # 检索链路的降级标记（rewrite_degraded / rerank_degraded / budget_exhausted）。
+    # 有降级的样本必须能单独挑出来，否则会把"链路没跑全"算成"答案质量差"。
     degraded: list[str] = field(default_factory=list)
+    # 与 Sample.kind 一致；报告分可答题/应拒答题两套口径统计。
     kind: str = "answerable"
     # 命中标注段的引用占全部引用的比例。None = 没 ground truth（应拒答题）。
     precision: float | None = None
+    # 防作弊标记：context ≥ 4 块却把全部编号引了一遍。
+    # 这种"全引"能稳过"至少一条命中"，必须单独判失败。
     blanket: bool = False
 
     @property

@@ -61,14 +61,25 @@ NO_CONTEXT_ANSWER = "知识库里没有检索到与这个问题相关的资料�
 class KnowledgeAnswer:
     """一次有出处的回答。字段够 `/v1/answer` 直接用，不再二次加工。"""
 
+    # 最终给用户的答案正文（含 [n] 引用标记）。零召回时是固定话术，不是模型生成。
     text: str
+    # 本次编号后的 context 全文 + index→Citation 映射。引用面板与复核都读它，
+    # 编号只能从这里取，不能由调用方自己按数组下标再算一遍。
     context: CitationContext
+    # 引用体检结果（verdict / matched / unmatched / precision）。
+    # 与 text 同源产生，避免"答案与体检报告对不上"。
     audit: CitationAudit
+    # 组装过程记录：去冗余删了谁、超预算裁了谁、是否首尾重排。
+    # W7 回答"这条为什么没进上下文"靠它的 explain()。
     assembled: AssembledContext
+    # 检索链路诊断（降级、耗时、ACL 过滤条数）。零召回或测试桩时可能为 None，
+    # 所以可空；报告里 None 与"没有降级"要能区分。
     diagnostics: RetrievalDiagnostics | None = None
     # 冲突提示：非 None 表示本次 context 里存在互相矛盾的资料，
     # 答案里必须显式指出（见 governance 模块的取舍说明）。
     conflict: str | None = None
+    # 实际命中的模型 alias（不是厂商原始模型名）：换模型导致引用行为变化时，
+    # 报告能按它分组，而不是去猜是哪次路由改了。零召回时为空串。
     model: str = ""
     # 本次调用的 token 用量。带出来是为了让"每条答案多少钱"可算——
     # 抽样脚本靠它汇总成本，路由面板也靠它；不带就没法回答"RAG 贵不贵"。
@@ -98,8 +109,12 @@ class KnowledgeAnswerer:
         *,
         settings: Settings | None = None,
     ) -> None:
+        # 检索流水线（进程内单例）。按请求传入 principal，主体不进这里。
         self._pipeline = pipeline
+        # 生成用的网关，复用它的重试 / fallback / 计费 / trace。
         self._gateway = gateway
+        # 产品侧配置（top_k、token_budget、answer_temperature、治理开关等）。
+        # 允许注入是为了评测能钉住参数，不靠改全局环境变量。
         self._settings = settings or Settings()
 
     @property

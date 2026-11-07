@@ -80,6 +80,8 @@ def similarity(left: Chunk, right: Chunk) -> float:
 
 @dataclass(frozen=True)
 class DedupeResult:
+    # 去重后保留的块，保持输入顺序（名次最靠前的那条赢）。
+    # 注意这里**还没有编号**，下一步才按预算裁剪、再下一步才 build_context。
     kept: list[ScoredChunk] = field(default_factory=list)
     # 被合并掉的 chunk_id -> 保留下来的那个 chunk_id。报告要能说清"删了哪条、为什么"
     merged: dict[str, str] = field(default_factory=dict)
@@ -124,8 +126,13 @@ def deduplicate(
 
 @dataclass(frozen=True)
 class TrimResult:
+    # 预算内保留的块，是从头部开始连续的一段（前缀裁剪）：
+    # 不"跳过放不下的块去装后面更小的"，否则事后无法解释取舍。
     kept: list[ScoredChunk] = field(default_factory=list)
+    # 因超预算被裁掉的 chunk_id，从第一个放不下的位置起**整段尾部**。
+    # 只记 id 不记正文，避免报告里出现被丢弃内容。
     dropped: list[str] = field(default_factory=list)
+    # 保留块消耗的估算 token 数（粗估，误差 ±30%）；不含 reserve_tokens。
     tokens: int = 0
 
 
@@ -190,11 +197,21 @@ def order_for_attention(chunks: Sequence[ScoredChunk]) -> list[ScoredChunk]:
 class AssembledContext:
     """组装结果。每个被丢掉的块都能在 `dropped_*` 里找到原因。"""
 
+    # 最终进 context 的块，顺序是"给模型看的排布"（可能已首尾重排）。
+    # 这个顺序就是接下来 [1]..[n] 的编号顺序，之后不许再移动。
     chunks: list[ScoredChunk] = field(default_factory=list)
+    # 实际消耗的估算 token 数，与 token_budget 对照看余量；
+    # 不含留给"规则+问题+答案"的 reserve_tokens。
     tokens: int = 0
+    # 被判为近重复而合并的 chunk_id -> 保留者的 chunk_id。
+    # 与 dropped_over_budget 分开，因为两者对策不同：改切分 vs 加预算。
     duplicate_of: dict[str, str] = field(default_factory=dict)
+    # 因超预算被裁掉的 chunk_id 列表（前缀裁剪的尾部）。
     dropped_over_budget: list[str] = field(default_factory=list)
+    # 本次使用的总预算上限，落进报告，便于复算"为什么第 6 条没进"。
     token_budget: int = 0
+    # 是否做过首尾重排（lost-in-the-middle 对策）。
+    # 与"检索名次"是两件事：重排只改列表顺序，不改 ScoredChunk.rank。
     attention_ordered: bool = False
 
     @property

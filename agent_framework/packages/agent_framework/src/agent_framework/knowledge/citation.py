@@ -65,14 +65,26 @@ class Citation:
     它不是给模型看的（模型看的是 context 正文），所以截断它不影响答案质量。
     """
 
+    # 1-based 引用编号，与 context 文本里的 [n] 由**同一个循环变量**产出。
+    # 它是答案回溯到原文的唯一键，绝不能由调用方按数组位置另算。
     index: int
+    # 对应的 chunk_id。抽样核对时与标注的 gold_chunk_ids 比对，判据是 chunk 级。
     chunk_id: str
+    # 所属文档 id。增量索引按它成组删除；chunk 级标注缺失时才退到文档级判据。
     document_id: str
+    # 文档出处（URL / 仓库相对路径）。**不是检索器名**——
+    # rag_mvp 里两者共用 source，搬过来会让引用指向 "[hybrid]"。
     source_uri: str
+    # 正文前 300 字，只给人工抽样复核看，不进模型 context；
+    # 截断它不影响答案质量，所以 build_context 里固定取前 300。
     excerpt: str = ""
+    # 起始页（1-based）。与 page_end 不等时定位写成"第 3–4 页"。
     page_start: int | None = None
+    # 结束页（1-based）。None 表示单页或语料没有页码信息。
     page_end: int | None = None
+    # 章节路径，如 ("第三章", "3.2 检索")，给引用补语境。
     section_path: tuple[str, ...] = ()
+    # 文档标题（来自 metadata["document_title"]），出现在 locator 的第一段。
     title: str = ""
     # 入库时就被标记为"出处缺失"（桥接层写 `metadata["source_uri_missing"]=True`）。
     # 单独一个字段而不是只看 uri 前缀：前缀是桥接层的约定，框架不该依赖它的字面量。
@@ -114,7 +126,11 @@ class Citation:
 class CitationContext:
     """带编号的 context 文本 + 编号映射。**两者同源**，不接受外部拼装。"""
 
+    # 拼好带 "[n] 标题 | 路径 | 页码" 头部的整段参考资料文本，
+    # 由 render_prompt 塞进用户消息。顺序即编号顺序，之后不许再改。
     text: str
+    # 与 text 中编号一一对应的 Citation 元组。by_index() 从它建映射；
+    # 单独存在是为了让"引用面板"不必再去解析文本。
     citations: tuple[Citation, ...] = ()
 
     def by_index(self) -> dict[int, Citation]:
@@ -217,6 +233,8 @@ class ParsedCitations:
 
     # 按出现顺序去重后的编号。重复引用同一段只算一次。
     indices: tuple[int, ...] = ()
+    # indices 依次映射成功的 Citation，与 indices 等长、同序。
+    # 审计时按它判 source_missing 与是否命中标注段。
     citations: tuple[Citation, ...] = ()
     # 映射里查不到的编号。这是**编号错位**的直接证据，不能静默丢弃。
     unknown: tuple[int, ...] = ()
@@ -266,7 +284,11 @@ class CitationExpectation:
     等于什么都没测。
     """
 
+    # 标注的正确答案 chunk_id 集合。**部分标注**（425 块里标了 69 块），
+    # 所以"引了没标的地方"不判失败，只计入 precision。
     chunk_ids: frozenset[str] = frozenset()
+    # 文档级标注，仅在 chunk_ids 为空时启用（matches() 里的降级分支）。
+    # 本语料只有一个文档，文档级恒等于 100%，绝不能当主判据。
     document_ids: frozenset[str] = frozenset()
 
     def matches(self, citation: Citation) -> bool:
@@ -283,8 +305,12 @@ class CitationAudit:
     `verdict` 只保留第一个失败原因（报告里好读），`reasons` 全量保留（排查时好用）。
     """
 
+    # 五档结论之一：ok / no_citation / unknown_index / source_missing / off_target。
+    # 只保留**第一个**失败原因，报告里好读；全量原因在 reasons。
     verdict: str
+    # 所有人类可读的说明，包含"不判失败"的噪声引用提示。
     reasons: tuple[str, ...] = ()
+    # 原始解析结果（indices / citations / unknown），排查编号问题时看它。
     parsed: ParsedCitations = field(default_factory=ParsedCitations)
     # 命中标注段的编号。**至少一条命中就算通过**——理由见 `audit_citations`。
     matched: tuple[int, ...] = ()

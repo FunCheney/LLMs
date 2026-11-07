@@ -89,7 +89,7 @@ growth-agent/
 > **逐日执行清单（做什么 / 怎么搭骨架 / 怎么自查 / 何时交给 AI review）**：总目录见 [`docs/weekly-guide.md`](./docs/weekly-guide.md)，每周详单见 `docs/wN/wN-tasks.md`（W1–W12 均已展开）。每份都用统一骨架：承接面 → 本周骨架总览 → Gate 0 → Day1–5（目标/你要做的事/引导骨架/自检/AI 锚点）→ 周五合流 → Gate 验收表 → 易返工处 → 产出物位置 → P3 挂载点。角色约定：架构与验收由 AI 给，代码由你写，AI 不代写。
 >
 > **★ 标记说明**：W6/W7/W8/W9/W11/W12 中带 ★ 的条目，是 2026-11-04 对照两份课程大纲（《AI Agent 全栈工程师训练营》《企业级 Agent 工程架构实战营》）后抬高的验收标准，
-> 依据与逐条对齐表见 [`docs/plan-review-course-outline-gap.md`](./docs/plan-review-course-outline-gap.md)。净增约 4h，不改变各周时长与 P3 决策。
+> 依据与逐条对齐表见 [`docs/plan-review-course-outline-gap.md`](docs/w5/plan-review-course-outline-gap.md)。净增约 4h，不改变各周时长与 P3 决策。
 
 ### Week 1：LLM 适配层 + 首个纵向切片（P0）
 

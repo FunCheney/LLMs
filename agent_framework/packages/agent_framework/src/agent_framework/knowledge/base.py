@@ -32,6 +32,8 @@ class Chunk(BaseModel):
     # 所属文档。增量索引的删除传播按它成组操作（W6），不按 chunk_id 逐条删。
     document_id: str
 
+    # 块正文。引用复核、embedding、上下文组装都以它为准；切分边界变化时
+    # chunk_id 会变，比对标注靠的也是它对应的 id 而不是文本模糊匹配。
     text: str
 
     # 文档出处：URL 或仓库内相对路径。注意**不是**检索器名（见 ScoredChunk.retriever）。
@@ -81,7 +83,10 @@ class ScoredChunk(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
+    # 被引用的原始块（frozen，治理改权重时用 model_copy 造新块，不原地改）。
     chunk: Chunk
+    # 该检索器给出的原始分数，**不可跨检索器比较**（见类 docstring）。
+    # 经过 RRF 后是 RRF 分，经过精排后是 logit，经过治理后是按权重缩放的分。
     score: float
 
     # 谁召回的：dense / sparse / hybrid / rerank 或自定义实现的名字。

@@ -65,12 +65,23 @@ _WRAPPING_QUOTES = "\"'`“”‘’「」"
 
 @dataclass(frozen=True, slots=True)
 class RewriteUsage:
-    """累计用量。给日志与 A/B 报告的成本列用。"""
+    """累计用量。给日志与 A/B 报告的成本列用。
 
+    改写是**每次请求都花钱**的一类，所以成本必须能单独列出来：
+    D5 的 A/B 要回答"这点召回提升值不值这个钱"，而不是只报一个总延迟。
+    """
+
+    # 实际完成的 LLM 调用次数。0 次与"调用很便宜"在报告里靠它区分，
+    # 不靠 cost_per_call（后者在 0 次时也返回 0.0）。
     calls: int = 0
+    # 累计输入 token（system prompt + 用户问题），按响应 usage 累加，不估算。
     input_tokens: int = 0
+    # 累计输出 token（改写出的候选查询 / 假设答案）。
     output_tokens: int = 0
+    # 按 catalog 价格表算出的累计成本，保留 6 位小数。
     cost: float = 0.0
+    # 币种来自所选 cheap 模型的价格表；取不到模型时兜底 CNY。
+    # 不同币种不能直接相加，报告里必须带着它。
     currency: str = "CNY"
 
     @property
@@ -137,12 +148,17 @@ class _GatewayRewriter:
         temperature: float = REWRITE_TEMPERATURE,
         max_tokens: int = REWRITE_MAX_TOKENS,
     ) -> None:
+        # 生成用的网关，复用重试/fallback/计费；改写不打直连厂商 HTTP。
         self._gateway = gateway
         # 从路由表取而不是 `catalog.models[...]` 里挑一个 tier == cheap：
         # 路由表才是"谁来干便宜活"的唯一真相。
         self._alias = alias or gateway.catalog.routes["cheap"].primary
+        # 采样温度 0.3：0 会让三次调用产出同一批 query（多查询退化成单查询），
+        # 1.0 开始跑题。这是本机试出来的可用区间，不是理论值。
         self._temperature = temperature
+        # 单次改写输出上限（默认 160 token），防止模型写成长篇解释。
         self._max_tokens = max_tokens
+        # 以下四个是累计用量，随每次 _complete 递增，由 usage 属性汇总给 A/B 报告。
         self._calls = 0
         self._input_tokens = 0
         self._output_tokens = 0

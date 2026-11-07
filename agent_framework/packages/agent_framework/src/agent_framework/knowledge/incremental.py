@@ -48,9 +48,15 @@ class SyncAction(StrEnum):
 class DocVersion:
     """库中已有的文档版本。`content_hash` 与 `model_snapshot` 共同决定"要不要重建"。"""
 
+    # 文档 id。删除传播按它成组操作，不按 chunk_id 逐条删。
     document_id: str
+    # 库中文档内容的 sha256（normalize_content 后）。与本次哈希相同且
+    # 模型快照也相同时才走 SKIPPED 分支——那是不花 embedding 钱的关键。
     content_hash: str
+    # 版本号，每次真正重建 +1。写进报告，用于确认"这次到底有没有更新"。
     version: int = 1
+    # 建这些向量时的 "模型名:维度" 快照。空串表示旧数据没记，
+    # 与当前快照不同时**即使内容没变也必须重建**（ADR-009）。
     model_snapshot: str = ""
 
 
@@ -58,11 +64,18 @@ class DocVersion:
 class SyncResult:
     """同步结果。字段都能直接进报告，不需要再拼。"""
 
+    # 本次实际动作：created / updated / skipped / deleted，报告按它分组计数。
     action: SyncAction
+    # 目标文档 id。空 document_id 在入口就被拒，避免删除按整表匹配。
     document_id: str
+    # 同步后的版本号。SKIPPED 时是库中已有版本；DELETE 时为 0。
     version: int = 0
+    # 实际写入的块数（replace_document 返回值），不是切分出的块数——
+    # 两者不一致正是"写库被截断"的信号。
     chunks_written: int = 0
+    # 同一事务里删掉的旧块数。0 通常意味着 document_id 拼错，不是"本来就没有"。
     chunks_deleted: int = 0
+    # 墙钟耗时（ms）。SKIPPED 时只有哈希与查版本的时间，用来证明跳过确实省钱。
     elapsed_ms: float = 0.0
     # 为什么是 skipped / 为什么明明没改却重建了。空串表示"没什么可解释的"。
     note: str = ""
@@ -145,8 +158,13 @@ class IncrementalIndexer:
         *,
         model_snapshot: str | None = None,
     ) -> None:
+        # 支持 get_version / replace_document / delete_document 的存储。
+        # replace_document 必须在同一事务内删旧写新，否则会留下半新半旧。
         self._store = store
+        # 向量化器。跳过分支存在时它一次都不会被调用，这是省钱的关键。
         self._embedder = embedder
+        # "模型名:维度" 快照。允许调用方显式钉住（迁移/回放场景），
+        # 默认从 embedder 推导；与库中快照不同时强制重建。
         self._model_snapshot = model_snapshot or model_snapshot_of(embedder)
 
     @property

@@ -33,8 +33,11 @@ router = APIRouter()
 
 
 class AnswerRequest(BaseModel):
+    # 用户原始问题。1–2000 字：空串不必走检索，超长则不该直接塞给模型。
     question: str = Field(min_length=1, max_length=2000, description="要回答的问题")
+    # 覆盖默认召回条数（仅调试/评测）。None = 用 Settings.retrieval_top_k。
     top_k: int | None = Field(default=None, ge=1, le=50, description="覆盖默认召回条数")
+    # 覆盖默认 context token 预算（调试用）。用于复现"第 6 条为什么没进上下文"。
     token_budget: int | None = Field(
         default=None, ge=200, le=32000, description="覆盖默认 context 预算（调试用）"
     )
@@ -43,13 +46,21 @@ class AnswerRequest(BaseModel):
 class AnswerResponse(BaseModel):
     """手写字段，不 dump 内部 dataclass。理由同 `/v1/draft`：字段一旦出去就是契约。"""
 
+    # 与响应头 X-Request-ID 同源，调用方用它对账"我看到的是哪一次"。
     request_id: str
+    # 答案正文（含 [n]）。零召回时是固定的 NO_CONTEXT_ANSWER，不是模型生成。
     text: str
+    # 实际命中的模型 alias；零召回时为空串（没调模型）。
     model: str
+    # 是否真的基于资料回答（等价于 context 里有没有块）。
     grounded: bool
+    # 答案实际引用到的段，citation_payload() 手写投影的字典列表。
     citations: list[dict[str, Any]]
+    # 引用体检结果：verdict / reasons / matched / unmatched / precision。
     audit: dict[str, Any]
+    # 检索诊断：降级标记、各段耗时、ACL 过滤条数、候选数。
     retrieval: dict[str, Any]
+    # 冲突提示文本；None 表示本次 context 里没有互相矛盾的资料。
     conflict: str | None = None
 
 

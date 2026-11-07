@@ -119,11 +119,21 @@ class GovernancePolicy:
     A/B 跑出差异时，先看两边的策略参数是否相同。
     """
 
+    # 可信来源白名单（域名，含子域匹配）。白名单而非黑名单：
+    # 新垃圾站点永远比我们更新黑名单快；空域名（本地文件）按可信处理。
     trusted_domains: tuple[str, ...] = DEFAULT_TRUSTED_DOMAINS
+    # 未知站点权重（0.6）。乘在分数上，是"退一名"而不是滤掉。
     unknown_weight: float = UNKNOWN_WEIGHT
+    # 可信站点 / 本地自有稿件的权重（1.0），即不降权。
     trusted_weight: float = TRUSTED_WEIGHT
+    # 解析失败惩罚系数（0.8，乘法）。表格丢了的 PDF 段仍有正文，
+    # 价值低于干净段但不等于无关，所以不置 0。
     parse_failure_penalty: float = PARSE_FAILURE_PENALTY
+    # 过期衰减系数（0.5）。只降权不丢弃：旧文档仍要能进 context，
+    # 答案才能写"截至 2024 年的规定是 X"。
     expiry_decay: float = DEFAULT_EXPIRY_DECAY
+    # 总开关。关掉时 apply() 原样返回，用于 A/B 的 baseline 组——
+    # 同一个策略对象改一个字段即可，不必换一条装配链。
     enabled: bool = True
 
     def quality_weight(self, chunk: Chunk) -> float:
