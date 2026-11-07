@@ -35,3 +35,15 @@ CREATE INDEX IF NOT EXISTS rag_chunks_embedding_idx
 
 -- 治理字段（tenant / doc_type / valid_until）的粗过滤走 jsonb 包含查询
 CREATE INDEX IF NOT EXISTS rag_chunks_metadata_idx ON rag_chunks USING gin (metadata);
+
+-- 文档注册表（W6 增量索引）：让"这份文档变没变"变成一次主键查询。
+-- 不建它的话，只能扫该文档的全部 chunk 取一个 hash；文档被清空后查不到任何行，
+-- 于是内容没变也会被判成首次入库，每次全量重嵌。
+CREATE TABLE IF NOT EXISTS rag_chunks_documents (
+    document_id    text PRIMARY KEY,
+    content_hash   text NOT NULL,
+    version        integer NOT NULL,
+    model_snapshot text,
+    chunk_count    integer NOT NULL DEFAULT 0,
+    updated_at     timestamptz NOT NULL DEFAULT now()
+);

@@ -331,6 +331,38 @@ class Settings(BaseSettings):
     # pgvector 连接串。和 redis_url 一样，只走 env，不进代码。
     pgvector_dsn: SecretStr | None = None
 
+    # -- W6：溯源 / 上下文组装 / 治理 / ACL --------------------------- #
+    # 单次回答的 context 预算（token，粗估）。3000 ≈ 4800 汉字 ≈ 6–8 个块。
+    # 再大不会提升答案质量，反而触发 lost-in-the-middle。
+    retrieval_token_budget: int = Field(default=3000, gt=0)
+    # 留给"引用规则 + 问题 + 答案"的余量。不留的话参考资料会填满窗口，
+    # 表现为 finish_reason=length 与半句答案，而日志上看是"检索很成功"。
+    retrieval_context_reserve_tokens: int = Field(default=600, ge=0)
+    # 近重复合并阈值（4-gram Jaccard）。1.0 = 只合并逐字相同，0 = 全部合并。
+    retrieval_dedupe_threshold: float = Field(default=0.9, gt=0, le=1.0)
+    # 首尾放置（lost-in-the-middle 缓解）。默认开：它只改"给模型看的顺序"，
+    # 不改检索名次，所以不影响任何检索指标。
+    retrieval_attention_ordering: bool = True
+    # 每块进 context 的字符上限。太长会让前几块吃掉整个预算。
+    retrieval_citation_max_chars: int = Field(default=800, gt=0)
+    # 治理三条（质量降权 / 过期降权 / 冲突标注）。默认开：
+    # 它们只乘权重、只加提示，不删数据，关掉不会变快只会变脏。
+    retrieval_governance: bool = True
+
+    # ACL 默认**关**：当前语料没有任何 acl 标注，开了等于全拒。
+    # 但策略默认是拒绝未标注（见 acl.ACLPolicy），不要把它改成"放行"来自欺欺人——
+    # "没开 ACL" 与 "开了但谁都能看" 在审计里是两件事。
+    retrieval_acl_enabled: bool = False
+    retrieval_acl_allow_unlabeled: bool = False
+
+    # 回答用的路由档位与长度。走 models.yaml 的 tasks，不写死模型名。
+    answer_task: str = "chat"
+    answer_max_tokens: int = Field(default=800, ge=1, le=8192)
+    # 温度默认不是 0：事实型回答也需要一点措辞自由度，否则长答案会退化成模板。
+    # 但**评测必须显式设 0**（见 evals/scripts/citation_accuracy.py 的 `--temperature`）：
+    # 抽样准确率若随采样波动，同一次改动跑两遍会得到两个结论。
+    answer_temperature: float = Field(default=0.2, ge=0.0, le=2.0)
+
     openai_api_key: SecretStr | None = None
     deepseek_api_key: SecretStr | None = None
     dashscope_api_key: SecretStr | None = None

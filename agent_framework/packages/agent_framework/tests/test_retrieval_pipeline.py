@@ -380,6 +380,61 @@ async def test_acl_filter_drops_chunks_and_counts_without_leaking_text() -> None
     assert filtered.diagnostics.filtered_out == 1
 
 
+async def test_acl_runs_before_rerank() -> None:
+    """ACL 必须在精排**之前**：无权限的块不参与精排。
+
+    两个理由，第二个是这条用例真正的价值：
+
+    - 算力：精排 20 条 cross-encoder 要 4.7s，其中一半无权限就是纯浪费；
+    - 侧信道：精排耗时与降级随"无权限块数量"变化。放在精排之后，一个没有任何
+      权限的调用方也能从响应时间推断"库里有多少他看不到的文档"。
+
+    所以这里断言的是 reranker **收到的条数**，而不只是最终结果——
+    最终结果正确、但精排已经看过机密块，侧信道依然存在。
+    """
+
+    class SpyReranker(FakeReranker):
+        def __init__(self) -> None:
+            super().__init__()
+            self.seen: list[str] = []
+
+        async def rerank(self, query, chunks, *, top_k=10):
+            self.seen = [s.chunk.chunk_id for s in chunks]
+            return await super().rerank(query, chunks, top_k=top_k)
+
+    reranker = SpyReranker()
+    retriever = FakeRetriever(
+        [
+            ScoredChunk(
+                chunk=Chunk(
+                    chunk_id="secret",
+                    document_id="d1",
+                    text="机密正文",
+                    source_uri="s.md",
+                    metadata={"acl": "private"},
+                ),
+                score=1.0,
+                retriever="dense",
+                rank=1,
+            ),
+            _scored("public-a"),
+            _scored("public-b"),
+        ]
+    )
+    pipeline = RetrievalPipeline(
+        retriever,
+        reranker=reranker,
+        acl_check=lambda chunk: chunk.metadata.get("acl") != "private",
+        budget_ms=5000,
+    )
+
+    await pipeline.run("查询", top_k=3)
+
+    assert reranker.calls == 1
+    assert "secret" not in reranker.seen, "无权限的块被送进了精排"
+    assert set(reranker.seen) == {"public-a", "public-b"}
+
+
 async def test_budget_exhausted_skips_rerank() -> None:
     """预算耗尽时不该再尝试精排，否则延迟成倍超出配置值。"""
     retriever = FakeRetriever([_scored("a"), _scored("b")])

@@ -271,6 +271,22 @@ context_assemble、裁剪后编号连续性测试。我会看：裁剪有没有�
 | 8 | 知识治理 | 质量降权生效 / 过期文档降权生效 / 冲突被显式指出 |
 | 9 | 合流 | history 接上，端到端仍可跑 |
 
+#### 实际验收（2026-11-07 实跑，详见 `docs/w6/w6-acceptance.md`）
+
+| # | 结论 | 一句话证据 |
+|---|---|---|
+| 1 | **pass** | `/v1/answer` 返回 chunk_id / document_id / 页码 / 章节 / 摘录 / locator |
+| 2 | **pass** | 28/28 = 1.0000；精确率 micro 0.4286 / macro 0.4855；2/2 应拒答未编引用；`--replay` 逐位复现 |
+| 3 | **pass** | 真库：新增 A 不动 B；同内容 SKIPPED 且 embedder 零调用；重复删除返回 0 |
+| 4 | **pass** | `replace_document` 单事务；更新后旧 chunk 全消失（写 4 删 3） |
+| 5 | **pass（默认关）** | 默认拒绝未标注；过滤在精排之前；13 条单测；真鉴权在 W10 |
+| 6 | **pass（离线档）** | 裁剪后编号连续；`run_eval` success_rate 100%、回归门禁通过（p95 2.48ms） |
+| 7 | **pass** | `docs/w6/rag-tuning-checklist.md` 11 节 |
+| 8 | **partial** | 单测 15 条覆盖三条；**语料无过期/矛盾文档，端到端未跑真样本** |
+| 9 | **pass** | `evals/history/2026-W49.json` + `docs/log.md` W49 |
+
+→ **7 pass / 1 partial / 0 fail**。第 8 项差额是本周唯一明确没做完的验收项。
+
 ---
 
 ## 本周最容易返工的 6 处

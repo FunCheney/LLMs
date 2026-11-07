@@ -416,3 +416,140 @@ def _to_retrieval_result(scored: ScoredChunk) -> RetrievalResult:
         chunk=document,
         rank=scored.rank,
     )
+
+def to_vector_record(chunk: Any, embedding: Sequence[float]) -> Any:
+    """框架 `Chunk` + 向量 → rag_mvp `VectorRecord`。
+
+    结构化字段写回 metadata 是必须的：`PgVectorStore._row` 从 metadata 里取
+    `document_id`，而 `_to_record` 读回来时也只还原 metadata。少写一个字段，
+    表现为"检索结果里 document_id 是空串"，删除传播会立刻失效。
+    """
+    from rag_mvp.vector_store.vector_store_types import VectorRecord
+
+    metadata = dict(chunk.metadata)
+    metadata.update(
+        {
+            "chunk_id": chunk.chunk_id,
+            "document_id": chunk.document_id,
+            "source_uri": chunk.source_uri,
+            "page_start": chunk.page_start or 0,
+            "page_end": chunk.page_end or 0,
+            "section_path": list(chunk.section_path),
+        }
+    )
+    return VectorRecord(
+        id=chunk.chunk_id,
+        text=chunk.text,
+        metadata=metadata,
+        embedding=list(embedding),
+    )
+
+
+class AsyncDocumentStore:
+    """`PgVectorStore` 的增量同步门面，满足 `agent_framework.knowledge.DocumentStore`。
+
+    三件事都在这里做完，不让框架知道 pgvector 的存在：
+
+    - **换线程**：建索引 / 写库是阻塞调用，直接在事件循环里跑会卡住所有请求；
+    - **字段映射**：`Chunk` ↔ `VectorRecord`；
+    - **事务**：`replace_document` 在 store 侧已经用 `conn.transaction()` 包住，
+      这里只调用一次，**不拆成 delete + upsert**——拆开就失去了原子性。
+
+    单线程执行器（`max_workers=1`）是刻意的：写库本身是串行的（同一张表、
+    同一批索引），多线程只会让"第 3 个文档先写完、第 5 个后写"这种顺序问题
+    变得不可复现。要并行靠多进程，不靠这里。
+    """
+
+    def __init__(
+        self,
+        store: Any,
+        *,
+        max_workers: int = 1,
+        executor: ThreadPoolExecutor | None = None,
+    ) -> None:
+        self._store = store
+        self._owns_executor = executor is None
+        self._executor = executor or ThreadPoolExecutor(
+            max_workers=max_workers, thread_name_prefix="rag-doc-store"
+        )
+
+    @property
+    def name(self) -> str:
+        return f"docstore:{type(self._store).__name__}"
+
+    async def get_version(self, document_id: str) -> Any:
+        """返回 `DocVersion | None`。None = 库里没有这份文档（首次入库或已删）。"""
+        from agent_framework.knowledge import DocVersion
+
+        row = await self._run(self._store.get_document, document_id)
+        if row is None:
+            return None
+        return DocVersion(
+            document_id=row["document_id"],
+            content_hash=row["content_hash"],
+            version=row["version"],
+            model_snapshot=row["model_snapshot"],
+        )
+
+    async def replace_document(
+        self,
+        document_id: str,
+        chunks: Sequence[Any],
+        vectors: Sequence[Sequence[float]],
+        *,
+        version: int,
+        content_hash: str,
+        model_snapshot: str,
+    ) -> tuple[int, int]:
+        """同事务删旧写新，返回 `(写入条数, 删除条数)`。"""
+        records = [
+            to_vector_record(chunk, vector)
+            for chunk, vector in zip(chunks, vectors, strict=True)
+        ]
+        return await self._run(
+            functools.partial(
+                self._store.replace_document,
+                document_id,
+                records,
+                content_hash=content_hash,
+                version=version,
+                model_snapshot=model_snapshot,
+            )
+        )
+
+    async def delete_document(self, document_id: str) -> int:
+        return await self._run(self._store.delete_document, document_id)
+
+    async def count(self) -> int:
+        return await self._run(self._store.count)
+
+    async def _run(self, func: Any, *args: Any) -> Any:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            self._executor, functools.partial(func, *args)
+        )
+
+    def close(self) -> None:
+        if self._owns_executor:
+            self._executor.shutdown(wait=False, cancel_futures=True)
+        close = getattr(self._store, "close", None)
+        if callable(close):
+            close()
+
+
+def build_async_document_store(
+    dsn: str | None = None,
+    *,
+    table: str = "rag_chunks",
+    dimension: int = 1024,
+) -> AsyncDocumentStore:
+    """按连接串建一个增量同步用的 store。
+
+    `ensure_schema=True` 会在启动时建表（全部 IF NOT EXISTS），所以**不需要**
+    先跑 migration——但也意味着连库失败会在这里直接抛出，而不是等到第一次入库。
+    这是刻意的：增量索引连不上库时，"静默跳过"会让抽取管线以为文档已经同步。
+    """
+    from rag_mvp.vector_store.pgvector import PgVectorStore
+
+    store = PgVectorStore(dsn, table=table, dimension=dimension)
+    return AsyncDocumentStore(store)

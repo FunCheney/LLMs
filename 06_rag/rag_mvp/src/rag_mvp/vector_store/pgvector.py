@@ -57,6 +57,30 @@ CREATE INDEX IF NOT EXISTS {table}_doc_idx ON {table} (document_id);
 CREATE INDEX IF NOT EXISTS {table}_embedding_idx
     ON {table} USING hnsw (embedding vector_cosine_ops);
 CREATE INDEX IF NOT EXISTS {table}_metadata_idx ON {table} USING gin (metadata);
+
+-- 文档注册表（W6 增量索引）。存在的唯一理由是让"这份文档变没变"变成一次主键查询，
+-- 而不是"扫该文档的所有 chunk 取一个 hash"。后者在文档被清空后查不到任何东西，
+-- 于是内容没变也会被判成首次入库，每次全量重嵌。
+CREATE TABLE IF NOT EXISTS {table}_documents (
+    document_id    text PRIMARY KEY,
+    content_hash   text NOT NULL,
+    version        integer NOT NULL,
+    model_snapshot text,
+    chunk_count    integer NOT NULL DEFAULT 0,
+    updated_at     timestamptz NOT NULL DEFAULT now()
+);
+"""
+
+_DOC_UPSERT_SQL = """
+INSERT INTO {table}_documents
+    (document_id, content_hash, version, model_snapshot, chunk_count)
+VALUES (%s, %s, %s, %s, %s)
+ON CONFLICT (document_id) DO UPDATE SET
+    content_hash   = EXCLUDED.content_hash,
+    version        = EXCLUDED.version,
+    model_snapshot = EXCLUDED.model_snapshot,
+    chunk_count    = EXCLUDED.chunk_count,
+    updated_at     = now()
 """
 
 _UPSERT_SQL = """
@@ -179,10 +203,87 @@ class PgVectorStore(VectorStore):
         """按 chunk_id 幂等写入，立即持久化。"""
         self._connection().execute(_UPSERT_SQL.format(table=self.table), self._row(vector))
 
+    # -- 增量替换（W6） ----------------------------------------------------- #
+
+    def get_document(self, document_id: str) -> dict[str, Any] | None:
+        """读文档版本。没有记录返回 None（老数据没进注册表时也是 None）。"""
+        cursor = self._connection().execute(
+            f"SELECT document_id, content_hash, version, model_snapshot, chunk_count "
+            f"FROM {self.table}_documents WHERE document_id = %s",
+            (document_id,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        return {
+            "document_id": row[0],
+            "content_hash": row[1],
+            "version": int(row[2]),
+            "model_snapshot": row[3] or "",
+            "chunk_count": int(row[4]),
+        }
+
+    def replace_document(
+        self,
+        document_id: str,
+        records: list[VectorRecord],
+        *,
+        content_hash: str,
+        version: int,
+        model_snapshot: str,
+    ) -> tuple[int, int]:
+        """**同一事务**内删旧写新，返回 `(写入条数, 删除条数)`。
+
+        为什么必须同事务：中途失败若留下半新半旧，引用会指向已删除的 chunk，
+        而检索本身一切正常——这类故障只能靠翻库发现。psycopg 的
+        `conn.transaction()` 在 autocommit 连接上同样有效（它会显式 BEGIN）。
+
+        顺带把 `document_id` / `content_hash` / `model_snapshot` / `doc_version`
+        写进每个 chunk 的 metadata：检索侧读不到注册表，只能靠 chunk 自带的信息
+        判断"这段属于哪个版本的文档"。
+        """
+        if not document_id:
+            raise ValueError("document_id 不能为空：空值会删掉整表")
+
+        staged: list[tuple[VectorRecord, list[Any]]] = []
+        for record in records:
+            metadata = dict(record.metadata)
+            metadata["document_id"] = document_id
+            metadata["content_hash"] = content_hash
+            metadata["model_snapshot"] = model_snapshot
+            metadata["doc_version"] = version
+            copy = VectorRecord(
+                id=record.id,
+                text=record.text,
+                metadata=metadata,
+                embedding=list(record.embedding),
+            )
+            staged.append((copy, self._row(copy)))
+
+        upsert_sql = _UPSERT_SQL.format(table=self.table)
+        doc_sql = _DOC_UPSERT_SQL.format(table=self.table)
+        conn = self._connection()
+
+        with conn.transaction():
+            cursor = conn.execute(
+                f"DELETE FROM {self.table} WHERE document_id = %s", (document_id,)
+            )
+            deleted = int(getattr(cursor, "rowcount", 0) or 0)
+            for _record, row in staged:
+                conn.execute(upsert_sql, row)
+            conn.execute(
+                doc_sql,
+                (document_id, content_hash, version, model_snapshot, len(staged)),
+            )
+
+        return len(staged), deleted
+
     def drop(self) -> None:
         """清空表（保留结构）。索引与扩展不动，省掉重建成本。"""
         self._buffer.clear()
-        self._connection().execute(f"TRUNCATE TABLE {self.table}")
+        self._connection().execute(
+            f"TRUNCATE TABLE {self.table}; TRUNCATE TABLE {self.table}_documents"
+        )
 
     def delete_document(self, document_id: str) -> int:
         """按文档成组删除，返回删除条数。
@@ -192,10 +293,19 @@ class PgVectorStore(VectorStore):
         """
         if not document_id:
             raise ValueError("document_id 不能为空：空值会删掉全表")
-        cursor = self._connection().execute(
-            f"DELETE FROM {self.table} WHERE document_id = %s", (document_id,)
-        )
-        return int(getattr(cursor, "rowcount", 0) or 0)
+        conn = self._connection()
+        with conn.transaction():
+            cursor = conn.execute(
+                f"DELETE FROM {self.table} WHERE document_id = %s", (document_id,)
+            )
+            deleted = int(getattr(cursor, "rowcount", 0) or 0)
+            # 注册表一起删：留着会让"删了再重新入库"被误判成"内容没变"，
+            # 于是新文档永远进不了索引（版本号还停在旧值）。
+            conn.execute(
+                f"DELETE FROM {self.table}_documents WHERE document_id = %s",
+                (document_id,),
+            )
+        return deleted
 
     # -- 读侧 --------------------------------------------------------------- #
 

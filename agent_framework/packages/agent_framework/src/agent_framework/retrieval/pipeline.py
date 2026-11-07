@@ -64,6 +64,9 @@ class RetrievalDiagnostics:
     filtered_out: int
     reranked: bool
     degraded: tuple[str, ...] = ()
+    # 本次是否真的执行了 ACL 过滤。`filtered_out=0` 有两种可能（"全都有权限"与
+    # "根本没过滤"），只靠条数分不出来，而这两件事在安全审计里差别巨大。
+    acl_applied: bool = False
     # 改写耗时单独记：它是一次 LLM 调用，比另外两段贵一个量级。
     # 不记的话，"总耗时长"只能归因到"检索慢"，而真实原因可能是上游在抖。
     rewrite_ms: float = 0.0
@@ -136,7 +139,15 @@ class RetrievalPipeline:
         *,
         top_k: int = 10,
         filters: Mapping[str, object] | None = None,
+        acl_check: Callable[[Chunk], bool] | None = None,
     ) -> RetrievalOutcome:
+        """跑一次检索。
+
+        `acl_check` 是**按请求**覆盖构造期过滤器的唯一入口。ACL 的主体来自调用方
+        （每个请求不同），而 pipeline 是启动阶段建一次的单例——所以主体不能进
+        构造函数，只能从 run 传。传 None 时沿用构造期配置（可能是"不启用"）。
+        """
+
         if top_k <= 0:
             raise ValueError("top_k 必须大于 0")
 
@@ -157,6 +168,24 @@ class RetrievalPipeline:
 
         rerank_ms = 0.0
         reranked = False
+        filtered_out = 0
+        # ACL 在**精排之前**。两个理由，第二个比第一个重要得多：
+        #
+        # 1. 算力：精排 20 条 cross-encoder 在本机要 4.7s。若其中一半是调用方无权
+        #    查看的块，这 2 秒是纯浪费——而且把"无权限文档多"变成了"检索变慢"，
+        #    运维会去查模型而不是查权限。
+        # 2. 侧信道：精排耗时与降级行为会随候选里无权限块的数量变化。放在精排之后，
+        #    一个没有任何权限的调用方也能从 p95 变化推断"库里有多少他看不到的文档"。
+        #    过滤在前，后面所有环节只看得见可见数据。
+        #
+        # 代价：精排池可能因为过滤而变小。这由 `recall_multiplier` 的 over-fetch 补偿
+        #    （见上面 recall_k 的注释），而不是靠"先精排再过滤"来凑条数。
+        checker = acl_check if acl_check is not None else self._acl_check
+        if checker is not None:
+            kept = [scored for scored in candidates if checker(scored.chunk)]
+            filtered_out = len(candidates) - len(kept)
+            candidates = kept
+
         if self._reranker is not None and len(candidates) > 1:
             remaining_ms = (deadline - time.perf_counter()) * 1000.0
             if remaining_ms <= 0:
@@ -172,12 +201,6 @@ class RetrievalPipeline:
                 else:
                     candidates = reranked_result
                     reranked = True
-
-        filtered_out = 0
-        if self._acl_check is not None:
-            kept = [scored for scored in candidates if self._acl_check(scored.chunk)]
-            filtered_out = len(candidates) - len(kept)
-            candidates = kept
 
         if self._governance is not None and candidates:
             candidates = list(self._governance(candidates))
@@ -201,6 +224,7 @@ class RetrievalPipeline:
             filtered_out=filtered_out,
             reranked=reranked,
             degraded=tuple(degraded),
+            acl_applied=checker is not None,
             rewrite_ms=round(rewrite_ms, 2),
             recall_ms=round(recall_ms, 2),
             rerank_ms=round(rerank_ms, 2),

@@ -27,6 +27,7 @@ from pathlib import Path
 
 from agent_framework.bootstrap import build_gateway
 from agent_framework.config import Settings
+from agent_framework.knowledge import GovernancePolicy
 from agent_framework.llm.client import LLMGateway
 from agent_framework.retrieval import MultiQueryRewriter, QueryRewriter, RetrievalPipeline
 from rag_mvp.contrib.agent_framework import (
@@ -97,6 +98,7 @@ def build_pipeline(
     *,
     reranker: AsyncReranker | None = None,
     rewriter: QueryRewriter | None = None,
+    governance: GovernancePolicy | None = None,
     settings: Settings | None = None,
 ) -> RetrievalPipeline:
     """把 `Settings` 的检索段翻译成 `RetrievalPipeline` 参数。
@@ -105,12 +107,21 @@ def build_pipeline(
     "同样口径、不同配置"的 A/B，如果它自己再写一遍 `budget_ms=...` 这串参数，
     那是两份可能漂移的真相：改了这里忘了那里，报告上的数字就不再是生产数字。
     所以评测只允许改 `Settings`，装配走同一个函数。
+
+    治理（W6）也在这里挂：它乘的是**分数**，必须与评测口径同源——
+    否则 A/B 报告里的排序差异会分不清是检索变强了还是治理降权变了。
     """
+
     resolved = settings or Settings()
+    policy = governance
+    if policy is None and resolved.retrieval_governance:
+        policy = GovernancePolicy()
+
     return RetrievalPipeline(
         retriever,
         reranker=reranker,
         rewriter=rewriter,
+        governance=policy,
         budget_ms=resolved.retrieval_budget_ms,
         rerank_timeout_ms=resolved.retrieval_rerank_timeout_ms,
         rewrite_timeout_ms=resolved.retrieval_rewrite_timeout_ms,
@@ -242,7 +253,7 @@ def build_runtime(settings: Settings | None = None) -> RagRuntime:
     )
 
     logger.info(
-        "retrieval ready: mode=%s store=%s rerank=%s rewrite=%s budget=%.0fms",
+        "retrieval ready: mode=%s store=%s rerank=%s rewrite=%s governance=%s budget=%.0fms",
         resolved.retrieval_mode,
         resolved.vector_store,
         # 开精排时直接打出超时值：`rerank=True budget=800ms` 这种组合本身就是
@@ -253,6 +264,9 @@ def build_runtime(settings: Settings | None = None) -> RagRuntime:
             else "off"
         ),
         resolved.retrieval_rewrite,
+        # 治理默认开：它只乘权重不删数据，但"开没开"会影响同一 query 的排序，
+        # A/B 时必须能从日志确认两边一致。
+        "on" if resolved.retrieval_governance else "off",
         resolved.retrieval_budget_ms,
     )
     return RagRuntime(

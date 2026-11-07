@@ -8,5 +8,5 @@ chat_router 和 task_router 的关系是什么。
 6. submit_task 提交到队列中的任务是如何执行的
 7. task_queue 处理使用 InMemoryTaskQueue，还有其他的实现吗？如果有如何接入，如果没有如何实现并接入
 7. 重写查询不能再 06_rag/rag_mvp/src/rag_mvp/pre_query 中实现吗？
-8. 
+8. 给w5和w6中用到的类的字段添加注释
 9. 梳理一个整体的架构图出来
