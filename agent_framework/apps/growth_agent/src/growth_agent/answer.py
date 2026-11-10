@@ -21,9 +21,19 @@ prompt 由产品层写（这里是增长营销），框架只提供引用**格�
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
+from typing import Any
 
 from agent_framework.config import Settings
+from agent_framework.context import (
+    ContextBudget,
+    ContextBuilder,
+    ContextItem,
+    ContextKind,
+    TrustLevel,
+    allocate,
+)
 from agent_framework.knowledge import (
     Citation,
     CitationAudit,
@@ -35,6 +45,7 @@ from agent_framework.knowledge import (
 )
 from agent_framework.llm.client import ChatCall, LLMGateway
 from agent_framework.llm.types import Message, MessageRole
+from agent_framework.observability import current_request_id
 from agent_framework.retrieval import (
     ACLPolicy,
     AssembledContext,
@@ -44,6 +55,12 @@ from agent_framework.retrieval import (
     assemble,
     make_acl_check,
 )
+
+logger = logging.getLogger(__name__)
+
+# W7 槽位化组装器。复用框架的 ContextBuilder：排布规则（system 头、
+# 历史中段、问题尾）是全局策略，不该每个产品自己写一份。
+_builder = ContextBuilder()
 
 # 产品层的说话方式。引用规则不写在这里——那是框架的 `CITATION_RULES`，
 # 换产品只需要换这段 system prompt，引用机制不变。
@@ -85,6 +102,11 @@ class KnowledgeAnswer:
     # 抽样脚本靠它汇总成本，路由面板也靠它；不带就没法回答"RAG 贵不贵"。
     input_tokens: int = 0
     output_tokens: int = 0
+    # 本次注入的记忆 key 列表（W7）。空 = 没开记忆或没召回到；
+    # 这两个字段让"记忆有没有真的进 prompt"在响应里可核对，不靠猜。
+    memory_keys: tuple[str, ...] = ()
+    # 会话历史注入的条数（W7 工作记忆视图：摘要 + 最近原文）。
+    history_messages: int = 0
 
     @property
     def grounded(self) -> bool:
@@ -99,6 +121,33 @@ class KnowledgeAnswer:
         return self.audit.parsed.citations
 
 
+# W7 记忆/历史槽位的固定预算（token，粗估口径同框架 estimate_tokens）。
+# memory 600：3 条 × 一句偏好足够；调大前先想清楚"更多记忆"是否真的
+# 提升答案——注入的每条记忆都在稀释资料的相对注意力。
+MEMORY_SLOT_TOKENS = 600
+HISTORY_SLOT_TOKENS = 2000
+SYSTEM_SLOT_TOKENS = 400
+
+
+def _answer_budget(settings: Settings, *, token_budget: int) -> ContextBudget:
+    """回答链路的槽位预算。retrieved 跟随请求/配置（可被 token_budget
+    覆盖调试），window 取五槽之和——槽位预算加起来必须装进窗口，
+    这是 ContextBudget.validate 的前提。
+
+    tool_results=0：回答链路没有工具结果（W9 才会有），显式关掉
+    这个槽位，省下 1000 token 给检索。
+    """
+    retrieved = token_budget or settings.retrieval_token_budget
+    return ContextBudget(
+        window=SYSTEM_SLOT_TOKENS + retrieved + MEMORY_SLOT_TOKENS + HISTORY_SLOT_TOKENS,
+        system=SYSTEM_SLOT_TOKENS,
+        retrieved=retrieved,
+        memory=MEMORY_SLOT_TOKENS,
+        history=HISTORY_SLOT_TOKENS,
+        tool_results=0,
+    )
+
+
 class KnowledgeAnswerer:
     """把检索流水线与生成串起来。构造一次、全程复用。"""
 
@@ -108,6 +157,7 @@ class KnowledgeAnswerer:
         gateway: LLMGateway,
         *,
         settings: Settings | None = None,
+        memory: Any | None = None,
     ) -> None:
         # 检索流水线（进程内单例）。按请求传入 principal，主体不进这里。
         self._pipeline = pipeline
@@ -116,6 +166,9 @@ class KnowledgeAnswerer:
         # 产品侧配置（top_k、token_budget、answer_temperature、治理开关等）。
         # 允许注入是为了评测能钉住参数，不靠改全局环境变量。
         self._settings = settings or Settings()
+        # W7 记忆运行时（MEMORY=governed 时由 runtime.py 装配注入）。
+        # None = 记忆关闭（两档实验的 off 档就是它——不是"坏了"，是对照组）。
+        self._memory = memory
 
     @property
     def settings(self) -> Settings:
@@ -128,6 +181,7 @@ class KnowledgeAnswerer:
         top_k: int | None = None,
         principal: Principal | None = None,
         token_budget: int | None = None,
+        session_id: str | None = None,
     ) -> KnowledgeAnswer:
         resolved = self._settings
         # ACL 关闭时 principal 一定是 None（路由侧决定），这里不再判断开关：
@@ -171,11 +225,24 @@ class KnowledgeAnswerer:
             # 而它其实是一条指令。
             user_content = f"{user_content}\n\n{note}"
 
+        # -- W7：记忆召回与会话视图（都是可选增强，失败/缺省不挡回答） ----- #
+        memory_items: list[Any] = []
+        history: list[Message] = []
+        memory = self._memory
+        if memory is not None and resolved.memory == "governed":
+            # 召回按"当前问题"：记忆里最相关的是品牌调性/禁用词这类
+            # 偏好项，与检索命中的资料互不抢预算（各自的槽位）。
+            memory_items = await memory.recall_for_query(question)
+            if session_id:
+                history = await memory.session_view(session_id)
+
+        messages = self._build_messages(
+            user_content, question, memory_items, history,
+            token_budget=token_budget,
+        )
+
         call = ChatCall(
-            messages=[
-                Message(role=MessageRole.SYSTEM, content=ANSWER_SYSTEM_PROMPT),
-                Message(role=MessageRole.USER, content=user_content),
-            ],
+            messages=messages,
             task=resolved.answer_task,
             # 温度显式下发而不是留给厂商默认：默认值各厂商不同（0.7/1.0），
             # 换个模型答案风格就变，引用行为（尤其是"没资料就编编号"）也跟着变。
@@ -191,6 +258,12 @@ class KnowledgeAnswerer:
         # 是本末倒置——用量是运营信息，缺了就当 0。
         usage = getattr(chat.response, "usage", None)
 
+        # -- W7：会话落地（追加本轮 → 超阈值时压缩 → 显式指令才提取） ----- #
+        if memory is not None and session_id and resolved.memory == "governed":
+            await memory.record_turn(
+                session_id, question, text, request_id=current_request_id() or None
+            )
+
         return KnowledgeAnswer(
             text=text,
             context=context,
@@ -201,4 +274,69 @@ class KnowledgeAnswerer:
             model=chat.alias,
             input_tokens=getattr(usage, "input_tokens", 0) or 0,
             output_tokens=getattr(usage, "output_tokens", 0) or 0,
+            memory_keys=tuple(getattr(item, "key", "") for item in memory_items),
+            history_messages=len(history),
         )
+
+    def _build_messages(
+        self,
+        user_content: str,
+        question: str,
+        memory_items: list[Any],
+        history: list[Message],
+        *,
+        token_budget: int | None = None,
+    ) -> list[Message]:
+        """无记忆/无历史时**逐位保持 W6 的两消息结构**（回归基线不变）；
+        有记忆或历史时走 W7 的槽位化组装（system 头 + 历史中段 + 记忆/资料/问题尾）。
+
+        记忆块的信任级是 user（会话沉淀的偏好），**不进 system**：
+        混进 system 会被模型当成系统指令而不是历史信息（W10 注入防护
+        的同一条原则，提前在 Context 层立住）。
+        """
+        if not memory_items and not history:
+            return [
+                Message(role=MessageRole.SYSTEM, content=ANSWER_SYSTEM_PROMPT),
+                Message(role=MessageRole.USER, content=user_content),
+            ]
+
+        items: list[ContextItem] = [
+            ContextItem(
+                id="answer-system",
+                content=ANSWER_SYSTEM_PROMPT,
+                kind=ContextKind.SYSTEM,
+                source="growth_agent/answer.py",
+                trust=TrustLevel.SYSTEM,
+            ),
+        ]
+        for item in memory_items:
+            items.append(
+                ContextItem(
+                    id=str(getattr(item, "key", "memory")),
+                    content=f"{getattr(item, 'key', '')}: {getattr(item, 'value', '')}",
+                    kind=ContextKind.MEMORY,
+                    source=f"session:{getattr(item, 'source_session', '')}",
+                    # 召回分数归一化 Confidence 直接当相关性用（0–1 同量纲）。
+                    score=float(getattr(item, "confidence", 0.5)),
+                    trust=TrustLevel.USER,
+                )
+            )
+        for message in history:
+            content = message.content if isinstance(message.content, str) else ""
+            items.append(
+                ContextItem(
+                    id=f"history-{len(items)}",
+                    content=content,
+                    kind=ContextKind.HISTORY,
+                    source="session-history",
+                    message=message,
+                    score=0.4,  # 历史=上下文胶水：低分，超预算时最先让位
+                )
+            )
+
+        allocated = allocate(
+            items,
+            _answer_budget(self._settings, token_budget=token_budget or 0),
+        )
+        # 提问已在 render_prompt 里（user_content 尾部），不再重复追加。
+        return _builder.build(allocated, question="", retrieved_text=user_content)

@@ -41,6 +41,12 @@ class AnswerRequest(BaseModel):
     token_budget: int | None = Field(
         default=None, ge=200, le=32000, description="覆盖默认 context 预算（调试用）"
     )
+    # W7：会话 id。传入后本轮问答会追加进会话历史（工作记忆），
+    # 下轮自动带"摘要 + 最近原文"；显式记忆指令（"记住…"）会触发提取。
+    # None = 单轮问答（W6 行为，回归基线不受影响）。
+    session_id: str | None = Field(
+        default=None, min_length=1, max_length=64, description="多轮会话 id（可选）"
+    )
 
 
 class AnswerResponse(BaseModel):
@@ -62,6 +68,11 @@ class AnswerResponse(BaseModel):
     retrieval: dict[str, Any]
     # 冲突提示文本；None 表示本次 context 里没有互相矛盾的资料。
     conflict: str | None = None
+    # W7：本次注入的记忆 key（空 = 未开启记忆或未召回到）与历史条数。
+    # 让"记忆有没有真的进 prompt"在响应里可核对——记忆是可关的能力，
+    # 关掉时这里恒为空，两档实验（MEMORY=off/governed）看的就是这两列。
+    memory_keys: list[str] = Field(default_factory=list)
+    history_messages: int = 0
 
 
 def _principal(request: Request, settings: Settings) -> Principal | None:
@@ -112,6 +123,7 @@ async def answer(body: AnswerRequest, request: Request) -> JSONResponse:
         top_k=body.top_k,
         token_budget=body.token_budget,
         principal=_principal(request, settings),
+        session_id=body.session_id,
     )
 
     payload = AnswerResponse(
@@ -138,6 +150,8 @@ async def answer(body: AnswerRequest, request: Request) -> JSONResponse:
         },
         retrieval=_retrieval_payload(result.diagnostics),
         conflict=result.conflict,
+        memory_keys=list(result.memory_keys),
+        history_messages=result.history_messages,
     )
 
     return JSONResponse(payload.model_dump(mode="json"))

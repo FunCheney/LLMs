@@ -363,6 +363,28 @@ class Settings(BaseSettings):
     # 抽样准确率若随采样波动，同一次改动跑两遍会得到两个结论。
     answer_temperature: float = Field(default=0.2, ge=0.0, le=2.0)
 
+    # -- W7：记忆 / 上下文工程 ----------------------------------------- #
+    # 两档开关是实验设计的**变量**（见 docs/w7/context-cost-ab.md 实验二）：
+    # off = 关掉长期记忆，"记忆是否值得存在"要靠两档数字回答，不能靠注释。
+    # 字段名就叫 memory（env 即 MEMORY），不叫 memory_enabled——开关值
+    # 将来可能不止两档（如 "readonly"），布尔名会封死这个演进。
+    memory: Literal["off", "governed"] = "off"
+    # 长期记忆单次召回条数。3 够覆盖 brand_tone + forbidden_words + 当前主题；
+    # 调大之前先看 memory 槽位预算（600 token）装不装得下。
+    memory_recall_k: int = Field(default=3, ge=1, le=10)
+    # 低于此置信度的提取候选直接拒写（污染防线之一，另两道：来源信任级、dedupe）。
+    memory_min_confidence: float = Field(default=0.6, ge=0.0, le=1.0)
+    # 会话级压缩的 token 阈值：未压缩历史 + 现摘要超过它就触发滚动摘要。
+    # 主判据是 token 不是轮数（轮长差一个量级），summarize_after 是兜底。
+    working_memory_token_threshold: int = Field(default=6000, ge=500)
+    working_memory_summarize_after: int = Field(default=20, ge=1)
+    # 压缩后保留最近多少条消息的原文（当前问题的直接上下文，不进摘要）。
+    working_memory_keep_recent: int = Field(default=8, ge=1)
+    # tool result 截断长度（字符）。截断必须留可重新获取的句柄（见 working.py）。
+    memory_tool_result_max_chars: int = Field(default=2000, ge=100)
+    # 记忆存储的表名（pgvector namespace 隔离：与知识库表 rag_chunks 不同表）。
+    memory_table: str = "agent_memories"
+
     openai_api_key: SecretStr | None = None
     deepseek_api_key: SecretStr | None = None
     dashscope_api_key: SecretStr | None = None

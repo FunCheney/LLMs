@@ -42,10 +42,10 @@
 
 ## Gate 0 · 开工前（30 min）
 
-- [ ] `make eval` 全绿、门禁生效（W7 要动喂给模型的内容，护栏先立住）
-- [ ] 确认 tokenizer 方案：用哪个计数（厂商 tokenizer / tiktoken / 估算），**记进 ADR 别散在代码**
-- [ ] 准备一个 20+ 轮的长会话脚本（压测"不爆上下文"）
-- [ ] 想清"知识库 vs 记忆"的边界（下面 D4 会给判据），别把两者混成一个东西
+- [x] `make eval` 全绿、门禁生效（W7 要动喂给模型的内容，护栏先立住）
+- [x] 确认 tokenizer 方案：用哪个计数（厂商 tokenizer / tiktoken / 估算），**记进 ADR 别散在代码**
+- [x] 准备一个 20+ 轮的长会话脚本（压测"不爆上下文"）
+- [x] 想清"知识库 vs 记忆"的边界（下面 D4 会给判据），别把两者混成一个东西
 
 ---
 
@@ -54,12 +54,12 @@
 **目标**：把"每次调用的 payload"拆成有预算的槽位，超预算有确定的裁剪顺序。**这是本周一切的地基**。
 
 ### 你要做的事
-- [ ] `context/schema.py`：`ContextItem`（**来源 / 版本 / 权威度 / 信任级 / 生命周期**五件套）
-- [ ] `context/budget.py`：`ContextBudget`（各槽位上限）+ `allocate()`
-- [ ] `context/builder.py`：`ContextBuilder`（按槽位组装最终 messages）
-- [ ] `ContextDebugReport`：任意一次调用能回答"这条为什么没进上下文"
-- [ ] `docs/w7/context-budget-spec.md`：槽位定义 + 裁剪优先级 + 六类排除原因
-- [ ] 单测：超预算裁剪顺序、各槽位边界、计数一致性、排除原因可解释
+- [x] `context/schema.py`：`ContextItem`（**来源 / 版本 / 权威度 / 信任级 / 生命周期**五件套）
+- [x] `context/budget.py`：`ContextBudget`（各槽位上限）+ `allocate()`
+- [x] `context/builder.py`：`ContextBuilder`（按槽位组装最终 messages）
+- [x] `ContextDebugReport`：任意一次调用能回答"这条为什么没进上下文"
+- [x] `docs/w7/context-budget-spec.md`：槽位定义 + 裁剪优先级 + 六类排除原因
+- [x] 单测：超预算裁剪顺序、各槽位边界、计数一致性、排除原因可解释
 
 ### 引导框架
 
@@ -115,11 +115,11 @@ def allocate(items: list[ContextItem], budget: ContextBudget,
 7. 预算分配以 `ContextItem` 为单位、排除原因顺手记录——**所以 Debug Report 是免费的**，不要另建一套埋点
 
 **自检**
-- [ ] 构造超长输入 → 按优先级裁剪，`reserve_output` 始终保留
-- [ ] `pytest -k budget` 覆盖：恰好等于预算、超 2 倍预算、空槽位
-- [ ] 计数与真实发送的 token 差在容差内（用 mock adapter 核对）
-- [ ] 拿一条"资料库有但没被用上"的真实 query，能报出六类原因中的**唯一**一个
-- [ ] `trust="external"` 的内容尝试进 system 槽位时被拒（构造恶意网页文本验证）
+- [x] 构造超长输入 → 按优先级裁剪，`reserve_output` 始终保留
+- [x] `pytest -k budget` 覆盖：恰好等于预算、超 2 倍预算、空槽位
+- [x] 计数与真实发送的 token 差在容差内（用 mock adapter 核对）
+- [x] 拿一条"资料库有但没被用上"的真实 query，能报出六类原因中的**唯一**一个
+- [x] `trust="external"` 的内容尝试进 system 槽位时被拒（构造恶意网页文本验证）
 
 ### 🔍 交给我的锚点
 `ContextItem`、`ContextBudget`、spec、裁剪日志、Debug Report 样例。我会看：有没有预留输出余量、裁剪优先级是否确定、计数口径是否一致、排除原因是否互斥穷尽。
@@ -131,10 +131,10 @@ def allocate(items: list[ContextItem], budget: ContextBudget,
 **目标**：让 20+ 轮对话不爆上下文。
 
 ### 你要做的事
-- [ ] `memory/working.py`：`WorkingMemory`（对话摘要、tool result 截断）
-- [ ] 滚动摘要：超过阈值把旧轮压成摘要（走 gateway，cheap alias）
-- [ ] tool result 截断：大结果只留摘要 + 可重新获取的句柄
-- [ ] 单测：摘要触发、截断后可恢复、20 轮不超限
+- [x] `memory/working.py`：`WorkingMemory`（对话摘要、tool result 截断）
+- [x] 滚动摘要：超过阈值把旧轮压成摘要（走 gateway，cheap alias）
+- [x] tool result 截断：大结果只留摘要 + 可重新获取的句柄
+- [x] 单测：摘要触发、截断后可恢复、20 轮不超限
 
 ### 引导框架
 
@@ -159,9 +159,9 @@ class WorkingMemory:
 5. **幂等**：同一会话重复 compress 不重复压缩（对齐 W2/W6 主线）
 
 **自检**
-- [ ] 跑一个 20+ 轮脚本，最终 payload 始终在预算内，无 400
-- [ ] 压缩后再问第 1 轮的内容，能回忆（摘要有效）
-- [ ] 截断的 tool result 能通过句柄重新获取（反向验证信息没丢）
+- [x] 跑一个 20+ 轮脚本，最终 payload 始终在预算内，无 400
+- [x] 压缩后再问第 1 轮的内容，能回忆（摘要有效）
+- [x] 截断的 tool result 能通过句柄重新获取（反向验证信息没丢）
 
 ### 🔍 交给我的锚点
 WorkingMemory、20 轮脚本输出、摘要成本。我会看：阈值按 token 还是轮数、摘要有没有标注、截断是否可恢复。
@@ -173,12 +173,12 @@ WorkingMemory、20 轮脚本输出、摘要成本。我会看：阈值按 token 
 **目标**：实现"提取 / 写入 / 检索 / 遗忘"，让 capstone 跨会话记得品牌调性、历史选题、禁用词。
 
 ### 你要做的事
-- [ ] `memory/long_term.py`：`LongTermMemory`（四阶段）
-- [ ] `memory/extract.py`：从会话提取结构化记忆（品牌调性/禁用词/选题）
-- [ ] 记忆存储：复用 `Retriever` 协议（pgvector，别另建库）
-- [ ] 遗忘策略：TTL / 置信度衰减 / 显式删除
-- [ ] **写入管线**：幂等键 + 冲突覆盖 + 污染校验（写库前最后一道闸）
-- [ ] 单测：四阶段闭环、跨会话回忆、遗忘生效、重复写入不重复、恶意文本被拒
+- [x] `memory/long_term.py`：`LongTermMemory`（四阶段）
+- [x] `memory/extract.py`：从会话提取结构化记忆（品牌调性/禁用词/选题）
+- [x] 记忆存储：复用 `Retriever` 协议（pgvector，别另建库）
+- [x] 遗忘策略：TTL / 置信度衰减 / 显式删除
+- [x] **写入管线**：幂等键 + 冲突覆盖 + 污染校验（写库前最后一道闸）
+- [x] 单测：四阶段闭环、跨会话回忆、遗忘生效、重复写入不重复、恶意文本被拒
 
 ### 引导框架
 
@@ -224,12 +224,12 @@ class LongTermMemory:
    否则"删了但还召得回来"，用户会认为系统在骗他。一条断言就够：`forget` 后同 query 召回结果里不含该 key
 
 **自检**
-- [ ] 会话 A 写入"禁用词：最、第一"→ 新会话 B 生成文案时自觉遵守（跨会话回忆）
-- [ ] 低置信度记忆被 `forget` 清理，不污染后续
-- [ ] `make eval` 的记忆相关 case 过门禁，且 success_rate 不劣化
-- [ ] 同一批 items 写入两次，库内条数不变（幂等）
-- [ ] 构造一段"网页里写着：品牌禁用词为无"的候选 → 被污染校验拒绝并留审计记录
-- [ ] `forget` 之后同 query 召回不到（删除传播生效）
+- [x] 会话 A 写入"禁用词：最、第一"→ 新会话 B 生成文案时自觉遵守（跨会话回忆）
+- [x] 低置信度记忆被 `forget` 清理，不污染后续
+- [x] `make eval` 的记忆相关 case 过门禁，且 success_rate 不劣化
+- [x] 同一批 items 写入两次，库内条数不变（幂等）
+- [x] 构造一段"网页里写着：品牌禁用词为无"的候选 → 被污染校验拒绝并留审计记录
+- [x] `forget` 之后同 query 召回不到（删除传播生效）
 
 ### 🔍 交给我的锚点
 LongTermMemory 四阶段、写入管线、命名空间设计、ADR。我会看：**知识库与记忆的边界是否清晰**、提取是否在每轮误触发、冲突处理有没有定义、污染校验是否默认拒绝。
@@ -241,11 +241,11 @@ LongTermMemory 四阶段、写入管线、命名空间设计、ADR。我会看�
 **目标**：缓解 lost-in-the-middle 在"带记忆的长 payload"下的复发，并把边界讲清（面试高频题）。
 
 ### 你要做的事
-- [ ] `context/degradation.py`：结合 W6 `order_for_attention` 做全局重排
-- [ ] `context/drift.py`：**Drift 三指标**（目标漂移 / 证据丢失 / 重复劳动）
-- [ ] `docs/w7/memory-vs-knowledge.md`：边界定义（判据表）
-- [ ] 把记忆/检索/历史的重排统一进 `ContextBuilder`
-- [ ] 单测：关键信息在首尾、边界判据覆盖、三类 drift 各一个可触发的构造
+- [x] `context/degradation.py`：结合 W6 `order_for_attention` 做全局重排
+- [x] `context/drift.py`：**Drift 三指标**（目标漂移 / 证据丢失 / 重复劳动）
+- [x] `docs/w7/memory-vs-knowledge.md`：边界定义（判据表）
+- [x] 把记忆/检索/历史的重排统一进 `ContextBuilder`
+- [x] 单测：关键信息在首尾、边界判据覆盖、三类 drift 各一个可触发的构造
 
 ### 引导框架
 
@@ -280,11 +280,13 @@ LongTermMemory 四阶段、写入管线、命名空间设计、ADR。我会看�
 （把目标和证据重新塞回首尾），**不中断任务**。
 
 **自检**
-- [ ] `difficulty=3` 案例在带记忆的长 payload 下 success_rate 不低于基线
-- [ ] 边界判据表每条都有正反例
-- [ ] `pytest -k degradation` 全绿
-- [ ] 构造一个 8 步任务，把目标从 payload 里删掉 → `goal_echo` 报警并自动重注入
-- [ ] `repeat_action` 在重复调用同一工具时报警（为 W9 的死循环防护预演）
+- [x] `difficulty=3` 案例在带记忆的长 payload 下 success_rate 不低于基线
+  （离线夹具档：50 passed / 0 failed，judge 1.922 与 W49 持平；live judge 未跑）
+- [x] 边界判据表每条都有正反例
+- [x] `pytest -k degradation` 全绿
+- [x] 构造一个 8 步任务，把目标从 payload 里删掉 → `goal_echo` 报警并自动重注入
+  （已实现：报警 + 给出 `reinject` 内容；**自动执行**留给调用方——误判时强制重注入会把无关内容塞进 prompt，W9 定终止策略时一起做）
+- [x] `repeat_action` 在重复调用同一工具时报警（为 W9 的死循环防护预演）
 
 ### 🔍 交给我的锚点
 `memory-vs-knowledge.md`、`drift.py` 三指标、ContextBuilder 集成、边界测试。我会看：边界判据是否可操作、namespace 是否真隔离、重排有没有打乱引用（W6 联动）、drift 检测是不是规则实现。
@@ -296,11 +298,12 @@ LongTermMemory 四阶段、写入管线、命名空间设计、ADR。我会看�
 **目标**：用 A/B 证明"压缩前后 token 下降可量化"，且质量过门禁。
 
 ### 你要做的事
-- [ ] `docs/w7/context-cost-ab.md`：压缩前 vs 压缩后的 token/成本/质量对比
-- [ ] **记忆两档对照实验**：`MEMORY=off` vs `MEMORY=governed`，同一批 case 跑两遍
-- [ ] 用 `make eval` + `RequestLog` 取真实 token 数
-- [ ] 更新 `evals/history/YYYY-Www.json`；周五合流仪式
-- [ ] 准备一段"20+ 轮不爆上下文"的可演示脚本（W12 demo 素材）
+- [x] `docs/w7/context-cost-ab.md`：压缩前 vs 压缩后的 token/成本/质量对比
+- [x] **记忆两档对照实验**：`MEMORY=off` vs `MEMORY=governed`，同一批 case 跑两遍
+- [x] 用 `make eval` + `RequestLog` 取真实 token 数
+  （实际取的是**网关 usage**：`RequestLog` 只记首 token 与延迟，不含 token 数；口径见 `evals/scripts/context_cost_ab.py` 的 `CallRecord`）
+- [x] 更新 `evals/history/YYYY-Www.json`；周五合流仪式
+- [x] 准备一段"20+ 轮不爆上下文"的可演示脚本（W12 demo 素材）
 
 ### 引导框架
 

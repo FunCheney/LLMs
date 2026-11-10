@@ -38,6 +38,7 @@ from fastapi import FastAPI
 import growth_agent
 from growth_agent.routes_answer import router as answer_router
 from growth_agent.routes_draft import router as draft_router
+from growth_agent.routes_memory import router as memory_router
 from growth_agent.runtime import close_runtime
 
 
@@ -81,11 +82,14 @@ def create_app(
     app.state.rag_lock = asyncio.Lock()
     app.state.rag = None
     app.state.answerer = answerer
+    # W7：记忆运行时（MEMORY=governed 时由 ensure_answerer 惰性装配）。
+    app.state.memory = None
 
     app.add_middleware(RequestIDMiddleware)
     install_error_handlers(app)
     app.include_router(draft_router)
     app.include_router(answer_router)
+    app.include_router(memory_router)
 
     @app.get("/health")
     async def health() -> dict[str, str]:

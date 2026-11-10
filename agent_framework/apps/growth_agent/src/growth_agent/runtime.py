@@ -27,17 +27,46 @@ from fastapi import FastAPI
 from growth_agent.answer import KnowledgeAnswerer
 
 
-def _build_answerer_blocking(settings: Settings, gateway: LLMGateway) -> tuple[Any, Any]:
-    """同步部分：加载模型、装配流水线。放在线程里调用，别占事件循环。
+def _build_answerer_blocking(settings: Settings, gateway: LLMGateway) -> tuple[Any, Any, Any]:
+    """同步部分：加载模型、装配流水线与记忆。放在线程里调用，别占事件循环。
 
     `build_runtime` 内部先 `create_base_retriever`（加载 bge-m3），
     再把 Settings 翻译成 pipeline 参数——两件事都在这里，且只在这里。
+    记忆运行时（MEMORY=governed 时）复用检索链路已加载的 bge-m3
+    embedder，不再加载第二份模型。
     """
 
     from growth_agent.rag import build_runtime
 
     runtime = build_runtime(settings)
-    return runtime, KnowledgeAnswerer(runtime.pipeline, gateway, settings=settings)
+
+    memory_runtime = None
+    if settings.memory == "governed":
+        # 复用 dense 检索器的 embedder（bge-m3 已经加载过一次）。
+        # sparse 模式没有 embedder：记忆链路降级关闭并打 WARNING。
+        embedder = getattr(getattr(runtime.retriever, "_inner", None), "embedder", None)
+        if embedder is None:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "memory.governed 请求了记忆，但当前检索模式没有 embedder"
+                "（sparse/BM25 不加载模型）。记忆链路保持关闭；"
+                "要启用请设 RETRIEVAL_MODE=dense。"
+            )
+        else:
+            from growth_agent.memory import build_memory_runtime
+
+            try:
+                memory_runtime = build_memory_runtime(settings, gateway, embedder=embedder)
+            except Exception:  # noqa: BLE001 - 记忆装配失败不挡回答链路
+                logging.getLogger(__name__).warning(
+                    "memory 运行时装配失败，回答链路按 MEMORY=off 运行", exc_info=True
+                )
+
+    answerer = KnowledgeAnswerer(
+        runtime.pipeline, gateway, settings=settings, memory=memory_runtime
+    )
+    return runtime, answerer, memory_runtime
 
 
 async def ensure_answerer(app: FastAPI) -> KnowledgeAnswerer:
@@ -57,7 +86,7 @@ async def ensure_answerer(app: FastAPI) -> KnowledgeAnswerer:
         settings: Settings = app.state.settings
         gateway: LLMGateway = app.state.gateway
         try:
-            runtime, answerer = await asyncio.to_thread(
+            runtime, answerer, memory_runtime = await asyncio.to_thread(
                 _build_answerer_blocking, settings, gateway
             )
         except ImportError as exc:
@@ -73,11 +102,38 @@ async def ensure_answerer(app: FastAPI) -> KnowledgeAnswerer:
 
         app.state.rag = runtime
         app.state.answerer = answerer
+        app.state.memory = memory_runtime
         return answerer
+
+
+async def ensure_memory(app: FastAPI) -> Any:
+    """拿到记忆运行时（必要时先装配整条回答链路，因为 embedder 在它里面）。
+
+    记忆未开启（MEMORY != governed 或 sparse 无 embedder）时抛
+    ConfigError：`/v1/memory` 是运维入口，"静默空结果"会掩盖"没开"。
+    """
+    memory_runtime = getattr(app.state, "memory", None)
+    if memory_runtime is not None:
+        return memory_runtime
+
+    await ensure_answerer(app)
+    memory_runtime = getattr(app.state, "memory", None)
+    if memory_runtime is None:
+        settings: Settings = app.state.settings
+        raise ConfigError(
+            f"记忆未开启（MEMORY={settings.memory}）。要启用设 MEMORY=governed，"
+            f"且需要 dense 检索（embedder 复用）与 PGVECTOR_DSN。"
+        )
+    return memory_runtime
 
 
 async def close_runtime(app: FastAPI) -> None:
     """释放线程池与连接池。**必须在 lifespan 里调用**，否则进程退出会挂住。"""
+
+    memory_runtime = getattr(app.state, "memory", None)
+    if memory_runtime is not None:
+        memory_runtime.close()
+        app.state.memory = None
 
     runtime = getattr(app.state, "rag", None)
     if runtime is not None:
