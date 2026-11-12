@@ -1,0 +1,40 @@
+{
+  "args": {
+    "query": "增长"
+  },
+  "meta": {
+    "recorded_at": "2026-11-11T15:45:50+00:00",
+    "schema": 1,
+    "synthetic": false
+  },
+  "result": {
+    "_meta": {
+      "cost": 0.0
+    },
+    "content": [
+      {
+        "text": "\"增长\" 的检索结果（2 条）：\n1. 2026 年 B2B 内容营销基准报告 — https://example.com/b2b-content-bench-2026\n   样本 480 家企业：内容营销预算占市场预算 28%，线索转化周期中位数 94 天。\n2. 增长实验的样本量陷阱 — https://example.com/growth-sample-size\n   A/B 实验在转化率低于 3% 时需要每组至少 1.2 万样本才有 80% 功效。",
+        "type": "text"
+      }
+    ],
+    "structuredContent": {
+      "count": 2,
+      "query": "增长",
+      "results": [
+        {
+          "rank": 1,
+          "snippet": "样本 480 家企业：内容营销预算占市场预算 28%，线索转化周期中位数 94 天。",
+          "title": "2026 年 B2B 内容营销基准报告",
+          "url": "https://example.com/b2b-content-bench-2026"
+        },
+        {
+          "rank": 2,
+          "snippet": "A/B 实验在转化率低于 3% 时需要每组至少 1.2 万样本才有 80% 功效。",
+          "title": "增长实验的样本量陷阱",
+          "url": "https://example.com/growth-sample-size"
+        }
+      ]
+    }
+  },
+  "tool": "search_web"
+}

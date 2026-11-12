@@ -127,8 +127,33 @@ async def ensure_memory(app: FastAPI) -> Any:
     return memory_runtime
 
 
+async def ensure_tools(app: FastAPI) -> Any:
+    """拿到工具运行时（W8）。`TOOLS=off` 时抛 `ConfigError`。
+
+    与检索/记忆不同，工具链路**不需要加载模型**，所以没有惰性加载的收益，
+    但同惰性也无害（第一次请求时装配）。沿用惰性只有一个理由：
+    `TOOLS=governed` 但目录不可写时，错误应该出现在第一次使用时并带上
+    request_id，而不是启动时让整个进程起不来。
+    """
+    existing = getattr(app.state, "tools", None)
+    if existing is not None:
+        return existing
+
+    from growth_agent.tools import build_tool_runtime
+
+    settings: Settings = app.state.settings
+    runtime = build_tool_runtime(settings)
+    app.state.tools = runtime
+    return runtime
+
+
 async def close_runtime(app: FastAPI) -> None:
     """释放线程池与连接池。**必须在 lifespan 里调用**，否则进程退出会挂住。"""
+
+    tool_runtime = getattr(app.state, "tools", None)
+    if tool_runtime is not None:
+        tool_runtime.close()
+        app.state.tools = None
 
     memory_runtime = getattr(app.state, "memory", None)
     if memory_runtime is not None:

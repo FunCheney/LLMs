@@ -12,14 +12,15 @@
 
 ```bash
 # 1) 记忆要落库（与知识库同一个 pgvector，不同表）
-docker compose -f ops/compose.yaml up -d pgvector     # 或复用已有实例
+docker compose -f ops/docker-compose.yml up -d pgvector   # 端口 5433，用户/库都是 rag
 export PGVECTOR_DSN='postgresql://rag:rag@localhost:5433/rag'
 
 # 2) 打开记忆（默认 off：不配置就是 W6 的行为，一条 SQL 都不多跑）
 export MEMORY=governed
 
-# 3) 起服务，带 session_id 的多轮问答自动带摘要历史 + 记忆注入
-uv run agent-server
+# 3) 起服务（产品层带 /v1/answer + /v1/memory 的是 growth-agent），带 session_id 的多轮问答
+#    自动带摘要历史 + 记忆注入
+.venv/bin/growth-agent        # 或 `uv run growth-agent`；框架自带的 agent-server 只有 /v1/chat
 curl -s localhost:8000/v1/answer \
   -H 'content-type: application/json' \
   -d '{"question":"我们品牌的调性是什么？","session_id":"brand-2026"}'
@@ -191,7 +192,7 @@ result = await working.compress(session_id)  # created / updated / skipped
 .venv/bin/python scripts/demo_long_session.py            # 演示档 window=2000
 .venv/bin/python scripts/demo_long_session.py --window 8000   # 生产档（20 轮撞不穿）
 
-# 两档对照实验（真实调用，需要密钥；约 15 分钟）
+# 两档对照实验（真实调用，需要密钥；本机实测约 5 分钟）
 .venv/bin/python evals/scripts/context_cost_ab.py \
   --json evals/history/2026-W50-ab-run.json
 

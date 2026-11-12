@@ -1,0 +1,37 @@
+{
+  "args": {},
+  "meta": {
+    "recorded_at": "2026-11-11T15:45:50+00:00",
+    "schema": 1,
+    "synthetic": false
+  },
+  "result": {
+    "tools": [
+      {
+        "description": "检索公开网页，返回标题/链接/摘要。只用于公开信息；公司内部资料请用知识库检索。",
+        "inputSchema": {
+          "additionalProperties": false,
+          "properties": {
+            "max_results": {
+              "default": 5,
+              "description": "返回条数",
+              "maximum": 10,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "query": {
+              "description": "检索词，越具体越好",
+              "type": "string"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "type": "object"
+        },
+        "name": "search_web"
+      }
+    ]
+  },
+  "tool": "__list__"
+}

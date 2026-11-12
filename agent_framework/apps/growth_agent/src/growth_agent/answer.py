@@ -321,7 +321,8 @@ class KnowledgeAnswerer:
                     trust=TrustLevel.USER,
                 )
             )
-        for message in history:
+        total_history = max(len(history), 1)
+        for index, message in enumerate(history):
             content = message.content if isinstance(message.content, str) else ""
             items.append(
                 ContextItem(
@@ -330,7 +331,11 @@ class KnowledgeAnswerer:
                     kind=ContextKind.HISTORY,
                     source="session-history",
                     message=message,
-                    score=0.4,  # 历史=上下文胶水：低分，超预算时最先让位
+                    # 历史整体是"上下文胶水"（分数低于记忆与资料），但**槽位内**
+                    # 必须按新旧排序：`allocate` 从低分往高裁，分数全相同就会按
+                    # id 字典序裁（history-1 / history-10 / history-2…），
+                    # 裁掉的既不是最旧的也不是最不相关的，报告无法解释。
+                    score=0.1 + 0.4 * (index + 1) / total_history,
                 )
             )
 

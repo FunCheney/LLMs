@@ -385,6 +385,26 @@ class Settings(BaseSettings):
     # 记忆存储的表名（pgvector namespace 隔离：与知识库表 rag_chunks 不同表）。
     memory_table: str = "agent_memories"
 
+    # -- W8：工具 / Skill / MCP ---------------------------------------- #
+    # 两档开关。off = 不装配工具链路（`/v1/tools` 返回明确的"未开启"，
+    # 不是空列表——空列表会被读成"没有可用工具"，是另一个故障）。
+    tools: Literal["off", "governed"] = "off"
+    # 工具可写入的根目录。**默认是一个受限目录**而不是仓库根：
+    # 沙箱的默认策略是"只允许这个子树"，配成 `.` 等于让模型能改源码。
+    tools_workspace_root: str = "./.agent_workspace"
+    # 额外加载的 Skill 目录（逗号分隔）。新增 Skill 文件放这里 → reload 即可用。
+    tools_skills_dir: str = ""
+    # 命令白名单（逗号分隔前缀）。**默认空 = 不允许执行任何命令**：
+    # 一条默认放行的白名单，等于把"执行任意命令"当成默认能力。
+    tools_command_allow: str = ""
+    # 出网白名单（逗号分隔域名）。默认空 = 不允许出网。
+    tools_network_allow: str = ""
+    # 单条命令的硬超时与工具结果进入 context 的截断长度。
+    tools_command_timeout_s: float = Field(default=15.0, gt=0)
+    tools_max_result_chars: int = Field(default=2000, ge=200)
+    # 幂等缓存存活时间（秒）。默认 24h，与 action.py 的 DEFAULT_TTL_S 同源。
+    tools_idempotency_ttl_s: float = Field(default=86400.0, gt=0)
+
     openai_api_key: SecretStr | None = None
     deepseek_api_key: SecretStr | None = None
     dashscope_api_key: SecretStr | None = None

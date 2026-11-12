@@ -1,0 +1,34 @@
+{
+  "args": {
+    "query": "AI"
+  },
+  "meta": {
+    "recorded_at": "2026-11-11T15:45:50+00:00",
+    "schema": 1,
+    "synthetic": false
+  },
+  "result": {
+    "_meta": {
+      "cost": 0.0
+    },
+    "content": [
+      {
+        "text": "\"AI\" 的检索结果（1 条）：\n1. 生成式 AI 在营销中的落地现状 — https://example.com/genai-marketing-2026\n   调研 312 家团队：67% 已用于文案初稿，仅 19% 用于投放决策。",
+        "type": "text"
+      }
+    ],
+    "structuredContent": {
+      "count": 1,
+      "query": "AI",
+      "results": [
+        {
+          "rank": 1,
+          "snippet": "调研 312 家团队：67% 已用于文案初稿，仅 19% 用于投放决策。",
+          "title": "生成式 AI 在营销中的落地现状",
+          "url": "https://example.com/genai-marketing-2026"
+        }
+      ]
+    }
+  },
+  "tool": "search_web"
+}

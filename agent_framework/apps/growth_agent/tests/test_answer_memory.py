@@ -159,8 +159,8 @@ class TestBudgetSqueeze:
     async def test_history_squeezed_when_over_slot(self) -> None:
         """历史超槽位预算：低分历史先出局（budget_squeezed 而非硬报错）。"""
         long_history = [
-            Message(role=MessageRole.USER, content="很长的历史轮" * 300)
-            for _ in range(20)
+            Message(role=MessageRole.USER, content=f"第{i}条很长的历史轮" + "内容" * 300)
+            for i in range(20)
         ]
         memory = FakeMemoryRuntime(history=long_history)
         pipeline = FakePipeline([_scored("c1", text="正文")])
@@ -175,3 +175,8 @@ class TestBudgetSqueeze:
         assert len(messages) < 1 + 20 + 1
         assert messages[0].role is MessageRole.SYSTEM
         assert "参考资料" in (user_messages[-1].content or "")
+
+        # 裁掉的必须是最旧的：历史分数按新旧递增，低分先出局。
+        joined = "\n".join(m.content or "" for m in messages)
+        assert "第19条" in joined  # 最新一条在
+        assert "第0条" not in joined  # 最旧一条被裁

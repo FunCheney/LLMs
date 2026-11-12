@@ -478,18 +478,20 @@ def _declared_tool_schemas(request: dict[str, Any]) -> dict[str, dict[str, Any]]
 
 
 def _assert_call_matches_schema(call: Any, schemas: dict[str, dict[str, Any]]) -> None:
+    """复用框架的 `validate_arguments`（W8 D3 起是**唯一**实现）。
+
+    为什么不在测试里另写一份：执行期校验和一致性校验用两套逻辑时，
+    "测试通过但执行被拒"会变成一类查不出原因的故障。W8 起工具执行前
+    也走同一个函数，A14 因此从"纸面断言"升级成了"与线上同源"。
+    """
+
+    from agent_framework.skills.spec import validate_arguments
+
     assert call.name in schemas, f"调用了未声明的工具 '{call.name}'；已声明：{sorted(schemas)}"
 
-    parameters = schemas[call.name]
-    allowed = set((parameters.get("properties") or {}).keys())
-    required = set(parameters.get("required") or [])
+    problems = validate_arguments(schemas[call.name], call.arguments)
 
-    assert set(call.arguments) <= allowed, (
-        f"'{call.name}' 收到 schema 外的参数 {sorted(set(call.arguments) - allowed)}"
-    )
-    assert required <= set(call.arguments), (
-        f"'{call.name}' 缺少必填参数 {sorted(required - set(call.arguments))}"
-    )
+    assert problems == [], f"'{call.name}' 的参数不合 schema：{problems}"
 
 
 @pytest.mark.parametrize("provider", PROVIDERS)

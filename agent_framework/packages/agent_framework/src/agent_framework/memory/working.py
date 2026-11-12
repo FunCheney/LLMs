@@ -111,6 +111,7 @@ def make_gateway_summarizer(
     *,
     max_tokens: int = SUMMARY_MAX_TOKENS,
     usage: SummarizerUsage | None = None,
+    extra_opts: dict[str, Any] | None = None,
 ) -> SummaryFn:
     """构造走 LLMGateway 的摘要函数。单独一个工厂：测试注入假 summarizer
     时不需要假 gateway（依赖面更小）。
@@ -139,7 +140,7 @@ def make_gateway_summarizer(
             messages=[Message(role=MessageRole.USER, content=prompt)],
             task="chat",
             model=alias,
-            opts={"max_tokens": max_tokens, "temperature": 0.2},
+            opts={"max_tokens": max_tokens, "temperature": 0.2, **(extra_opts or {})},
         )
         try:
             outcome = await gateway.chat(call)

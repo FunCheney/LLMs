@@ -43,11 +43,11 @@
 
 ## Gate 0 · 开工前（30 min）
 
-- [ ] 重读 `architecture.md` §7（W1 明确不做"工具执行循环"）与 ADR-002（tool_call 单次发出）
-- [ ] 复核 conformance A14（工具调用 schema 校验）——本周执行前直接复用
-- [ ] 确认一个可抓取目标与一个搜索 provider；**先准备录制样本，别先花真钱**
-- [ ] `make eval` 全绿、门禁生效
-- [ ] 通读 W1 `tests/fixtures/` 的 mock 回放机制（本周录制回放复用它）
+- [x] 重读 `architecture.md` §7（W1 明确不做"工具执行循环"）与 ADR-002（tool_call 单次发出）
+- [x] 复核 conformance A14（工具调用 schema 校验）——本周执行前直接复用
+- [ ] 确认一个可抓取目标与一个搜索 provider；**先准备录制样本，别先花真钱**  → **部分**：录制样本已备（桩上游，确定性）；真 provider 未配凭证，见 `w8-acceptance.md` §3.1
+- [x] `make eval` 全绿、门禁生效
+- [x] 通读 W1 `tests/fixtures/` 的 mock 回放机制（本周录制回放复用它）
 
 ---
 
@@ -56,10 +56,10 @@
 **目标**：搞清 MCP 的 Server/Client、工具发现、协议边界，落一个最小 Client。**先把边界画对**，别急着封装工具。
 
 ### 你要做的事
-- [ ] `skills/mcp/client.py`：`MCPClient`（连接 server、列出工具、调用工具）
-- [ ] `skills/mcp/types.py`：MCP tool 描述 ↔ 内部 `ToolSpec` 的映射
-- [ ] `docs/w8/adr-w8-mcp-boundary.md`：协议边界 + 为什么 MCP 与 Skill 分层
-- [ ] 单测：工具发现、映射到 ToolSpec、调用超时处理
+- [x] `skills/mcp/client.py`：`MCPClient`（连接 server、列出工具、调用工具）
+- [x] `skills/mcp/types.py`：MCP tool 描述 ↔ 内部 `ToolSpec` 的映射
+- [x] `docs/w8/adr-w8-mcp-boundary.md`：协议边界 + 为什么 MCP 与 Skill 分层
+- [x] 单测：工具发现、映射到 ToolSpec、调用超时处理
 
 ### 引导框架
 
@@ -82,9 +82,9 @@ class MCPClient:
 4. 工具发现是**动态**的：server 加了工具，client 重启后就能列出（对齐检查点"新增工具不改主流程"）
 
 **自检**
-- [ ] `pytest -k mcp_client` 覆盖：发现、映射、超时
-- [ ] 用一个 fake MCP server 加一个新工具 → `list_tools` 能看到（反向验证动态发现）
-- [ ] 业务层 grep 不到 `import mcp`（边界干净）
+- [x] `pytest -k mcp_client` 覆盖：发现、映射、超时
+- [x] 用一个 fake MCP server 加一个新工具 → `list_tools` 能看到（反向验证动态发现）
+- [x] 业务层 grep 不到 `import mcp`（边界干净）
 
 ### 🔍 交给我的锚点
 MCPClient、ADR、映射测试。我会看：是否转成内部 ToolSpec、协议边界是否清楚、超时有没有做。
@@ -96,11 +96,11 @@ MCPClient、ADR、映射测试。我会看：是否转成内部 ToolSpec、协�
 **目标**：把"搜索/抓取"封装成 MCP Server，并落地**录制回放**——本周可靠性的关键。
 
 ### 你要做的事
-- [ ] `skills/servers/search_server.py`：搜索 MCP Server（工具：search_web）
-- [ ] `skills/servers/fetch_server.py`：抓取 MCP Server（工具：fetch_url）
-- [ ] `skills/replay.py`：录制回放（复用 W1 `RecordingTransport` 思路，落 `tests/fixtures/tools/`）
-- [ ] `docs/w8/adr-w8-record-replay.md`：回放策略 + 数据脱敏
-- [ ] 单测：回放命中、录制写入、脱敏
+- [x] `skills/servers/search_server.py`：搜索 MCP Server（工具：search_web）
+- [x] `skills/servers/fetch_server.py`：抓取 MCP Server（工具：fetch_url）
+- [x] `skills/replay.py`：录制回放（复用 W1 `RecordingTransport` 思路，落 `tests/fixtures/tools/`）
+- [x] `docs/w8/adr-w8-record-replay.md`：回放策略 + 数据脱敏
+- [x] 单测：回放命中、录制写入、脱敏
 
 ### 引导框架
 
@@ -122,9 +122,9 @@ class RecordedToolTransport:
 5. 真 API 调用成本进 `RequestLog`；回放调用标记 `replayed=True`，成本记 0 但**要在报告里区分**（否则 W11 成本看板失真）
 
 **自检**
-- [ ] 断网跑 `make eval` 全绿，工具调用全部走回放
-- [ ] 删掉一条 fixture → 明确报错而非联网（反向验证）
-- [ ] 录制一条含 key 的响应 → 落盘文件里 key 被打码
+- [x] 断网跑 `make eval` 全绿，工具调用全部走回放
+- [x] 删掉一条 fixture → 明确报错而非联网（反向验证）
+- [x] 录制一条含 key 的响应 → 落盘文件里 key 被打码
 
 ### 🔍 交给我的锚点
 replay 实现、ADR、断网跑 eval 输出。我会看：未命中是否真报错、脱敏是否到位、回放成本是否与真调用区分。
@@ -136,12 +136,12 @@ replay 实现、ADR、断网跑 eval 输出。我会看：未命中是否真报�
 **目标**：定义 Skill = 元数据 + 指令 + 脚本 + 参数契约 + 沙箱执行。**规范先行**，加载器明天才写。
 
 ### 你要做的事
-- [ ] `skills/spec.py`：`SkillSpec` 数据结构 + 校验（**六层结构**，见下）
-- [ ] `docs/w8/skill-spec.md`：Skill 文件布局与字段说明
-- [ ] `skills/spec` 校验器：参数契约、必需字段、危险操作声明
-- [ ] `skills/validator.py`：**SkillValidator**（"声称完成"必须给证据）
-- [ ] 把 2–3 个工具（search/fetch/…）描述成 Skill 草案（先不加载）
-- [ ] 单测：规范校验（缺字段、参数不匹配、危险声明）、Validator 拦下无证据的"已完成"
+- [x] `skills/spec.py`：`SkillSpec` 数据结构 + 校验（**六层结构**，见下）
+- [x] `docs/w8/skill-spec.md`：Skill 文件布局与字段说明
+- [x] `skills/spec` 校验器：参数契约、必需字段、危险操作声明
+- [x] `skills/validator.py`：**SkillValidator**（"声称完成"必须给证据）
+- [x] 把 2–3 个工具（search/fetch/…）描述成 Skill 草案（先不加载）
+- [x] 单测：规范校验（缺字段、参数不匹配、危险声明）、Validator 拦下无证据的"已完成"
 
 ### 引导框架
 
@@ -202,11 +202,11 @@ class SkillValidator:
    这和 W4 judge"解析失败给 None 不补分"是同一条原则：不确定就暴露，不粉饰
 
 **自检**
-- [ ] `pytest -k skill_spec` 覆盖：缺字段、参数不匹配、危险声明
-- [ ] 2–3 个 Skill 草案通过校验
-- [ ] Skill 的 `parameters` 能被 conformance A14 的校验逻辑接受
-- [ ] 构造一个"输出里没有引用但自称完成"的结果 → Validator 拦下并回喂 hint
-- [ ] 每个 Skill 草案的 `mission` 都写了"不负责什么"（只写"负责什么"等于没边界）
+- [x] `pytest -k skill_spec` 覆盖：缺字段、参数不匹配、危险声明
+- [x] 2–3 个 Skill 草案通过校验
+- [x] Skill 的 `parameters` 能被 conformance A14 的校验逻辑接受
+- [x] 构造一个"输出里没有引用但自称完成"的结果 → Validator 拦下并回喂 hint
+- [x] 每个 Skill 草案的 `mission` 都写了"不负责什么"（只写"负责什么"等于没边界）
 
 ### 🔍 交给我的锚点
 SkillSpec 六层、skill-spec.md、Validator、校验测试。我会看：permissions/dangerous 是否今天声明、parameters 是否与 A14 对齐、
@@ -219,12 +219,12 @@ SkillSpec 六层、skill-spec.md、Validator、校验测试。我会看：permis
 **目标**：注册/发现/动态加载，并把 D2 的搜索/抓取工具重构成 Skill（对齐检查点"新增不改主流程"）。
 
 ### 你要做的事
-- [ ] `skills/loader.py`：`SkillRegistry`（发现、加载、热重载、**渐进式加载**）
-- [ ] `skills/executor.py`：`SkillExecutor`（校验 → 权限 → 执行 → 回注）
-- [ ] `skills/sandbox.py`：**执行边界**（路径 / 命令 / 网络三道白名单 + 超时）
-- [ ] `skills/visibility.py`：**最小模型可见面**（按 principal + 任务阶段裁剪工具集）
-- [ ] 把 search/fetch 重构成 Skill，主流程只调 `registry` 不硬编码
-- [ ] 单测：动态加载新 Skill、执行校验、结果回注、三类越界各被拦一次
+- [x] `skills/loader.py`：`SkillRegistry`（发现、加载、热重载、**渐进式加载**）
+- [x] `skills/executor.py`：`SkillExecutor`（校验 → 权限 → 执行 → 回注）
+- [x] `skills/sandbox.py`：**执行边界**（路径 / 命令 / 网络三道白名单 + 超时）
+- [x] `skills/visibility.py`：**最小模型可见面**（按 principal + 任务阶段裁剪工具集）
+- [x] 把 search/fetch 重构成 Skill，主流程只调 `registry` 不硬编码
+- [x] 单测：动态加载新 Skill、执行校验、结果回注、三类越界各被拦一次
 
 ### 引导框架
 
@@ -284,12 +284,12 @@ CI 里跑不了，所以本周做**本地级三道白名单 + 超时**，把契�
 7. 命令白名单用**前缀匹配 + 参数级黑名单**双保险：光前缀匹配挡不住 `git push --force`
 
 **自检**
-- [ ] 新放一个 Skill 文件 → reload 后可调用，主流程代码未改（反向验证检查点）
-- [ ] 参数不合 schema → 执行前被 A14 拦下，返回确定错误
-- [ ] 大结果被截断且留句柄
-- [ ] 三个越界构造各被拦一次：写 `../outside.txt`、`rm -rf /tmp/x`、访问白名单外域名
-- [ ] 可见工具数 < 全集的 60%，且被裁剪工具调用返回 `tool_not_visible`
-- [ ] 30 个 Skill 时 `describe_all()` 的 token 总量 < 全量 `instructions` 的 20%
+- [x] 新放一个 Skill 文件 → reload 后可调用，主流程代码未改（反向验证检查点）
+- [x] 参数不合 schema → 执行前被 A14 拦下，返回确定错误
+- [x] 大结果被截断且留句柄
+- [x] 三个越界构造各被拦一次：写 `../outside.txt`、`rm -rf /tmp/x`、访问白名单外域名
+- [x] 可见工具数 < 全集的 60%，且被裁剪工具调用返回 `tool_not_visible`
+- [ ] 30 个 Skill 时 `describe_all()` 的 token 总量 < 全量 `instructions` 的 20%  → **部分**：6 个 Skill 实测 19.1%；30 个规模未实测
 
 ### 🔍 交给我的锚点
 SkillRegistry/Executor、sandbox/visibility、检查点验证、日志。我会看：执行顺序是否固定、动态加载是否真零改动、
@@ -303,13 +303,13 @@ SkillRegistry/Executor、sandbox/visibility、检查点验证、日志。我会�
 周五合流 + W8 末 P3 决策。
 
 ### 你要做的事
-- [ ] `skills/guard.py`：`PermissionGuard`（白名单 + 风险分级 + 二次确认钩子）
-- [ ] `skills/action.py`：**`ActionRuntime`**（提议 → 校验 → 授权 → 审批 → 执行 → 验真）
-- [ ] 审计日志：每次调用的工具/参数摘要/主体/结果/耗时进 `RequestLog`
-- [ ] 与 W10 HITL 预留缝：`dangerous` 动作走审批钩子（本周占位 `pending`）
-- [ ] 三个 badcase 全部拦住：重复请求 / 参数篡改 / 接口假成功
-- [ ] 更新 `evals/history/YYYY-Www.json`、`docs/log.md`；周五合流仪式
-- [ ] **W8 末 P3 决策**：余量 ≥15h 才解锁一个深入档（ROI 顺序，见 ROADEMAP §7）
+- [x] `skills/guard.py`：`PermissionGuard`（白名单 + 风险分级 + 二次确认钩子）
+- [x] `skills/action.py`：**`ActionRuntime`**（提议 → 校验 → 授权 → 审批 → 执行 → 验真）
+- [x] 审计日志：每次调用的工具/参数摘要/主体/结果/耗时进 `RequestLog`
+- [x] 与 W10 HITL 预留缝：`dangerous` 动作走审批钩子（本周占位 `pending`）
+- [x] 三个 badcase 全部拦住：重复请求 / 参数篡改 / 接口假成功
+- [x] 更新 `evals/history/YYYY-Www.json`、`docs/log.md`；周五合流仪式
+- [x] **W8 末 P3 决策**：余量 ≥15h 才解锁一个深入档（ROI 顺序，见 ROADEMAP §7）
 
 ### 引导框架
 

@@ -21,7 +21,7 @@
 | 8 | Context 可解释 | 六类排除原因互斥穷尽，任一 query 能报出唯一原因 | `test_context_budget.py::TestExclusionReasons`（含 `test_upstream_reason_not_overridden`、`explain()` 四态） | ✅ |
 | 9 | 记忆写入可信 | 幂等 / 冲突可追溯 / 污染默认拒绝 / 删除可传播 | `test_long_term_memory.py` + `test_memory_pgvector_e2e.py`（`test_idempotent_write_rowcount_unchanged`、`test_conflict_supersede_keeps_old_row`、`test_polluted_candidate_never_reaches_db`、`test_forget_deletes_rows_and_vectors`） | ✅ |
 | 10 | Drift 可检测 | 三指标各有一个可触发构造，命中只重注入不中断 | `test_context_drift.py`（10 条，三指标各 2 条正反例） | ✅ |
-| 11 | 记忆值得存在 | `off` vs `governed` 两档数字齐全，能回答"值不值" | `docs/w7/context-cost-ab.md` 实验二：通过 3/4 → 4/4，input tokens +95.5%、cost +44.9%（分母极小，结论要带量纲读） | ✅ |
+| 11 | 记忆值得存在 | `off` vs `governed` 两档数字齐全，能回答"值不值" | `docs/w7/context-cost-ab.md` 实验二：通过 3/4 → 4/4（唯一变好的是跨会话召回），input tokens +89.2%、cost +22.0%（基线仅 63 token，换成 RAG 真实 payload 约 +1.5%） | ✅ |
 | 12 | 合流 | history 接上，端到端仍可跑 | `evals/history/2026-W50.json`、`docs/log.md` W50 条目、`pytest` 794 passed / 30 skipped | ✅ |
 
 ---
@@ -34,6 +34,8 @@
 .venv/bin/python -m mypy packages/agent_framework/src/agent_framework \
   apps/growth_agent/src/growth_agent evals/scripts/context_cost_ab.py \
   scripts/demo_long_session.py                           # 74 文件 0 问题
+# 说明：`make type` 只查 pyproject 里配的 packages+apps（72 文件）；
+# 上面把两个新脚本一起纳入是更严的口径，74 即由此而来。
 
 # 全量离线用例
 .venv/bin/python -m pytest packages/agent_framework/tests/ apps/growth_agent/tests/
@@ -51,7 +53,7 @@ PGVECTOR_DSN=postgresql://rag:rag@localhost:5433/rag \
 # 演示（零密钥）
 .venv/bin/python scripts/demo_long_session.py
 
-# 两档对照实验（真实调用，约 15 分钟）
+# 两档对照实验（真实调用，本机实测约 5 分钟；需密钥 + pgvector）
 .venv/bin/python evals/scripts/context_cost_ab.py --json evals/history/2026-W50-ab-run.json
 ```
 
@@ -79,7 +81,7 @@ PGVECTOR_DSN=postgresql://rag:rag@localhost:5433/rag \
 | 项 | 状态 | 差在哪 |
 |---|---|---|
 | Gate 7 #2 的"无 400" | 部分 | 20 轮在 8000 预算口径下未撞窗（真机 256K 窗口更不会 400），所以"不爆"的证据是**预算口径判定 + 演示脚本**，不是"真的收到过 400 又修好了"。爆窗点约在第 45 轮（按增长率外推），未实测到真 400。 |
-| Gate 7 #7 的"成本下降" | 有数字但需带量纲 | 实验一的 cost 列在短会话（<3K token）里差异小（0.1618 → 0.1371 元，-15%）；压缩调用本身有成本，会话越长越划算，20 轮是**临界点附近**。报告里给了 token 曲线，比单个成本数字更能说明拐点。 |
+| Gate 7 #7 的"成本下降" | 有数字但需带量纲 | 实验一 20 轮：净成本 `0.0661 → 0.0563 元`（-14.9%，已把摘要自身 0.0083 元算进去），input tokens -31.1%、p95 -37.2%。但摘要成本占 12.5%，**拐点在 12 轮附近**：更短的会话里压缩不划算。报告给的是曲线与拐点，不是单一百分比。 |
 | 记忆的两档实验 | 已跑通 | 单次跑、4 个任务。样本量小，`pass +1` 的置信度有限；结论写的是"方向"而不是"幅度"。 |
 | live judge 档 | 未跑 | 需要稳定配额；与 W6 同一取舍，W8 一起补。 |
 

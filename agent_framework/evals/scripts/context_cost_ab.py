@@ -229,12 +229,18 @@ def cost_of(gateway: LLMGateway, alias: str, record: CallRecord) -> float:
     )
 
 
+# 思考模式必须钉死：qwen3.7-plus 默认开思考，同一条 26 字答案实测
+# 876 output tokens（思考）vs 14（不思考）。不钉住，输出侧噪声会完全盖过
+# 输入侧的优化——实验会得出"压缩没用"，而真相是"测量被另一种开销淹了"。
+PIN_OPTS: dict[str, Any] = {"thinking": False}
+
+
 async def chat_once(
     gateway: LLMGateway,
     messages: list[Message],
     *,
     alias: str,
-    max_tokens: int = 160,
+    max_tokens: int = 320,
     temperature: float = 0.2,
 ) -> tuple[str, CallRecord]:
     """发一次真实请求并读数。异常不抛：记进 record 由调用方决定怎么算。"""
@@ -243,7 +249,7 @@ async def chat_once(
         messages=messages,
         task="chat",
         model=alias,
-        opts={"max_tokens": max_tokens, "temperature": temperature},
+        opts={"max_tokens": max_tokens, "temperature": temperature, **PIN_OPTS},
     )
     record = CallRecord(
         payload_tokens=sum(estimate_tokens(text_of(m.content)) for m in messages)
@@ -376,7 +382,9 @@ async def run_exp1(
     summary_usage = SummarizerUsage()
     working = WorkingMemory(
         store,
-        summarizer=make_gateway_summarizer(gateway, usage=summary_usage),
+        summarizer=make_gateway_summarizer(
+            gateway, usage=summary_usage, extra_opts=PIN_OPTS
+        ),
         token_threshold=SUMMARY_THRESHOLD,
         keep_recent_messages=KEEP_RECENT,
         summarizer_usage=summary_usage,
@@ -830,6 +838,8 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
             "爆窗按 ContextBudget.window=8000 的产品预算口径判；本机模型真实窗口更大，"
             "未触发厂商 400",
             "实验一三个 arm 共用同一份 naive 答案作为历史，保证单变量",
+            "所有调用钉住 thinking=False：qwen 默认思考会让 output tokens 涨 60 倍，"
+            "输出侧开销会盖过输入侧对比",
         ],
     }
 
