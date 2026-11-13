@@ -1,0 +1,70 @@
+# 生产覆盖层：只暴露 443，其余端口全部收进内网。
+#
+#   cd ops && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# 为什么要这一层，而不是直接改 docker-compose.yml：
+# 基础文件是**开发者的日常**（8000/8100 直连、方便 curl），生产要的是
+# "只有一个入口、只有一种协议"（https）。混在一个文件里，迟早会有人在
+# 本地调试时把生产端口打开。
+#
+# 覆盖的两个东西：
+#   1. 端口绑定收到 127.0.0.1 —— 容器还在，但不监听公网网卡。
+#      反代在同一台机器上，走 loopback 进来。
+#   2. 加 caddy 做 TLS —— 自动申请与续期证书，不用手工 cron。
+#
+# `ports` 为什么要写 `!override`：compose 对 `ports` 这类多值字段是**拼接**，
+# 不是替换。不写 `!override`，基础文件的 "8000:8000" 会与这里的
+# "127.0.0.1:8000:8000" 同时生效，于是端口照样对公网开着——而 `docker compose
+# config` 的输出里两行都在，很容易被读成"配好了"。
+# 需要 Docker Compose ≥ 2.24.4（`!override` 从这一版起支持）。
+
+name: agent-platform
+
+services:
+  agent-server:
+    # 框架服务**不对公网提供**：它没有我方鉴权（只有产品层有），
+    # `AUTH_MODE` 挂在 growth-agent 上。把它映射到公网等于开了个后门。
+    ports: !override
+      - "127.0.0.1:8000:8000"
+
+  growth-agent:
+    ports: !override
+      - "127.0.0.1:8100:8100"
+    environment:
+      # 生产档必须开鉴权。写死在覆盖层而不是 .env 里：`.env` 会被复制到
+      # 每台开发机，而"忘了在服务器上打开鉴权"是这类事故里最常见的一种。
+      AUTH_MODE: key
+    # 生产不要挂载 .env 之外的任何宿主目录：容器里能写宿主目录，
+    # 一次目录穿越就是完整的主机权限。
+
+  redis:
+    ports: !override
+      - "127.0.0.1:6379:6379"
+
+  pgvector:
+    ports: !override
+      - "127.0.0.1:5433:5432"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      # 域名与邮箱走 env（Caddyfile 里用 {$VAR} 引用）。
+      # 域名没配时 Caddy 会拒绝启动——这是有意的：一个"启动了但证书不对"的
+      # 反代比没起更糟，它会让浏览器报证书错误而不是连接错误。
+      SITE_ADDRESS: ${SITE_ADDRESS:?SITE_ADDRESS 未设置（例：growth.example.com）}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    depends_on:
+      growth-agent:
+        condition: service_healthy
+
+volumes:
+  caddy-data:
+  caddy-config:

@@ -27,6 +27,7 @@ B 的镜像同样没装 `local` extra，原因相同——"连数据库"和"跑�
 | 6379 | redis | 形态 B | 会话存储；裸进程默认 memory，不用它 |
 | 5433 → 容器 5432 | pgvector | 形态 B / C | **宿主是 5433**，写错就连到本机别的 postgres |
 | 7233 | temporal | `--profile temporal` | W9 才用 |
+| 80 / 443 | caddy | 生产档（`-f docker-compose.prod.yml`） | 唯一对公网开放的入口，其余端口绑 127.0.0.1 |
 
 查占用：`lsof -nP -iTCP:8000 -iTCP:8100 -sTCP:LISTEN`。
 
@@ -481,6 +482,18 @@ make clean          # 只删 .pytest_tmp / 各工具缓存，不碰 .venv 与 .e
 - `ops/.env` 里 `AGENT_SERVER_URL` 目前没有任何代码读取（`/v1/draft` 是进程内调用），
   属于 W1 遗留的保守配置，接服务间 HTTP 调用时再确认是否要留
 
+### W10 补记：上线相关（2026-11-13）
+
+- **生产档 compose 没跑过**：`docker-compose.prod.yml` 的 `!override` 语法需要
+  Compose ≥ 2.24.4，本机有没有这个版本我没验证；`docker compose config` 也没跑过
+- **caddy 没起过**：`Caddyfile` 的语法、证书申请、`SITE_ADDRESS` 缺失时的拒绝行为
+  全部**未经运行验证**，只按文档写的
+- **公网可访问没验证**：没有域名、没有服务器。§10.3 那次实测是本机 127.0.0.1
+- **真实厂商 key 下的 `/v1/article` 全链路**（四次模型调用 + 三次改写）没跑过；
+  端点级端到端用的是脚本化网关（`apps/growth_agent/tests/test_article_route.py`）
+- **两位真实用户**：还没有。ROADEMAP §3.3 要求的"朋友开始用"这一环未发生，
+  W11 要的"真实反馈"因此**目前没有任何输入**
+
 ---
 
 ## 9. 一分钟自检（改完代码 / 换机器后跑这个）
@@ -506,3 +519,188 @@ curl -s --noproxy '*' localhost:8100/health
 ```
 
 全绿再动手做别的。**任何一条红着往下做，后面所有"指标变好"都不可信。**
+
+---
+
+## 10. 上线（W10）：从"能起"到"别人能用"
+
+> 这一节与前面九节的区别：前面回答"怎么跑起来"，这一节回答"**别人怎么访问到它，
+> 以及怎么证明它现在是对外可用的那个东西**"。
+
+### 10.1 三档环境，别混用
+
+| 档 | 命令 | 谁在访问 | 鉴权 |
+|---|---|---|---|
+| 开发 | `uv run uvicorn growth_agent.app:app --port 8100` | 只有你 | `AUTH_MODE=off`（默认） |
+| 预演 | `cd ops && docker compose up -d --build` | 内网/你自己 | `.env` 里的 `AUTH_MODE` |
+| 生产 | `cd ops && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build` | 公网（经 caddy） | **强制 `key`**（写死在 prod 覆盖层） |
+
+生产档的两个硬约束：
+
+1. **只有 443 对公网开**。`docker-compose.prod.yml` 把 8000/8100/6379/5433 全部
+   绑到 `127.0.0.1`。基础文件里那些 `"8000:8000"` 是给开发者的，生产必须覆盖掉。
+2. **框架服务（8000）不对外**。它没有我方鉴权——`AUTH_MODE` 只挂在 growth-agent 上。
+   把 8000 映射到公网等于开了个后门，而它在 `docker compose ps` 里看起来和 8100 一样正常。
+
+### 10.2 上线前必须做的三件事
+
+```bash
+# 1) 配密钥（`.env` 不要进 git，`.gitignore` 已含）
+cd ops && cp .env.example .env
+# 编辑 .env：
+#   AUTH_MODE=key
+#   API_KEYS=sk-live-xxxx=<你的名字>:admin
+#   SITE_ADDRESS=growth.example.com      # 生产档必填，缺了 caddy 拒绝启动
+#   ACME_EMAIL=you@example.com
+
+# 2) 本地预演（不花证书、不暴露公网）
+docker compose -f docker-compose.yml -f docker-compose.prod.yml config > /dev/null   # 语法
+docker compose up -d --build
+./ops/deploy_check.sh http://localhost:8100 sk-live-xxxx            # 5 项全绿
+
+# 3) 起生产档并复检（证书申请需要域名已解析到这台机器）
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+./ops/deploy_check.sh https://growth.example.com sk-live-xxxx
+```
+
+`deploy_check.sh` 五项，任何一项红都不要继续：
+
+| # | 断言 | 失败的含义 |
+|---|---|---|
+| 1 | `/health` 200 | 进程没起来 / 端口没通 |
+| 2 | 无 key → **401** | **鉴权没开**（比内容问题严重得多） |
+| 3 | 错 key → 401 + `AUTH_INVALID` | 校验逻辑坏了，或所有 key 都被当成有效 |
+| 4 | 正确 key → 200 | 鉴权通过了，但上游/超时有问题（`502/504` 会单独标出来） |
+| 5 | 响应头有 `X-Request-Id` | 多实例时无法串联同一次调用 |
+
+第 2 项是这张表的核心：**"没设防"和"设了防但没人试"在监控上长得一样**。
+
+### 10.3 一次真实的首次上线记录 `[实测：本机进程，非公网]`
+
+2026-11-13 在本机用生产同构的参数起进程验证：
+
+```bash
+AUTH_MODE=key API_KEYS="sk-local-test=alice:admin" \
+RETRIEVAL_MODE=sparse SESSION_BACKEND=memory \
+uvicorn growth_agent.app:app --host 127.0.0.1 --port 8199
+```
+
+```
+$ ./ops/deploy_check.sh http://localhost:8199 sk-local-test
+  ✓ /health 200        {"status":"ok","service":"growth-agent",...,"rag":"cold"}
+  ✓ 无 key → 401        code=AUTH_REQUIRED
+  ✓ 错 key → 401        code=AUTH_INVALID
+  ✓ 带 key → 200        request_id=req_826f6bb204a3
+  ✓ X-Request-Id 存在
+通过 5 项，失败 0 项
+```
+
+401 的响应体（`request_id` 有值，说明 RequestID 中间件在最外层）：
+
+```json
+{"code":"AUTH_REQUIRED","message":"缺少凭据：请在 X-API-Key 或 Authorization 中提供",
+ "request_id":"req_71f1570dc97b"}
+```
+
+**没做过的部分**（不要当成已可用）：镜像构建、caddy 证书申请、公网 DNS、
+真实厂商 key 下的全链路（`/v1/article` 四次模型调用 + 三次改写）。
+
+### 10.4 回滚
+
+镜像 tag 是唯一可靠的锚点。**上线前先记下当前 tag**：
+
+```bash
+docker compose ps --format '{{.Service}} {{.Image}}' | tee /tmp/before-release.txt
+```
+
+回滚 = 把 `.env` 里的 `IMAGE_TAG` 调回上一个 + `up -d`。不重建镜像：
+重建会带着当前（可能有问题的）源码，那不是回滚，是"重启了另一个 bug"。
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build
+```
+
+回滚后**必须复跑 `deploy_check.sh`**：容器起来了不等于新代码没生效
+（镜像 tag 变了但 compose 用了缓存的情况真实存在）。
+
+---
+
+## 11. 密钥轮换
+
+两套密钥，轮换方式完全不同——混了会停机。
+
+### 11.1 我方 API key（调用方的 key）
+
+`API_KEYS` 支持多个条目，所以可以**双写过渡**，不需要停机：
+
+```bash
+# 1) 同时放新旧两个 key（同一个人两个 key，subject 相同）
+API_KEYS="sk-live-old=alice:admin, sk-live-new=alice:admin"
+docker compose up -d --no-deps --force-recreate growth-agent
+
+# 2) 通知调用方换（把新 key 给对方）
+# 3) 观察一周：确认 old 的请求量归零
+#    日志里每一次 401 都带 mask 后的 key，按 mask 前缀聚合就能看出谁还在用旧的
+grep '我方鉴权失败' app.log | sed 's/.*presented=//' | sort | uniq -c
+
+# 4) 从 API_KEYS 里删掉旧 key，再 recreate 一次
+```
+
+**不要**直接删旧 key：那一次 recreate 会把所有还拿着旧 key 的调用方同时打成 401，
+而他们的第一反应是"服务挂了"。
+
+### 11.2 上游厂商 key
+
+```bash
+# 1) 新 key 写进 .env（旧的不动）
+# 2) 重启（网关在启动时读 Settings，运行期不重读）
+docker compose up -d --no-deps --force-recreate growth-agent
+# 3) 确认用的是新的：打一次真实调用，看日志里的 provider 与计费是否正常
+# 4) 观察 30 分钟，确认 UPSTREAM_AUTH 为 0
+# 5) 去厂商控制台把旧 key 作废
+```
+
+顺序不能反：先作废旧 key 再换新 key，中间那段时间所有请求都是 `502 UPSTREAM_AUTH`，
+而值班看到 502 的第一反应是"上游挂了"。
+
+---
+
+## 12. W10 新增的排障入口
+
+### 12.1 状态码先分流，再看 code
+
+| 你看到 | 是谁的问题 | 先查 |
+|---|---|---|
+| **401** `AUTH_REQUIRED` | 调用方没带凭据 | 调用方的 header |
+| **401** `AUTH_INVALID` | 凭据不对 | `API_KEYS` 里有没有这个 key |
+| **502** `UPSTREAM_AUTH` | **厂商 key 失效/欠费** | 厂商控制台，不是我们的 key 表 |
+| **400** `CONTENT_BLOCKED` | 输入被护栏拦了 | `violations` 字段；`docs/w10/threat-model.md` |
+| **422** `CONTENT_BLOCKED` | 产物不合格（缺引用/禁用词） | `violations`；多半是 prompt 或证据质量问题 |
+| **422** `CONTENT_UNQUALIFIED` | 文章阶段失败（无证据/引用体检不过） | `stage` 字段：`evidence` 说明检索没回来 |
+| **202** `APPROVAL_REQUIRED` | 动作等人批 | `approval_id`；用 `/v1/approvals` 列表 |
+
+**401 与 502 的区别是这套系统里最容易搞混的一处**，也是 ADR-005 的全部内容：
+401 是"你不对"，502 是"我不对"。分错了，值班会去查错的那一端。
+
+### 12.2 `CONTENT_BLOCKED` 突然变多
+
+两种原因，处理方式相反：
+
+1. **真的在被扫**：`violations` 里出现多个不同 `kind`，来源 IP 集中。
+   → 保留拦截；`run_redteam.py` 跑一遍确认规则没被改坏。
+2. **误报变多**：集中在某一类正常业务输入上（例如用户在讨论"系统提示词"这个主题）。
+   → 修规则，**不是**关护栏。关护栏的成本在 `threat-model.md` §5 写了。
+
+判断依据不是感觉，是 `RequestLog` 里的 `violations` 分布：同一条规则占比 > 80%
+且集中在少数 principal 上，多半是误报；`kind` 分散则是被扫。
+
+### 12.3 审批卡住（`approval_backlog` 告警）
+
+`behavior.py` 的规则是"10 分钟内 3 条待审没人管"。这**不是安全事件**，是流程卡住：
+
+```bash
+curl -s --noproxy '*' localhost:8100/v1/approvals -H "X-API-Key: $KEY" | python -m json.tool
+```
+
+待审请求 15 分钟过期且**默认拒绝**。所以"没人管"的结果不是"事后补批"，
+而是"这个动作没发生"——这一点在告诉用户"稍等一下"之前要先想清楚。

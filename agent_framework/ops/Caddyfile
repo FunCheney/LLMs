@@ -1,0 +1,40 @@
+# 反代配置：一个域名，一个后端，TLS 自动申请。
+#
+#   SITE_ADDRESS=growth.example.com docker compose -f docker-compose.yml \
+#     -f docker-compose.prod.yml up -d
+#
+# 只做三件事，每件都有理由：
+#   1. 强制 https：http 请求 308 跳到 https。不跳的话，调用方的
+#      `Authorization: Bearer ...` 会以明文过一次公网。
+#   2. 透传 X-Request-Id：我们自己的请求号由边缘决定，而不是让每个实例
+#      各自生成——否则同一次调用打两个实例会得到两个 id。
+#   3. 把 `X-Forwarded-For` 交给后端：日志里要能看出真实来源，
+#      而不是全是 caddy 容器的内网地址。
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	# 请求号：调用方带了就用它的（便于跨系统串联），没带我们就发一个。
+	# 用 `{http.request.uuid}` 而不是时间戳：同一毫秒内的两个请求不会撞。
+	@no_rid header_regexp X-Request-Id ^$
+	header @no_rid X-Request-Id {http.request.uuid}
+
+	reverse_proxy growth-agent:8100 {
+		header_up X-Real-IP {remote_host}
+		# 超时按 **最长链路** 设：/v1/article 是四次模型调用 + 三次改写，
+		# 单次 60s 超时会让它在 p99 上被反代掐断，而应用侧日志显示"还在跑"。
+		# 这里给 180s，与应用侧 `request_timeout_s` 的关系写在 RUNBOOK 里。
+		transport http {
+			response_header_timeout 180s
+		}
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

@@ -125,6 +125,14 @@ class RequestLog:
     trace_id: str = ""
     span_id: str = ""
 
+    # W11 D5 追加：这条请求的答案来自语义缓存。
+    #
+    # 为什么必须单独一个字段：命中缓存的日志 `cost=0 & usage=0`，与
+    # "mock 厂商"、"厂商没给 usage 于是估算成 0" 在数值上完全一样。
+    # 没有这个字段，成本看板会把"缓存省了多少钱"和"这笔钱根本没算清"
+    # 加进同一个格子，而这两件事的处置完全相反。
+    cache_hit: bool = False
+
     def as_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         payload["request_id"] = self.request_id or "-"

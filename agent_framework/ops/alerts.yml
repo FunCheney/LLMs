@@ -1,0 +1,76 @@
+# 告警规则（W11 D1）。与 `ops/slo.py` 的 ALERT_RULES 一一对应。
+#
+# 格式照 Prometheus 的 rules 文件写，但**我们不跑 Prometheus**——
+# 现在没有秒级写入压力，一个 `python ops/slo_report.py --alert` 够用。
+# 照它的格式写是因为：将来真要接时序库时，这份文件能直接用，
+# 而"换个监控系统就重写一遍规则"是告警失效最常见的原因。
+#
+# 三条共同的设计：
+#   1. 阈值一律用 **burn rate**（误差预算消耗速度），不用裸的成功率。
+#      "成功率 97%"是好是坏取决于目标：目标 99.9% 时它是灾难，目标 95% 时它很健康。
+#   2. 每条都有 `for`（持续时间）。没有它，一次 30 秒抖动会叫醒值班，
+#      而被误报叫醒三次之后这个告警就会被静音——那时真故障也没人看。
+#   3. 每条都写 `runbook`：告警的第一行必须是"接下来做什么"，
+#      而不是"某个数字超了"。没有处置动作的告警只是噪音。
+
+groups:
+  - name: growth-agent-slo
+    interval: 60s
+    rules:
+      - alert: AvailabilityBudgetBurningFast
+        # burn 5x = 28 天预算按当前速度将在 5.6 天内烧完。
+        # 5x 是"还不用全员上"的门槛：1h 内能定位就不必叫醒第二个人。
+        expr: slo:availability:burn_rate5m > 5
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: 可用性误差预算以 5 倍速消耗
+          impact: 按当前速度，28 天预算将在 5.6 天内耗尽
+          runbook: RUNBOOK §12.1（状态码先分流：401 是我方鉴权，502 才是上游）
+          first_check: 看 error_code 分布；单一 code 集中 → 故障，多个 code 分散 → 被扫
+
+      - alert: FirstTokenLatencyBudgetBurning
+        # 3x 而不是 5x：延迟退化通常是渐进的（模型变慢、上下文变长），
+        # 等到 5x 时用户已经开始抱怨"怎么这么慢"。
+        expr: slo:latency_p95:burn_rate10m > 3
+        for: 10m
+        labels:
+          severity: warn
+        annotations:
+          summary: 首 token p95 逼近 1.5s
+          impact: DoD 要求首 token p95 ≤ 1.5s；超过即不达标
+          runbook: RUNBOOK §12.1；先查是否 fallback 到了慢档，再查检索预算是否被抬高
+          first_check: stages[] 里哪一段变慢（retrieval / draft / rewrite）
+
+      - alert: CostPerTaskOverBudget
+        # 成本告警给 15 分钟而不是 5 分钟：单次贵请求不代表趋势，
+        # 而成本的处置动作（切 cheap 档 / 修 prompt）本来就要几分钟。
+        expr: slo:cost_per_task:burn_rate15m > 2
+        for: 15m
+        labels:
+          severity: warn
+        annotations:
+          summary: 单任务成本超预算
+          impact: 预算 2.0 CNY/任务；超支即毛利转负
+          runbook: 先看 usage_estimated 占比——>20% 时这个数本身不可信（W1 Day5 教训）
+          first_check: 缓存命中率是否掉了；是否大量 fallback 到 strong 档
+
+      # 下面这条不是 SLO 告警，是**流程**告警，但它必须和上面的放一起：
+      # "等人"和"卡住"在监控上长得一样，而处置动作完全相反
+      # （一个去催人，一个去重启）。所以它有自己的名字。
+      - alert: ApprovalBacklog
+        expr: approval_pending_total > 3
+        for: 10m
+        labels:
+          severity: warn
+        annotations:
+          summary: 待审请求积压
+          impact: 审批 15 分钟过期且**默认拒绝**——积压的结果是"动作没发生"，不是"稍后补批"
+          runbook: RUNBOOK §12.3；`GET /v1/approvals` 看是谁在等
+          first_check: 是否有 principal 一次性提交了大量 dangerous 动作（可能是循环重试）
+
+# SLO 定义本身不在这个文件里，在 `ops/slo.py` 的 SLOS。
+# 理由：目标值（0.99/0.95/2.0）是**口径**，规则是**用法**。
+# 两处都写的话，改目标时会漏一处，而漏掉的那处不会报错——
+# 它只是让告警按旧目标继续判断。

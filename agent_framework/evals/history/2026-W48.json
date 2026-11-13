@@ -1,0 +1,195 @@
+{
+  "week": "2026-W48",
+  "period": {
+    "from": "2026-11-23",
+    "to": "2026-11-27"
+  },
+  "gate": "W5",
+  "status": "retrieval-quantified-end-to-end-pending",
+  "note": "记录于 2026-11-06 本地预跑；检索层六档已量化，但检索尚未接进 /v1/draft，因此本期没有任何「线上请求含检索」的延迟读数",
+  "summary": "生产 RAG I：Retriever 协议 + pgvector（bge-m3 1024 维，425 chunks）→ RRF 融合 → 精排（预算超时降级）→ query 改写（走 cheap 档、记成本）。核心结论与预期相反：纯稠密单路全场最优（R@1 .7857 / R@10 1.0000 / MRR .8628），混合检索与精排均为负收益，默认档由 hybrid 改为 dense，精排与改写保留开关但默认关。六个组件各自都有单变量 A/B 数字，没有一格是估的。",
+  "metrics": {
+    "tests": {
+      "offline_passed": 602,
+      "offline_collected": 624,
+      "live_skipped": 22,
+      "live_skipped_reason": "无 API 凭证；显式 `-m live` 且 .env.local 就绪后执行（其中 16 条 pgvector 集成测试需 DSN，6 条 live 需 key）",
+      "static_checks": {
+        "ruff": "pass",
+        "mypy_files": 53,
+        "mypy": "pass"
+      },
+      "new_this_week": {
+        "framework_side": 106,
+        "note": "496 → 602。框架侧 106 条：retrieval_pipeline 22 / query_rewrite 16 / retrieval_metrics 21 / knowledge_base 19 / rag_bridge 19 / rag_config 9（含 4 条 rerank_preflight）/ pgvector_e2e 6",
+        "rag_mvp_side": 34,
+        "rag_mvp_note": "另在 06_rag/rag_mvp：pgvector_store 23 + pgvector_integration 11，不计入本仓 624 的统计"
+      }
+    },
+    "golden": {
+      "path": "evals/golden/golden_v1.jsonl",
+      "total": 54,
+      "changed": false,
+      "note": "W5 未改主数据集。检索评测走另一份 30 条 chunk 级标注（rag_mvp data/eval/golden_queries.yaml，28 正例 + 2 负例），因为它标的是 chunk_id 而不是答案文本"
+    },
+    "eval": {
+      "command": "python evals/scripts/run_eval.py --week 2026-W48 --judge",
+      "mode": "offline",
+      "total": 54,
+      "passed": 50,
+      "failed": 0,
+      "interrupted": 0,
+      "skipped": 4,
+      "pipeline_success_rate": 1.0,
+      "elapsed_s": 6.08,
+      "source": "evals/history/2026-W48-eval.json（pipeline 块）",
+      "caveat": "pipeline_success_rate 只证明执行管道通，不代表质量。检索未接入，本期 54 条 case 走的仍是 W4 的纯 LLM 链路"
+    },
+    "latency": {
+      "latency_p50_ms": 30.236,
+      "latency_p95_ms": 30.8094,
+      "latency_samples": 50,
+      "first_token_p50_ms": 30.085,
+      "first_token_samples": 4,
+      "by_kind_p95_ms": {
+        "chat": 30.757,
+        "tool_call": 31.239,
+        "draft": 30.475,
+        "research": 30.692,
+        "stream": null,
+        "error": null,
+        "adversarial": null
+      },
+      "comparable": false,
+      "caveat": "**不可与前两期比较，不可作为性能结论。** 30ms 是每条 case 恒定开销（p50 30.236 / p95 30.809，方差 0.6ms，含 error case 也 ≥30ms），cProfile 显示 3.44s 落在 `_socket.socket.recv`、`sitecustomize.py:361(_broker_readline)` 被调用 109 次——本次记录的 python 进程被 CLI shim（/Applications/WorkBuddy.app/.../cli/vendor/shim/sitecustomize.py）注入了 socket broker，每次 IO 有固定往返。W47 同链路是 0.18ms。裸终端 `make eval` 不受影响，需在那里重跑一次才能作为基线"
+    },
+    "retrieval": {
+      "dataset": "06_rag/rag_mvp/data/eval/golden_queries.yaml",
+      "samples": 30,
+      "positive_samples": 28,
+      "negative_samples": 2,
+      "corpus_chunks": 425,
+      "embedding": "BAAI/bge-m3（1024 维，L2 归一化，本地推理）",
+      "vector_backends": ["local", "pgvector"],
+      "backend_equivalence": {
+        "same_top_chunk": "5/5",
+        "score_delta": "小数点后 6 位一致",
+        "source": "06_rag/rag_mvp/scripts/compare_vector_backends.py"
+      },
+      "harness": "evals/scripts/retrieval_metrics.py（指标只从 RetrievalPipeline.run() 的 diagnostics 取，不测裸 retriever）",
+      "configs": {
+        "dense": {
+          "recall_at_1": 0.7857, "recall_at_5": 0.9643, "recall_at_10": 1.0,
+          "mrr": 0.8628, "ndcg_at_10": 0.7416,
+          "latency_p50_ms": 156.2, "latency_p95_ms": 174.7, "degraded_count": 0
+        },
+        "sparse": {
+          "recall_at_1": 0.25, "recall_at_5": 0.6786, "recall_at_10": 0.7143,
+          "mrr": 0.4122, "ndcg_at_10": 0.4288,
+          "latency_p50_ms": 0.705, "latency_p95_ms": 0.886, "degraded_count": 0
+        },
+        "hybrid": {
+          "recall_at_1": 0.5714, "recall_at_5": 0.8571, "recall_at_10": 0.9286,
+          "mrr": 0.6921, "ndcg_at_10": 0.6484,
+          "latency_p50_ms": 150.7, "latency_p95_ms": 159.0, "degraded_count": 0
+        },
+        "dense+rerank": {
+          "recall_at_1": 0.7143, "recall_at_5": 0.9286, "recall_at_10": 0.9643,
+          "mrr": 0.8146, "ndcg_at_10": 0.7233,
+          "latency_p50_ms": 4729.7, "latency_p95_ms": 5381.5, "degraded_count": 0,
+          "candidates": 20,
+          "caveat": "超时放宽到 15s 才拿到真实读数；默认 3000ms 时 28/28 全降级（见 rerank-timeout-trap）"
+        },
+        "dense+rewrite": {
+          "run2": {"recall_at_1": 0.7857, "recall_at_5": 0.8929, "recall_at_10": 1.0, "mrr": 0.8482, "ndcg_at_10": 0.7278, "latency_p95_ms": 15207.2, "degraded_count": 3},
+          "run3": {"recall_at_1": 0.7143, "recall_at_5": 0.9643, "recall_at_10": 0.9643, "mrr": 0.8089, "ndcg_at_10": 0.6909, "latency_p95_ms": 15173.8, "degraded_count": 4},
+          "rewrite_p50_ms": 8700.0,
+          "calls": 25,
+          "cost": 0.0888,
+          "currency": "CNY",
+          "caveat": "两轮 R@1 不同（.7857 / .7143）说明 temperature=0.3 有随机性，单跑一次不足以定论；两轮 MRR 都低于 dense"
+        }
+      },
+      "verdict": {
+        "best_config": "dense",
+        "hybrid_delta": "R@1 -21.4pp / MRR -17.1pp（相对 dense）",
+        "rerank_delta": "R@1 -7.1pp / MRR -4.8pp，p95 +5207ms",
+        "rewrite_delta": "MRR -1.5pp ~ -5.4pp，p95 +15000ms，¥0.0888/25 次",
+        "defaults_honored": "retrieval_mode=dense / retrieval_rerank=False / retrieval_rewrite=False"
+      },
+      "cross_check": {
+        "claim": "框架侧 retrieval_metrics 与 rag_mvp golden_runner 同口径同算法",
+        "evidence": "`--preset ragmvp --configs dense+rerank --rerank-timeout-ms 90000` 得 .714/.929/.929/.964/.815/.723，与 rag_mvp 存档 .7143/.9286/.9286/.9643/.8146/.7232 四位小数一致",
+        "production_vs_ragmvp": "生产口径（recall_multiplier=3、20 候选）与 rag_mvp 口径（×10、100 候选）在精排档上逐位相同，说明精排结论不依赖候选池大小"
+      }
+    },
+    "judge": {
+      "alias": "heuristic-keyword",
+      "rubric": "answer-quality@w4-v1",
+      "samples": 50,
+      "score": 1.922,
+      "status": "rule-baseline-only",
+      "note": "与 W47 完全一致（1.922），符合预期：检索未接入，夹具答案没变"
+    },
+    "ragas": {
+      "samples": 9,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.0543,
+      "context_precision": 1.0,
+      "method": "lexical",
+      "note": "与 W47 完全一致。faithfulness 恒 0 的真因是夹具答复固定、与引用无关，不是检索质量问题——W5 已有独立检索指标，不再指望 RAGAS 回答检索好坏"
+    },
+    "regression_gate": {
+      "baseline_week": "2026-W46",
+      "baseline_commit": "afbded2",
+      "compared": ["success_rate", "latency_p95_ms"],
+      "skipped": ["cost_per_task", "judge_score", "faithfulness", "tool_error_rate"],
+      "violations": 1,
+      "verdict": "fail-env-artifact",
+      "detail": "success_rate 1.0 与基线一致；latency_p95_ms 2.2924 → 30.8094（+1243.98%），但该值被 CLI shim 的 socket broker 抬高（见 latency.caveat），判定为**执行环境伪影**而非代码劣化。判据：①30ms 对所有 case 恒定、方差 0.6ms，不符合真实链路抖动；②检索未接入 /v1/draft，本期跑的路径与 W47 逐字节一致；③cProfile 定位到 sitecustomize broker",
+      "action": "裸终端重跑 `make run-eval-judge WEEK=2026-W48` 后以那次结果替换本块；在替换前，本期延迟不作为基线，也不触发回滚"
+    }
+  },
+  "gate_checklist": {
+    "1_protocol_first": "pass（knowledge/base.py 定义 Chunk/ScoredChunk/Retriever；业务层 grep psycopg|pgvector = 0 处，后端实现全在 rag_mvp）",
+    "2_provenance": "pass（source_uri 由 field_validator 强制非空，test_knowledge_base.py 用 parametrize 覆盖三个必填字段）",
+    "3_hybrid_effective": "not-met-as-written（原措辞「Recall@K 相对 baseline 提升 ≥10%」无法验收：纯稠密 R@10 已是 1.0000。ADR §4 改为 R@10 触顶时以 R@1/MRR 为主指标，且如实记录混合与精排为负收益）",
+    "4_rrf_correct": "pass（fusion.py 用 1/(k+rank)，不看原始分数；去重键 chunk_id；单测覆盖同分并列不抖动、一路空结果）",
+    "5_latency_guard": "partial（三条降级路径单测过：预算耗尽跳过精排、精排超时回落 RRF、精排报错回落 RRF；但「latency_p95 过 W4 门禁」无从验证——检索还没进请求路径，run_eval 的 p95 不含检索）",
+    "6_cost_visible": "partial（改写成本进 A/B 报告：25 次调用 ¥0.0888、p50 8.7s；精排是本地 cross-encoder，货币成本 0，只记延迟 5.4s。建议后续把「本地算力时长」也折算成一列，否则报告会让人误以为精排是免费的）",
+    "7_attribution_loop": "pass（case-1：标点被当 token → sparse top1 是含 12 个「？」的列表页 → 去纯标点后 R@1 .2500→.5357，且明确记录「修好分词后 hybrid 仍不如 dense」）",
+    "8_merge": "pass（history W48 已接；ruff 全绿 / mypy 53 文件 0 问题 / 602 passed 22 skipped；run_eval 54 条 50 passed 0 failed；回归门禁的红已归因为环境伪影并留了复跑动作）"
+  },
+  "decisions": [
+    "协议先行：Chunk/ScoredChunk/Retriever 定义在框架，pgvector 只做实现；业务层不 import 任何后端类型，W6 换库时不改调用点",
+    "source_uri（文档出处）与 retriever（谁召回的）必须是两个字段：合并成一个，引用会指向「[hybrid]」这种检索器名",
+    "向量库用 pgvector 而非 Milvus/自研：compose 里一个 service + init.sql 就够，425 条量级下 hnsw 不是瓶颈",
+    "embedding 用本地 bge-m3 1024 维：中文与中英混排（CLAUDE.md、MCP）比同价位 API 稳，且离线可评测",
+    "RRF 只看名次不看分数：BM25 分与余弦分不同量纲，用分数加权需要一个没人能证明的归一化",
+    "默认关混合检索（retrieval_mode=dense）：混合 R@1 .5714 vs 稠密 .7857，且修好分词后仍差 14pp——是 RRF 等权融合的算法性质，不是实现 bug",
+    "默认关精排（retrieval_rerank=False）：两套口径逐位相同的负收益，且 p95 +5.2s；能力与降级路径保留，换语料或做 hard negative 微调后可直接重测",
+    "默认关改写（retrieval_rewrite=False）：MRR 两轮都降、p95 涨到 15s、25 次 ¥0.0888；开关已真正接进装配（此前是死开关）",
+    "切分归 rag_mvp，框架不造 knowledge/chunking.py：切分策略与页面感知逻辑属于语料侧，框架只需要协议",
+    "精排与召回分开装配，不合成 RerankedRetriever：合成后拿不到「融合但未精排」的中间结果，降级路径就没有可回落的位置"
+  ],
+  "discovered": [
+    "「混合检索更好」是教科书假设而非本地事实：sparse 路 R@1 .25 时，RRF 的 1/(k+rank) 把「dense 排 1、sparse 排 30」的正解算成 0.0275，而「两路都排 5」的邻居页得 0.0308——等权融合在惩罚单路强信号",
+    "分词器把纯标点当 token：tokenize('如何配置 MCP 服务器？') 产出 '？'。golden-018 的 sparse top1 是含 12 个「？」的列表页；去纯标点后 sparse R@1 .2500→.5357（+114%），但 hybrid 仍不如 dense",
+    "默认超时值可以让组件「永远不生效」：rerank_timeout_ms=3000，而本机 CPU 20 条要 4.7s，于是 28/28 全降级、指标等于没开。这类默认值比功能缺失更危险——它让人以为「我试过了，没用」",
+    "死开关比没实现更危险：retrieval_rewrite 字段存在、pipeline 支持 rewriter= 注入，但 rag.py 从没读过它。设了没有任何效果，且不会报错",
+    "重排是在删除信息而不是重排：hybrid+rerank 与 dense+rerank 五指标完全相同；golden-022 的 gold chunk 从第 8 位掉出 top10，而同一页的邻居被顶上来——精排偏好「主题邻近段落」，题目要的是「恰好回答的那一段」"
+  ],
+  "risks": [
+    "28 条正例太少：R@1 差 6 条、MRR 差 15.7pp 可视为系统性，但 R@10 差 1 条不显著，不能据此说「混合会影响长尾」",
+    "检索未接 /v1/draft：所有检索数字都来自离线批跑，没有一次真实请求的端到端延迟；p95 门禁也因此无法覆盖检索",
+    "桥接层不转发 filters：rag_mvp 的 DenseRetriever 丢弃 filters，W6 的 ACL 若直接依赖会静默越权",
+    "改写的两轮结果不一致（R@1 .7857 / .7143）：temperature=0.3 带来了随机性，任何「改写提升 X%」的结论都需要三次以上取中位数",
+    "镜像里没装 psycopg：Dockerfile 缺 --extra pgvector，容器走 pgvector 后端会 ImportError；完整镜像构建还卡在 docker.io 502"
+  ],
+  "next": [
+    "/v1/draft 接检索：接上才有真实端到端延迟，Gate 5 的 #5 才能从 partial 变 pass",
+    "normalize_query 接进 pipeline 最前面：dense 不受格式脏输入影响（18/18 组 Δscore=0.0000），真正价值是把空/超长 query 变成 InvalidQueryError 而不是返回一堆 0 分",
+    "W6 ACL 走 filters：先修桥接层不转发的问题，再谈权限",
+    "Dockerfile 补 --extra pgvector，并在裸终端重跑一次 run_eval 换掉本期被污染的延迟块"
+  ]
+}

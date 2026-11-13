@@ -15,6 +15,12 @@ dependencies = [
 [project.scripts]
 agent-server = "agent_framework.server.app:main"
 
+[project.optional-dependencies]
+# W9 D4 的 LangGraph 对照实现。**刻意做成 extra 而不是主依赖**：
+# 主实现（`multi_agent/supervisor.py`）不 import 它，装不装都不影响生产路径；
+# 没装时 `langgraph_variant` 的 import 不报错，对照测试自动 skip。
+langgraph = ["langgraph>=1.0"]
+
 [build-system]
 requires = ["uv_build>=0.12.0,<0.13.0"]
 build-backend = "uv_build"

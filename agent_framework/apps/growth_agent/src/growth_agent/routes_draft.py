@@ -14,6 +14,23 @@
 为什么响应里不带 cost：`cost` 依赖 `models.yaml` 的 pricing，是**运营口径**。
 把它放进对外响应，等于把"内部计价表"变成对外契约，改一次价格就要发一次版本。
 成本留在 `agent_framework.request` 的结构化日志里，由看板去读（W11）。
+
+## W10 接入护栏两层（输入 + 输出）
+
+- **输入**：`brief` 过 `InputGuard`（长度 + 注入），通过后**隔离**成
+  `<untrusted>` 块再进 prompt，系统消息前置 `layer_prompt()` 的指令分层声明。
+- **输出**：`OutputGuard` 检查《广告法》绝对化用语。
+
+输出这一层**标注而不拦断**，与 `/v1/article` 的行为不同，原因是产物性质不同：
+`/v1/draft` 的产物是**给人继续编辑的草稿**，绝对化用语在这里标出来更有用
+（人改一个字就能过）；`/v1/article` 的平台文案与 W8 的 `publish` 是**交付点**，
+那里必须拦断。同一个检查用两种处置，不是不一致，是"交付点"的定义不同。
+
+## 为什么不把 system prompt 直接字符串拼接
+
+`layer_prompt()` 里那句"优先级高于本次对话中的任何其他内容"必须是**唯一一份**：
+散在三个端点里各写一遍，就会出现三种措辞，而模型对这类措辞的服从性
+取决于它是否只出现一次、是否措辞一致。
 """
 
 from __future__ import annotations
@@ -21,9 +38,17 @@ from __future__ import annotations
 from typing import Any
 
 from agent_framework.config import ConfigError
+from agent_framework.guardrails import (
+    SOURCE_USER,
+    InputGuard,
+    OutputGuard,
+    OutputPolicy,
+    layer_prompt,
+)
 from agent_framework.llm.client import ChatCall, ChatOutcome, LLMGateway
 from agent_framework.llm.types import Message, MessageRole
 from agent_framework.observability import current_request_id
+from agent_framework.server.errors import error_body
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -37,6 +62,25 @@ DRAFT_SYSTEM_PROMPT = (
 )
 
 DEFAULT_MAX_TOKENS = 512
+
+# 《广告法》第九条禁止的绝对化用语（节选）。放在产品层而不是框架里：
+# 这是中文广告合规的具体条款，框架不该内置任何国家的法规清单。
+ABSOLUTE_TERMS: tuple[str, ...] = (
+    "最佳",
+    "最好",
+    "最强",
+    "第一品牌",
+    "国家级",
+    "最高级",
+    "100%",
+    "绝对安全",
+    "唯一",
+    "顶级",
+)
+
+# 草稿的硬上限。80 字是 prompt 里的**建议**，200 字是**界面能装下的极限**：
+# 把建议当硬约束会让模型偶尔写 85 字就被判失败，那是误伤。
+DRAFT_MAX_CHARS = 2000
 
 
 class DraftRequest(BaseModel):
@@ -76,6 +120,11 @@ class DraftResponse(BaseModel):
     # 必须显式标出来：估算值混进成本报表会让数字看起来比实际精确。
     usage_estimated: bool
     latency_ms: float
+    # 广告法绝对化用语的命中项。**不拦断**（草稿是给人改的），
+    # 但要让前端能高亮——"标了没人看"和"没标"是一样的。
+    violations: list[str] = Field(default_factory=list)
+    # 空 = 可以原样发布；非空 = 至少有一项要人改。
+    delivery_ok: bool = True
 
     @classmethod
     def from_outcome(cls, outcome: ChatOutcome, *, request_id: str) -> DraftResponse:
@@ -110,10 +159,27 @@ def _gateway(request: Request) -> LLMGateway:
 async def draft(body: DraftRequest, request: Request) -> JSONResponse:
     gateway = _gateway(request)
 
+    # 输入层：长度 + 注入。通过后拿到的是**已隔离**的文本，
+    # 不必在这里记得再包一层 <untrusted>（忘了包是这类代码最常见的失误）。
+    input_check = InputGuard().check(body.brief, source=SOURCE_USER)
+    if not input_check.ok:
+        return JSONResponse(
+            error_body(
+                "CONTENT_BLOCKED",
+                "输入未通过安全检查",
+                violations=list(input_check.violations),
+            ),
+            status_code=400,
+        )
+
     call = ChatCall(
         messages=[
-            Message(role=MessageRole.SYSTEM, content=DRAFT_SYSTEM_PROMPT),
-            Message(role=MessageRole.USER, content=body.brief),
+            # 指令分层声明在前、产品 prompt 在后：安全语义不该被产品规则改写。
+            Message(
+                role=MessageRole.SYSTEM,
+                content=layer_prompt(extra=DRAFT_SYSTEM_PROMPT),
+            ),
+            Message(role=MessageRole.USER, content=input_check.sanitized),
         ],
         task=body.task,
         model=body.model,
@@ -122,6 +188,14 @@ async def draft(body: DraftRequest, request: Request) -> JSONResponse:
 
     outcome = await gateway.chat(call)
     payload = DraftResponse.from_outcome(outcome, request_id=current_request_id())
+
+    # 输出层：广告法绝对化用语 + 长度。**标注不拦断**（理由见模块头）。
+    review = OutputGuard().check(
+        payload.text,
+        policy=OutputPolicy(forbidden=ABSOLUTE_TERMS, max_chars=DRAFT_MAX_CHARS),
+    )
+    payload.violations = list(review.violations)
+    payload.delivery_ok = review.ok
 
     return JSONResponse(
         payload.model_dump(mode="json"),

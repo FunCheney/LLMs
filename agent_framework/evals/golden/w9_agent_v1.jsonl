@@ -1,0 +1,13 @@
+// W9 D5 任务集：给"单 Agent vs 多 Agent"对比用。6 条，两档难度。
+// difficulty 1/2 = 单步（查一次就有答案）；3 = 五步，且**第五步要回忆第一步的值**。
+// recall_from 是这个任务集唯一的"机关"：它把"上下文窗口够不够"变成可测的变量。
+// 回忆距离刻意设成 4 步：窗口 1 与窗口 3 都够不着，窗口 8 够得着——
+// 于是"窗口大小"成了自变量，而不是"用了哪种范式"。
+// 没有这一列，四种编排会全部打平（实测过），而打平本身也是要报的结果，
+// 只是说明任务集没区分度。
+{"id": "w9-a01", "difficulty": 1, "question": "MCP 的工具注解怎么定义？", "steps": [{"goal": "查工具注解定义", "query": "MCP 工具注解 定义"}]}
+{"id": "w9-a02", "difficulty": 2, "question": "A2A 的 Agent Card 发布在哪个路径？", "steps": [{"goal": "查 Agent Card 路径", "query": "A2A Agent Card 路径"}]}
+{"id": "w9-a03", "difficulty": 2, "question": "LangGraph 的 recursion_limit 是什么语义？", "steps": [{"goal": "查 recursion_limit 语义", "query": "LangGraph recursion_limit 语义"}]}
+{"id": "w9-b01", "difficulty": 3, "question": "多 Agent 编排该怎么定方案？", "steps": [{"goal": "查多 Agent 编排定义", "query": "多 Agent 编排 定义"}, {"goal": "查部署规模数据", "query": "多 Agent 部署 规模 数据"}, {"goal": "查失败模式", "query": "多 Agent 失败模式 案例"}, {"goal": "查成本口径", "query": "w9-b01-成本 口径 数据"}, {"goal": "复核定义并对比风险", "query": "编排方案 风险 对比", "recall_from": 0}]}
+{"id": "w9-b02", "difficulty": 3, "question": "Agent 评测该怎么做？", "steps": [{"goal": "查评测方法论", "query": "Agent 评测 方法论"}, {"goal": "查公开数据集", "query": "Agent 评测 公开数据集"}, {"goal": "查判定口径", "query": "Agent 评测 判定口径"}, {"goal": "查成本口径", "query": "w9-b02-成本 口径 数据"}, {"goal": "复核方法论并对比数据集", "query": "评测数据集 对比 风险", "recall_from": 0}]}
+{"id": "w9-b03", "difficulty": 3, "question": "工具沙箱怎么设计？", "steps": [{"goal": "查沙箱设计原则", "query": "工具沙箱 设计 原则"}, {"goal": "查逃逸案例", "query": "沙箱 逃逸 案例"}, {"goal": "查资源限制", "query": "沙箱 资源限制 配置"}, {"goal": "查成本口径", "query": "w9-b03-成本 口径 数据"}, {"goal": "复核原则并对比案例", "query": "沙箱方案 对比 风险", "recall_from": 0}]}

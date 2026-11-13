@@ -31,12 +31,14 @@ from agent_framework.bootstrap import build_gateway
 from agent_framework.config import Settings
 from agent_framework.llm.client import LLMGateway
 from agent_framework.observability import configure_logging
+from agent_framework.server.auth import install_api_key_auth
 from agent_framework.server.errors import install_error_handlers
 from agent_framework.server.middleware import RequestIDMiddleware
 from fastapi import FastAPI
 
 import growth_agent
 from growth_agent.routes_answer import router as answer_router
+from growth_agent.routes_article import router as article_router
 from growth_agent.routes_draft import router as draft_router
 from growth_agent.routes_memory import router as memory_router
 from growth_agent.routes_tools import router as tools_router
@@ -48,11 +50,16 @@ def create_app(
     *,
     settings: Settings | None = None,
     answerer: Any | None = None,
+    seo: Any | None = None,
 ) -> FastAPI:
-    """`answerer` 是给测试的注入口：传一个假回答器就不必加载模型。
+    """`answerer` / `seo` 是给测试与离线演示的注入口。
 
-    它必须是"显式注入"而不是"环境变量开关"——测试若靠 env 关掉检索，
+    必须是"显式注入"而不是"环境变量开关"——测试若靠 env 关掉检索，
     就永远测不到接线的真实行为（这正是 W5 留下的那道缺口）。
+
+    W10 新增 `seo`：内容流水线的四个 stage 各调一次模型，靠真检索跑一次
+    要 18–20s 冷启动；注入之后，`/v1/article` 的路由、错误翻译、部分失败
+    收口全都能在毫秒级测到，而**不需要**把 gate 也一起 stub 掉。
     """
 
     # 产品应用同样要配：否则本进程里的 RequestLog 会被静默丢弃，
@@ -87,13 +94,21 @@ def create_app(
     app.state.memory = None
     # W8：工具运行时（TOOLS=governed 时由 ensure_tools 惰性装配）。
     app.state.tools = None
+    # W10：内容流水线（惰性装配）。注入的优先级最高。
+    app.state.seo = seo
 
+    # 鉴权必须**在** RequestID 之前加进列表：Starlette 的 `add_middleware`
+    # 是"后加的更外层"，所以先加鉴权、后加 RequestID，最终 RequestID 在最外层。
+    # 顺序反了的表现是 401 响应体里 `request_id == "-"`——
+    # 而排障时最需要 request_id 的恰恰是被拒的那些请求。
+    install_api_key_auth(app, resolved_settings)
     app.add_middleware(RequestIDMiddleware)
     install_error_handlers(app)
     app.include_router(draft_router)
     app.include_router(answer_router)
     app.include_router(memory_router)
     app.include_router(tools_router)
+    app.include_router(article_router)
 
     @app.get("/health")
     async def health() -> dict[str, str]:

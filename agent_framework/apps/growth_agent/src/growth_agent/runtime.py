@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any
 
 from agent_framework.config import ConfigError, Settings
@@ -145,6 +146,93 @@ async def ensure_tools(app: FastAPI) -> Any:
     runtime = build_tool_runtime(settings)
     app.state.tools = runtime
     return runtime
+
+
+async def _brand_profile(app: FastAPI) -> Any:
+    """从长期记忆取品牌调性（W10）。**取不到就用空档，不报错**。
+
+    为什么不让"记忆没开"阻断内容生产：`MEMORY=off` 是合法配置（W7 的两档
+    实验变量），内容链路在它下面必须能跑，只是没有调性约束。
+    反过来把它做成硬依赖，会让"关掉记忆做对照实验"变成关不掉。
+    """
+    from growth_agent.pipeline import BrandProfile
+
+    memory_runtime = getattr(app.state, "memory", None)
+    if memory_runtime is None:
+        return BrandProfile()
+
+    try:
+        items = await memory_runtime.long_term.recall(
+            "品牌调性 禁用词", k=memory_runtime.settings.memory_recall_k
+        )
+    except Exception:  # noqa: BLE001 - 记忆故障不挡内容链路
+        logging.getLogger(__name__).warning("品牌记忆召回失败，按默认调性继续", exc_info=True)
+        return BrandProfile()
+
+    tone = ""
+    forbidden: list[str] = []
+    for item in items:
+        if item.key == "brand_tone" and item.value:
+            tone = item.value
+        elif item.key == "forbidden_words" and item.value:
+            forbidden.extend(
+                part.strip() for part in item.value.split(",") if part.strip()
+            )
+
+    return BrandProfile(tone=tone or BrandProfile.tone, forbidden=tuple(forbidden))
+
+
+async def ensure_seo(app: FastAPI) -> Any:
+    """拿到内容流水线（W10）。与检索共用同一条 `RetrievalPipeline`。
+
+    共用的理由不是省代码：`/v1/answer` 与 `/v1/article` 的引用要能互相对照，
+    两条独立的检索链路会给出两套编号，运营核对时说不清"这个 [3] 是哪个 [3]"。
+    """
+    existing = getattr(app.state, "seo", None)
+    if existing is not None:
+        return existing
+
+    from growth_agent.pipeline import RetrievalEvidence, SEOPipeline, StyleRewriter
+
+    settings: Settings = app.state.settings
+    gateway: LLMGateway = app.state.gateway
+
+    await ensure_answerer(app)
+    rag = getattr(app.state, "rag", None)
+    if rag is None or getattr(rag, "pipeline", None) is None:
+        raise ConfigError("检索链路未就绪，无法装配内容流水线")
+
+    brand = await _brand_profile(app)
+    evidence = RetrievalEvidence(
+        rag.pipeline,
+        top_k=settings.retrieval_top_k,
+        max_chars_per_chunk=settings.retrieval_citation_max_chars,
+    )
+    pipeline = SEOPipeline(gateway, evidence=evidence, brand=brand)
+    rewriter = StyleRewriter(gateway, brand=brand)
+    app.state.seo = (pipeline, rewriter)
+    return app.state.seo
+
+
+async def ensure_guardrails(app: FastAPI) -> Any:
+    """拿到护栏编排器（W10 D4）。**不注入 ApprovalGate**，这是个刻意的决定。
+
+    审批门已经由工具运行时持有（`ToolRuntime.approvals`，`PermissionGuard` 的
+    `approver` 就是它）。这里再建一个 `ApprovalGate`，同一个动作会在两个 gate
+    里各挂一条 pending——人被问两遍，且批了一边另一边仍拦着。
+
+    所以分工是：**审批的归属点在 ActionRuntime，护栏编排器只负责顺序**。
+    `/v1/article` 这条链路没有 dangerous 动作，审批层据实记为 skipped。
+    """
+    existing = getattr(app.state, "guardrails", None)
+    if existing is not None:
+        return existing
+
+    from agent_framework.guardrails import GuardrailPipeline
+
+    pipeline = GuardrailPipeline()
+    app.state.guardrails = pipeline
+    return pipeline
 
 
 async def close_runtime(app: FastAPI) -> None:

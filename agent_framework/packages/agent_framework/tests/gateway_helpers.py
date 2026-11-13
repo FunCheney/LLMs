@@ -131,6 +131,7 @@ def build_test_gateway(
     *,
     settings: Settings | None = None,
     sleep: Any = None,
+    breaker: Any = None,
 ) -> LLMGateway:
     return LLMGateway(
         registry=FakeRegistry(catalog, clients),  # type: ignore[arg-type]
@@ -138,6 +139,7 @@ def build_test_gateway(
         catalog=catalog,
         settings=settings or make_settings(),
         sleep=sleep or RecordingSleep(),
+        breaker=breaker,
     )
 
 

@@ -25,6 +25,13 @@ from collections import Counter
 from collections.abc import Iterable, Sequence
 from enum import StrEnum
 
+from agent_framework.error_codes import (
+    CALLER_CODES,
+    RELIABILITY_CODES,
+    is_reliability_code,
+    is_timeout_code,
+)
+
 from evals.metrics import CaseStatus, EvalResult
 
 __all__ = [
@@ -74,44 +81,8 @@ class FailureCategory(StrEnum):
         )
 
 
-# 错误码 → 分类。用 code 而不是异常类型：分类器只读日志，不 import 异常树
-# （离线档与在线档的错误可能来自不同进程，日志才是唯一共同输入）。
-#
-# **这里是唯一一份码表**（W4 D5 案例 3）。之前 `run_eval` 与 `classify_failures`
-# 各有一份，10 个已知错误码里有 6 个在两处判定不同：`SERVER_BUSY`（我们自己的
-# 限流器吐的 503）在 run_eval 里被算成"质量失败"，在分类器里是"上游问题"。
-# 结果是一批被限流的请求把 success_rate 拉低，而报告说"模型答错了"。
-RELIABILITY_CODES = {
-    "UPSTREAM_AUTH",
-    "UPSTREAM_ERROR",
-    "UPSTREAM_TIMEOUT",
-    "RATE_LIMITED",
-    "SERVER_BUSY",
-}
-
-_TIMEOUT_CODES = {"UPSTREAM_TIMEOUT", "SERVER_BUSY"}
-
-# 我方问题：请求本身不合法、能力不匹配、配置写错。既不是厂商故障，也不是模型答错。
-CALLER_CODES = {
-    "BAD_REQUEST",
-    "CAPABILITY_UNSUPPORTED",
-    "CONFIG_ERROR",
-    "TASK_NOT_FOUND",
-    "CONTENT_FILTERED",
-}
-
-
-def is_reliability_code(code: str | None) -> bool:
-    """这个错误码是否属于"厂商侧故障"（→ `interrupted`，不进成功率分母）。
-
-    未知码返回 `True`（按可靠性处理）：宁可少算一次"模型答错"，
-    也不要把一个新出现的厂商故障记成质量退化。
-    """
-
-    if not code:
-        return False
-
-    return code not in CALLER_CODES
+# 码表本体在 `agent_framework.error_codes`（W11 D3 搬过去，见那里的模块文档）。
+# 这里只做 re-export：这两份码表曾经各有一份，10 个码里 6 个判定相反（W4 D5 案例 3）。
 
 
 # 出现在 failures 文本里的结构性关键词。匹配的是 runner 自己生成的断言文案，
@@ -142,7 +113,7 @@ def classify(
         if is_reliability_code(error_code):
             categories.append(
                 FailureCategory.TIMEOUT
-                if error_code in _TIMEOUT_CODES
+                if is_timeout_code(error_code)
                 else FailureCategory.UPSTREAM
             )
         else:

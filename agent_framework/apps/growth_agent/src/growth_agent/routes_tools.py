@@ -17,8 +17,15 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
+from agent_framework.guardrails import (
+    EVENT_APPROVAL_PENDING,
+    EVENT_DANGEROUS_CALL,
+    EVENT_TOOL_CALL,
+    ApprovalError,
+)
 from agent_framework.llm.types import ToolCall
 from agent_framework.observability import current_request_id
 from agent_framework.retrieval import Principal
@@ -106,6 +113,17 @@ async def call_tool(body: ToolCallRequest, request: Request) -> JSONResponse:
     runtime = await ensure_tools(request.app)
     principal = _principal(request)
 
+    # W10 行为监控：记录调用频次。**只记录不拦断**——批量场景下频率高是正常的，
+    # 拦断会误伤；告警的消费者是值班与 W11 的熔断器，不是这里的状态码。
+    spec = runtime.registry.get(body.name)
+    runtime.behavior.record(
+        EVENT_TOOL_CALL, scope=principal.subject_id, skill=body.name
+    )
+    if spec is not None and getattr(spec, "dangerous", False):
+        runtime.behavior.record(
+            EVENT_DANGEROUS_CALL, scope=principal.subject_id, skill=body.name
+        )
+
     call = ToolCall(
         id=f"http-{current_request_id() or 'anon'}-{body.name}",
         name=body.name,
@@ -117,6 +135,13 @@ async def call_tool(body: ToolCallRequest, request: Request) -> JSONResponse:
         stage=body.stage,
         intent_id=body.intent_id,
     )
+
+    # 停在等审批也是一类"卡住"，单独计一次：它的告警阈值更宽（10 分钟 3 次），
+    # 因为它不是安全问题，是流程吞吐问题。
+    if result.status == "pending":
+        runtime.behavior.record(
+            EVENT_APPROVAL_PENDING, scope=principal.subject_id, skill=body.name
+        )
 
     return JSONResponse(
         {
@@ -172,7 +197,19 @@ async def reload_tools(request: Request) -> JSONResponse:
 
 
 def _principal(request: Request) -> Principal:
-    """总是返回一个主体。无请求头 = 匿名（只能跑 read/net）。"""
+    """身份来源：**先看鉴权中间件写的 `request.state.principal`**，其次请求头。
+
+    为什么要有第二条：`AUTH_MODE=off` 时（本地/测试）没有中间件，
+    此时用 `X-Principal-Id` 方便调试。但这意味着**开鉴权后请求头不再被信任**——
+    顺序必须是"可信来源优先"，否则带一个 `X-Principal-Id: admin` 就能
+    绕过 key 冒充管理员。先查 state，正是为了让请求头只在
+    "本来就没设防"的档位下起作用。
+    """
+
+    from_state = getattr(request.state, "principal", None)
+    if isinstance(from_state, Principal):
+        return from_state
+
     subject = (request.headers.get("X-Principal-Id") or "").strip()
     raw_groups = request.headers.get("X-Principal-Groups") or ""
     groups = frozenset(item.strip() for item in raw_groups.split(",") if item.strip())
@@ -180,3 +217,109 @@ def _principal(request: Request) -> Principal:
     if not subject:
         return Principal.anonymous()
     return Principal(subject_id=subject, groups=groups)
+
+
+# --------------------------------------------------------------------------- #
+# HITL 审批通道（W10 D4）
+# --------------------------------------------------------------------------- #
+
+
+class ApprovalDecisionRequest(BaseModel):
+    """人工决策。`by` 必填：一条没有决策人的审批记录在审计里等于没有。"""
+
+    approved: bool
+    by: str = Field(min_length=1, max_length=64, description="审批人标识")
+
+
+@router.get("/v1/approvals")
+async def list_approvals(request: Request) -> JSONResponse:
+    """待审清单 + 审计尾部。
+
+    顺带返回 `audit_tail` 是为了让"谁批的、什么时候批的"能在同一个响应里看到——
+    分成两个端点之后，排障时必然要开两个 tab 对照。
+    """
+
+    runtime = await ensure_tools(request.app)
+    pending = runtime.approvals.pending()
+
+    return JSONResponse(
+        {
+            "request_id": current_request_id() or "-",
+            "pending": [
+                {
+                    "id": item.id,
+                    "skill": item.skill,
+                    "arguments_digest": item.arguments_digest,
+                    "summary": item.summary,
+                    "reason": item.reason,
+                    "created_at": item.created_at,
+                    "expires_at": item.expires_at,
+                    # 剩余秒数给前端做倒计时；人看不到"还有多久过期"就不会去处理。
+                    "expires_in_s": round(max(0.0, item.expires_at - _now()), 1),
+                }
+                for item in pending
+            ],
+            "audit_tail": [
+                {
+                    "at": entry.at,
+                    "action": entry.action,
+                    "request_id": entry.request_id,
+                    "skill": entry.skill,
+                    "by": entry.by,
+                    "note": entry.note,
+                }
+                for entry in runtime.approvals.audit_log[-20:]
+            ],
+            "behavior": runtime.behavior.snapshot(),
+        }
+    )
+
+
+@router.post("/v1/approvals/{request_id}")
+async def decide_approval(
+    request_id: str, body: ApprovalDecisionRequest, request: Request
+) -> JSONResponse:
+    """批准或拒绝。
+
+    三种失败语义分开：
+
+    - 未知 id → 404（可能是过期后被清理，也可能是拼错）
+    - 已终态 → 409（已经批过/拒过，**不能改历史**）
+    - 成功 → 200 + 新状态
+    """
+
+    runtime = await ensure_tools(request.app)
+    existing = runtime.approvals.get(request_id)
+    if existing is None:
+        return JSONResponse(
+            {"error": "approval_not_found", "request_id_field": request_id},
+            status_code=404,
+        )
+
+    try:
+        decided = await runtime.approvals.decide(
+            request_id, approved=body.approved, by=body.by
+        )
+    except ApprovalError as exc:
+        return JSONResponse(
+            {"error": "approval_conflict", "message": str(exc), "state": existing.status},
+            status_code=409,
+        )
+
+    return JSONResponse(
+        {
+            "request_id": current_request_id() or "-",
+            "id": decided.id,
+            "skill": decided.skill,
+            "status": decided.status,
+            "by": decided.decided_by,
+            "decided_at": decided.decided_at,
+        }
+    )
+
+
+def _now() -> float:
+    """当前时间。抽出来是为了让测试能 monkeypatch 单点，
+    而不是在每个断言里算 `time.time() - created_at` 的浮点误差。"""
+
+    return time.time()

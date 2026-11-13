@@ -1,0 +1,149 @@
+{
+ "week": "2026-W49",
+ "period": {
+  "from": "2026-11-30",
+  "to": "2026-12-04"
+ },
+ "gate": "W6",
+ "status": "provenance-and-incremental-shipped",
+ "note": "记录于 2026-11-07 本地实跑：引用抽样 30 条（28 可答 / 2 应拒答）、增量索引在真 pgvector 上验证；/v1/answer 已接入，/v1/draft 仍未接检索。generation 侧没有线上流量读数。",
+ "summary": "生产 RAG II：把「能检索」升级成「可溯源、可增量、可限权」。溯源链路 build_context → 编号 → 生成 → audit_citations 贯通，引用抽样 28/28 通过、2/2 正确拒答；增量索引在真库上验证「新增文档不动旧文档、内容未变零 embedding、更新同事务无残留、删除幂等」；ACL 最小实现（默认拒绝未标注、过滤在精排之前）；上下文组装（去冗余 + 预算裁剪 + 首尾放置）；知识治理三条（质量降权 / 过期降权 / 冲突标注，降权不丢弃、标注不裁决）。本周最重要的一次返工不是代码，是判据：首版引用判定跑出 0/2，而两条答案其实都引到了标注段——根因是标注只覆盖 69/425 个块。",
+ "metrics": {
+  "tests": {
+   "offline_passed": 715,
+   "offline_collected": 740,
+   "live_skipped": 25,
+   "live_skipped_reason": "3 条新增 pgvector 真库用例（需 PGVECTOR_DSN）+ 既有 22 条（无 API 凭证 / 需真库）",
+   "static_checks": {
+    "ruff": "pass",
+    "mypy_files": 61,
+    "mypy": "pass"
+   },
+   "new_this_week": {
+    "framework_side": 113,
+    "note": "602 → 715。新增模块：citation / context_assemble / acl / governance / incremental / citation_accuracy，以及 pipeline、answer 的接线用例"
+   }
+  },
+  "citation": {
+   "sample": "evals/golden/citation_sample_v1.jsonl",
+   "sample_size": 30,
+   "answerable": 28,
+   "insufficient": 2,
+   "accuracy": 1.0,
+   "passed": 28,
+   "threshold": 0.9,
+   "precision_micro": 0.4286,
+   "precision_macro": 0.4855,
+   "cited_total": 84,
+   "cited_matched": 36,
+   "unmatched_same_page": 11,
+   "unmatched_other_page": 37,
+   "gold_in_context": 28,
+   "insufficient_refused": 2,
+   "blanket_citations": 0,
+   "answer_p50_ms": 14733.3,
+   "answer_p95_ms": 22166.3,
+   "tokens_input": 40984,
+   "tokens_output": 24080,
+   "replay_reproducible": true
+  },
+  "incremental": {
+   "backend": "pgvector (postgres 16, local:5433)",
+   "created_chunks": 3,
+   "created_without_touching_other_doc": true,
+   "skipped_with_zero_embed_calls": true,
+   "update_written": 4,
+   "update_deleted": 3,
+   "delete_idempotent": true,
+   "model_snapshot_change_forces_rebuild": true,
+   "document_id_mismatch_refused": true
+  },
+  "acl": {
+   "default_allow_unlabeled": false,
+   "enabled_by_default": false,
+   "filter_before_rerank": true,
+   "tests": 13
+  },
+  "context": {
+   "dedupe_threshold": 0.9,
+   "token_budget": 3000,
+   "reserve_tokens": 600,
+   "attention_ordering": true
+  },
+  "e2e": {
+   "mode": "offline",
+   "total": 54,
+   "passed": 50,
+   "failed": 0,
+   "skipped": 4,
+   "success_rate": 1.0,
+   "judge_mean": 1.922,
+   "ragas": {
+    "samples": 9,
+    "faithfulness": 0.0,
+    "answer_relevancy": 0.0543,
+    "context_precision": 1.0
+   },
+   "regression_gate": {
+    "verdict": "pass",
+    "compared": [
+     "success_rate",
+     "latency_p95_ms"
+    ],
+    "latency_p95_ms": 2.4847
+   }
+  }
+ },
+ "gate_checklist": {
+  "1_provenance_end_to_end": "pass（/v1/answer 返回 chunk_id / document_id / 页码 / 章节 / 摘录 / locator；test_answer_endpoint_returns_citations）",
+  "2_citation_accuracy": "pass（28/28 = 1.0000 ≥ 0.90；精确率 micro 0.4286 / macro 0.4855；2/2 应拒答未编引用；--replay 逐位复现）",
+  "3_incremental_no_full_rebuild": "pass（真库：新增 A 后 B 不变；同内容 SKIPPED 且 embedder 零调用；重复删除返回 0）",
+  "4_transaction_safety": "pass（replace_document 单事务删旧写新；更新后旧 chunk 全消失：写 4 删 3）",
+  "5_acl_minimal": "pass-but-disabled（默认拒绝未标注；过滤在精排之前；13 条单测；ACL 默认关且语料无 acl 标注，真鉴权在 W10）",
+  "6_context_quality": "pass-offline（裁剪后编号连续可解析；run_eval success_rate 1.0、回归门禁通过；离线档不覆盖生成质量）",
+  "7_tuning_checklist": "pass（docs/w6/rag-tuning-checklist.md，11 节，现象→层→旋钮→命令）",
+  "8_knowledge_governance": "partial（单测 15 条覆盖质量/过期/冲突；语料里没有过期文档与矛盾文档，端到端未跑真样本）",
+  "9_merge": "pass（本文件 + docs/log.md W49；/v1/answer 与 /v1/draft 同时可用）"
+ },
+ "decisions": [
+  "引用通过口径 = 「至少一条命中标注段」，不是「条条命中」：标注只覆盖 69/425 个块，按条条命中判等于用标注是否穷尽衡量引用是否正确，且失败会归因到生成层让人去改 prompt",
+  "精确率不做门槛但必须报，且 micro/macro 两个口径都给：micro 回答「全部引用里多少指对」，macro 回答「典型答案多干净」；差 6pp 正是「长答案引得多、命中少」",
+  "「全量引用」不算通过（context ≥4 块且引用数 = 块数）：宽松口径下的必要反制，否则「每段挂个编号」可稳过",
+  "新增 acl 的块默认拒绝，而不是默认放行：反过来后「忘了打标签」与「公开」在审计上无法区分，而漏标是多发事故",
+  "ACL 过滤放在精排之前：省算力，更重要的是消除侧信道——精排耗时随无权限块数量变化，放在后面等于泄露「库里有几份看不到的文档」",
+  "增量更新必须同事务删旧写新，且 hash 与 model_snapshot 两个判据都要：只看 hash，换 embedding 模型后旧向量与新 query 不在同一空间，相似度全是噪声且不报错",
+  "过期文档降权（×0.5）不丢弃：丢弃会让「最新政策是什么」直接无答案，比给一条旧政策更糟——它连「我有一条旧的」都丢了",
+  "冲突不自动裁决，只在答案里显式提示：裁决需要业务权威，模型猜错比暴露冲突贵（与 W4「解析失败给 None 不给补分」同一条原则）",
+  "上下文顺序固定为 去冗余 → 预算裁剪 → 首尾放置 → build_context：先编号再移动会让 [n] 指向错的块，裁剪后不重编号会留悬空引用",
+  "检索惰性装配，不进 lifespan：bge-m3 加载 18–20s，healthcheck start_period 只有 10s，放进去部署直接失败；代价写进 RUNBOOK（上线打一次预热请求）",
+  "答案温度显式下发（默认 0.2，评测 0）：各厂商默认不同，换模型答案风格与引用行为都变，抽样会随采样波动得出两个结论",
+  "/v1/answer 与 /v1/draft 分开不合并：合并要么让写 slogan 也背引用义务，要么让回答事实可以不标"
+ ],
+ "discovered": [
+  "引用判据本身会成为一个 bug：首版「条条命中」跑出 0/2，而两条答案都引到了标注段（golden-001 引 5 条中 2 条命中，另 3 条是同页相邻块）。这个错误如果没被两条试跑拦住，会被判成「模型不会引用」，然后去改 prompt——最贵且无效的一条路",
+  "「精确率」不能用单一分母：micro（36/84 = 0.4286）与 macro（0.4855）差 6pp。只报 macro 会让「引 8 条命中 2 条」和「引 2 条命中 1 条」等权，把「长答案灌水」平均掉",
+  "48 条未命中引用里只有 11 条是同页相邻块，37 条在别的页——「未命中 = 切分边界问题」这个解释站不住。真正能判「每条引用是否支撑它所在那句」的是逐句 judge（W7），不是 chunk 集合比对",
+  "标注是「必答段」而非「全部相关段」：一道跨页的题（query 执行循环）本来就会引多页。所以 chunk 集合级 precision 的上限由标注工作量决定，不能当门禁",
+  "ACL 过滤位置原先在精排之后：功能上「越权块不进 context」成立，但它把 4.7s 的精排算力花在了调用方看不到的块上，且让 p95 随「库里无权限文档数量」变化——这是可观测的侧信道",
+  "`StrEnum` 而不是 `str, Enum`：ruff 的 UP042 只在「仓库里第一次出现 str+Enum」时才有意义，改掉比加 noqa 便宜",
+  "落盘只写可答题会让 replay 悄悄丢掉一整类样本：第一版 write_run 过滤了 insufficient，replay 报「28 条、应拒答 0」，数字看着全正常——「拒绝编引用」这件事再也无法复算",
+  "检索链路目前唯一的真实调用方是 /v1/answer：eval 脚本之外没有第二个入口，所以「检索有没有接进服务」必须靠请求级测试证明，不能靠 import 成功"
+ ],
+ "risks": [
+  "引用准确率在本语料上已饱和（28/28 全过）：它的区分度来自精确率与失败归因，不是准确率本身。下一期若要提高区分度，需要把标注扩成「相关段」或引入逐句 judge",
+  "28 条抽样里 28 条 gold 都进了 context：检索段没拖后腿，但也意味着引用指标几乎没有受到检索质量变化的扰动——检索退化时，这个门禁不一定能先红",
+  "知识治理三条只有单测：语料里没有过期文档、没有矛盾文档、没有低质量来源，端到端从未跑过真样本。Gate 6 #8 因此标 partial",
+  "ACL 只有主体解析，没有真鉴权：X-Principal-Id 可伪造。当前默认关，一旦开启而没有网关鉴权，等于给了「自己填个 header 就能过」的权限",
+  "/v1/draft 仍未接检索：Gate 5 #5 的 p95 门禁继续覆盖不到检索段",
+  "端到端仍是离线夹具档：faithfulness 0.0 与 W48 一致（夹具属性），但 generation 侧没有任何线上读数，p95 只有抽样脚本的 14.7s（含 LLM）",
+  "镜像缺 --extra pgvector（容器内无 psycopg），完整镜像构建仍卡 docker.io 502"
+ ],
+ "next": [
+  "知识治理三条造真样本跑一遍：低质量源 / 2024 旧政策 vs 2026 新政策 / 两篇矛盾文档，把 Gate 6 #8 从 partial 推到 pass",
+  "/v1/draft 接检索：接上后 Gate 5 #5 的 p95 门禁才真正覆盖检索段",
+  "normalize_query 接进 pipeline 最前面：把空/超长 query 变成 InvalidQueryError，而不是静默返回 0 分结果",
+  "逐句引用支撑判定（W7 judge）：chunk 集合级 precision 已到天花板，下一步要判「这条引用是否支撑它所在那句」",
+  "裸终端复跑 run_eval 并把本期 2.48ms 的延迟块写进基线（W48 那块被 socket broker 污染，标了 not comparable）",
+  "Dockerfile 补 --extra pgvector，并解决镜像构建的网络问题"
+ ]
+}

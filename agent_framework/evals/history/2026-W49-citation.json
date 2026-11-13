@@ -1,0 +1,23 @@
+{
+ "total": 30,
+ "answerable": 28,
+ "insufficient": 2,
+ "passed": 28,
+ "accuracy": 1.0,
+ "precision": 0.42857142857142855,
+ "precision_macro": 0.48554421768707484,
+ "cited_total": 84,
+ "cited_matched": 36,
+ "blanket_cases": 0,
+ "verdicts": {
+  "ok": 28
+ },
+ "failure_kinds": {},
+ "insufficient_refused": 2,
+ "gold_in_context": 28,
+ "answer_p50_ms": 14732.888833503239,
+ "answer_p95_ms": 22166.03961921064,
+ "input_tokens": 40984,
+ "output_tokens": 24080,
+ "degraded_cases": 0
+}

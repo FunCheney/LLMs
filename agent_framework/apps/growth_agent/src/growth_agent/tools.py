@@ -12,9 +12,11 @@
 2. **命令与网络白名单默认空**（全拒）。放行清单必须是显式配置：
    `echo`、`pytest` 这些看起来无害，但白名单一旦非空，模型就能在
    前缀之后接任意参数（`pytest --rootdir=/` 之类）。所以清单要短、要评审。
-3. **审批通道留空**（`approver=None`）。`irreversible` 动作会返回 `pending`，
-   这是 W10 HITL 的挂载点。现在填一个"永远同意"的 approver，等于把
-   审批门装成了一个装饰。
+3. **审批通道接的是 `ApprovalGate`（W10 改）**。W8 时这里留空，`irreversible`
+   动作返回 `pending` 且不执行——那是对的默认值，但没有人能把它放行。
+   现在接上真通道：第一次调用仍返回 `pending`（人还没批），批完之后同一动作
+   返回 `approved`。**默认行为没有变化**（仍是 fail-closed），变化的是
+   "pending 终于有出口了"。
 
 `TOOLS=off` 时装配函数直接抛 `ConfigError`：`/v1/tools` 是运维/演示面，
 "静默返回空工具集"会让人以为 Skill 没加载，而实际是没开。
@@ -28,6 +30,10 @@ from pathlib import Path
 from typing import Any
 
 from agent_framework.config import ConfigError, Settings
+from agent_framework.guardrails import (
+    ApprovalGate,
+    BehaviorMonitor,
+)
 from agent_framework.retrieval import Principal
 from agent_framework.skills import (
     ActionRuntime,
@@ -78,6 +84,9 @@ class ToolRuntime:
     audit: AuditLog
     workspace: WorkspaceServer
     settings: Settings
+    # W10：审批门与行为监控。路由要用它们开审批端点、看频率告警。
+    approvals: ApprovalGate
+    behavior: BehaviorMonitor
 
     def surface(
         self, *, principal: Principal | None = None, stage: TaskStage | str = TaskStage.RESEARCH
@@ -128,10 +137,15 @@ def build_tool_runtime(settings: Settings, *, gateway: Any = None) -> ToolRuntim
         logger.info("已加载外部 Skill：%s", [spec.name for spec in loaded])
 
     audit = AuditLog()
+    # W10：审批门。`PermissionGuard(approver=...)` 之后，W8 的
+    # "irreversible → pending" 就接到了真通道上——但**默认仍然是 pending**，
+    # 因为人还没批。这条接线不会让任何动作自动放行。
+    approvals = ApprovalGate()
+    behavior = BehaviorMonitor()
     executor = SkillExecutor(
         registry=registry,
         clients=clients,
-        guard=PermissionGuard(),
+        guard=PermissionGuard(approver=approvals.as_approver()),
         sandbox=sandbox,
         audit=audit,
         truncator=ResultTruncator(max_chars=settings.tools_max_result_chars),
@@ -147,6 +161,8 @@ def build_tool_runtime(settings: Settings, *, gateway: Any = None) -> ToolRuntim
         audit=audit,
         workspace=workspace,
         settings=settings,
+        approvals=approvals,
+        behavior=behavior,
     )
 
 

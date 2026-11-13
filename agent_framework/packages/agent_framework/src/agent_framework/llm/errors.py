@@ -198,6 +198,39 @@ class TaskNotFoundError(LLMError):
         super().__init__(message, provider=provider, **kwargs)
 
 
+class CircuitOpenError(LLMError):
+    """熔断打开期间被快速拒绝 → 503 `CIRCUIT_OPEN`（W11 D2）。
+
+    为什么不复用 `ServerBusyError`（同为 503）：两者的处置动作相反。
+    `SERVER_BUSY` 是"我们自己的并发满了，等一会儿"，`CIRCUIT_OPEN` 是
+    "上游在连续失败，我们已经停止调用它"——后者值班要做的是去看上游，
+    而不是回头扩我们自己的并发。混成一个 code，第一反应必然错。
+
+    `retryable=False` 同 `ServerBusyError`：熔断期间如果我们自己也重试，
+    半开探测的那一个名额会被瞬间挤满，探测永远拿不到结果。
+    """
+
+    default_retryable = False
+    default_retry_after = 5.0
+
+    def __init__(
+        self,
+        message: str = "上游连续失败，已熔断",
+        *,
+        provider: str = "gateway",
+        retry_after: float | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(
+            message,
+            provider=provider,
+            retry_after=(
+                retry_after if retry_after is not None else self.default_retry_after
+            ),
+            **kwargs,
+        )
+
+
 # 内部异常 → (对外 HTTP, 对外 code)。architecture §3.6 是这张表的唯一来源。
 # 放在 errors.py 而不是 server/：客户端层打日志也要用 code，两处各写一份必然漂移。
 ERROR_HTTP: dict[type[LLMError], tuple[int, str]] = {
@@ -209,6 +242,7 @@ ERROR_HTTP: dict[type[LLMError], tuple[int, str]] = {
     UpstreamServerError: (502, "UPSTREAM_ERROR"),
     CapabilityError: (400, "CAPABILITY_UNSUPPORTED"),
     ServerBusyError: (503, "SERVER_BUSY"),
+    CircuitOpenError: (503, "CIRCUIT_OPEN"),
     TaskNotFoundError: (404, "TASK_NOT_FOUND"),
 }
 

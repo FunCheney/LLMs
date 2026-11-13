@@ -1,0 +1,189 @@
+{
+  "week": "2026-W52",
+  "period": { "from": "2026-12-21", "to": "2026-12-25" },
+  "gate": "W9",
+  "status": "planning-and-multi-agent-shipped",
+  "note": "记录于 2026-11-12 本地实跑：Plan-and-Execute / ReAct / Agentic Search / 多智能体 supervisor 全部落地，三道守卫与环路指纹各有反向用例；LangGraph 对照实现 8 条 parity 用例与自研版逐项对齐；Trajectory 层四个过程指标补上，单 Agent vs 多 Agent 七档对比实跑。Gate 9 判 10 项通过、2 项部分（#2 归因与样本量、#7→已通过，#11 极差 0 不等于稳定）。在线档未跑：无可用真模型 key，所有模型侧结论都是离线档的。",
+  "summary": "规划与多智能体：把 W1 只做归一化的 ToolCall 用到「模型自己决定下一步」这条路上，但落点不是「Agent 能自己跑」，而是「自主性有上限、中止有原因」。四道上限（步数 / token / 成本 / 墙钟）由 code 判，模型只拿到三个决定（下一步 / 工具 / 参数），矩阵在运行时被 assert 查询——它红过一次，当时矩阵确实是装饰品，修法是把矩阵接进 StepRunner 与 PlannerBase，不是给测试加豁免。多智能体把三道守卫（步数 / 预算累计 / 环路指纹）放在编排层最外层：预算是一个数在递减不是每跳重置（实测 250→3 轮 300 token、1000→10 轮 1000 token），环路指纹只看 (from,to,task)（带 step_no 则永不重复），两种环都抓（同边重复 + 两点来回）。共享状态用乐观锁在写入点校验，不自动重试——重试会把「谁的工作被丢了」藏起来。LangGraph 用同一张图做对照，8 条用例逐项对齐（状态/轮数/上游调用序列/报告正文全等），差异项是框架多出一个不在枚举里的 recursion_limit；结论是主实现不换，理由是守卫需要一个「所有路径都必经」的位置，而框架里没有。三个最硬的实测结论：①P&E 与 ReAct 的差距完全由观察窗口解释（w3 都 0.80、w8 都 1.00），不来自「有计划」；②多 Agent 到 1.00 是因为共享状态不受窗口限制，等价于窗口无限大，「分工」在本次任务集上贡献为 0；③过程层抓到了结果层看不见的成本——noisy 档覆盖率一样但多花一步。",
+  "metrics": {
+    "tests": {
+      "offline_passed": 1096,
+      "offline_collected": 1126,
+      "live_skipped": 30,
+      "live_skipped_reason": "5 条 pgvector 真库记忆用例 + 既有 25 条（无 API 凭证 / 需真库 / 对抗样例）",
+      "static_checks": {
+        "ruff": "pass",
+        "mypy_files": 110,
+        "mypy": "pass"
+      },
+      "new_this_week": {
+        "framework_side": 102,
+        "app_side": 0,
+        "note": "1024 → 1126。新增 test_planner(26) / test_research_planner(19) / test_multi_agent(31) / test_multi_agent_langgraph(8) / test_trajectory_eval(18)"
+      }
+    },
+    "w9_ab": {
+      "script": "evals/scripts/agent_paradigm_ab.py",
+      "task_set": "evals/golden/w9_agent_v1.jsonl",
+      "cases": 6,
+      "shapes": "简单档 3 条（1 步）/ 复杂档 3 条（5 步，第 5 步回忆第 1 步，回忆距离 4）",
+      "configs": [
+        "react_w1",
+        "react_w3",
+        "react_w8",
+        "plan_execute_w3",
+        "plan_execute_w8",
+        "react_w8_noisy",
+        "multi_agent"
+      ],
+      "trials_complex": 3,
+      "outcome_coverage_complex": {
+        "react_w1": 0.8,
+        "react_w3": 0.8,
+        "react_w8": 1.0,
+        "plan_execute_w3": 0.8,
+        "plan_execute_w8": 1.0,
+        "react_w8_noisy": 1.0,
+        "multi_agent": 1.0
+      },
+      "outcome_coverage_simple": {
+        "all_configs": 1.0
+      },
+      "trajectory_complex": {
+        "tool_selection_acc": 1.0,
+        "invalid_call_rate_react_w8_noisy": 0.17,
+        "invalid_call_rate_others": 0.0,
+        "steps_used_others": 5.0,
+        "steps_used_react_w8_noisy": 6.0,
+        "path_repeat_rate": 0.0
+      },
+      "system_complex_tokens": {
+        "react_w1": 926,
+        "react_w3": 926,
+        "react_w8": 925,
+        "plan_execute_w3": 926,
+        "plan_execute_w8": 925,
+        "react_w8_noisy": 1049,
+        "multi_agent": 139,
+        "caveat": "token 列不可跨档比较：单 Agent 记 reasoner 申报 + 工具输出估算，多 Agent 只记角色申报，supervisor/validator 推理成本未计"
+      },
+      "range_all_configs": 0.0,
+      "range_caveat": "极差 0 = 确定性任务世界下的可复现，不是稳定性。稳定性要在线档 3 次极差，本次未跑"
+    },
+    "w9_guards": {
+      "budget_accumulates": {
+        "budget_250": { "rounds": 3, "tokens": 300, "stop_reason": "max_tokens" },
+        "budget_1000": { "rounds": 10, "tokens": 1000, "stop_reason": "max_tokens" },
+        "note": "若每跳重置，两档都会跑满 max_steps=50，轮数相同"
+      },
+      "loop_fingerprint": {
+        "key": "sha256(from \\x00 to \\x00 task)[:12]",
+        "excluded": ["step_no", "artifacts"],
+        "shapes_caught": ["同边重复", "两点来回(a→b→a→b)"],
+        "false_positive_fixed": "同一角色连任（[r,r]）不算环；修前两个子问题的正常流程在第 4 轮被误杀"
+      },
+      "step_guard": {
+        "unit": "角色轮数（不是工具调用次数）",
+        "why": "空转角色不产出动作，按工具调用计数则守卫永不触发",
+        "companion": "no_progress：同一角色连续两轮空手才停（validator needs_fix 也是空手，但下一棒该换人）"
+      }
+    },
+    "langgraph_parity": {
+      "langgraph_version": "1.2.20",
+      "packages_added": 18,
+      "parity_cases": 8,
+      "aligned": ["状态", "轮数", "步数", "上游调用序列", "报告正文"],
+      "framework_only_reason": "recursion_limit（不在 StopReason 枚举里）",
+      "degradation_check": {
+        "with_langgraph": "1070 passed / 30 skipped",
+        "without_langgraph": "1070 passed / 38 skipped",
+        "failures": 0
+      }
+    },
+    "golden_run": {
+      "week": "2026-W52",
+      "mode": "offline",
+      "cases": 54,
+      "passed": 50,
+      "failed": 0,
+      "interrupted": 0,
+      "skipped": 4,
+      "success_rate": 1.0,
+      "note": "离线夹具只证明执行管道通，不代表模型质量；quality 块保持 null",
+      "ragas_samples": 9,
+      "ragas": {
+        "faithfulness": 0.0,
+        "answer_relevancy": 0.0543,
+        "context_precision": 1.0
+      },
+      "regression_gate": {
+        "baseline": "2026-W46",
+        "compared_metrics": ["success_rate", "latency_p95_ms"],
+        "skipped_metrics": [
+          "cost_per_task",
+          "judge_score",
+          "faithfulness",
+          "tool_error_rate"
+        ],
+        "result": "pass"
+      }
+    }
+  },
+  "gate_checklist": {
+    "1_control_group": "pass（planner/react.py + plan_execute.py 都实现可跑；D5 实测七档里三档是 ReAct、两档是 P&E）",
+    "2_planning_effective": "partial（复杂档 5 步：multi_agent 1.00 vs react_w3 0.80，确实更高；但归因显示差异来自观察窗口而非范式——react_w8 同为 1.00；且 9 个样本不足以称「显著」）",
+    "3_decomposition": "pass（研究规划器按定义/规模/竞品/风险四角度拆分；Gap.failed 显式标注失败子问题；Evidence.quote 构造期硬校验非空；报告三段分区 + unreferenced_claims() 可执行判据；19 条用例）",
+    "4_three_guards": "pass（步数/预算/环路三守卫各配反向用例；plan_loop / no_progress / max_steps / max_tokens 都能断言；环路两种形态都抓）",
+    "5_budget_accumulates": "pass（250→3 轮 300 token；1000→10 轮 1000 token；budget_left 递减传递；反证用例证明「不是每跳重置」）",
+    "6_langgraph_variant": "pass（8 条 parity 用例逐项对齐，含报告正文；差异项 recursion_limit 有实测；取舍结论写在 langgraph-vs-inhouse.md，依赖走 extra）",
+    "7_planner_choice_adr": "pass（adr-w9-planner-choice.md 对 capstone 五条链路逐条判定，四条明确写「不用 Agent」；另附五条「不该用 Agent」红旗）",
+    "8_agentic_search": "pass（四个停止原因都能单独断言：enough_evidence / search_budget / low_marginal_yield / duplicate_query；字符 bigram Jaccard 0.8 去重；同义 query 被拦）",
+    "9_three_layer_ab": "pass（Outcome/Trajectory/System 三层数字齐全，七档 × 两档；trajectory_eval.py 四指标 + 18 条口径单测；TaskMetrics 已回填）",
+    "10_attribution": "pass（差异归因到「记忆机制」：窗口≥回忆距离→1.00，否则 0.80；tool_selection_acc 与 steps_used 在对照间无差异；「分工本身」明确写为无法归因，不外推）",
+    "11_stability": "pass（复杂档每配置跑 3 次，均值与极差已报；极差全为 0.00——但必须读作「可复现」而不是「稳定」，在线档 3 次未跑）",
+    "12_integration": "pass（history 2026-W52 已写；run_eval 54 条 50 passed / 0 failed；regression_gate 通过；全量 1096 passed / 30 skipped）"
+  },
+  "decisions": {
+    "ADR-W9-001": "编排范式选型：capstone 五条链路只有「深度调研」需要自主性，其余四条是确定性编排；主线 P&E，ReAct 作为对照组保留",
+    "ADR-W9-002": "多智能体：handoff 传 id 不传正文、预算递减不重置、环路指纹不含 step_no、版本号在写入点校验且不自动重试、角色没有可越界的工具",
+    "ADR-W9-003": "langgraph 走 optional extra 且不替换主实现：守卫需要一个「所有路径都必经」的位置，框架里没有；18 个包的依赖面积与 3 个节点的收益不成比例",
+    "react_vs_plan_execute": "两者在 5 步任务上的差距完全由观察窗口解释（w3 都 0.80、w8 都 1.00）。所以「P&E 更适合长任务」这句要改成「P&E 让窗口可以开小而不失控」——如果窗口本来够大，两者没有差别",
+    "multi_agent_attribution": "多 Agent 到 1.00 的原因是共享状态不受窗口限制，等价于窗口无限大；「分工」在本次任务集上贡献为 0。要证明分工有价值，需要「角色需要不同工具面/权限」的任务，本任务集没有",
+    "offline_answer_not_outcome": "离线档的答案文本由 PolicyReasoner.compose 按任务书合成，天然含真值——用它判覆盖七档全 1.00（实测过）。Outcome 只能从「证据有没有真的取回来」判",
+    "no_progress_threshold": "no_progress 判据必须是「同一角色连续两轮空手」；判成「本轮空手」会把 validator 的 needs_fix 误当成终结",
+    "loop_false_positive": "环路指纹的窗口内必须有两个以上不同角色。同一角色连任不是互踢皮球（那是逐个查子问题），它归 no_progress 与步数守卫管",
+    "matrix_model_count": "w9-tasks 正文写「模型只拿 2 个」，同页表里列了 3 个 model 行——以代码为准，是 3 个。表格与正文各说一套必须当场钉死",
+    "token_accounting": "多 Agent 的 token 记账单位是「角色申报的成本」，不含 supervisor/validator 的推理；因此 AB 报告里 token 列标注为不可跨档比较，真实成本等在线档统一计价"
+  },
+  "discovered": [
+    "控制权矩阵第一次是装饰品：test_control_matrix_has_no_dead_entries 红了，当时矩阵没有任何运行时查询。修法不是加豁免，是把 assert_code_owned/owner_of/model_may_decide 接进 StepRunner 与 PlannerBase",
+    "PLAN_LOOP 阈值 >2 会让第二次重复那轮真的执行——同一个失败花两遍钱。改成 >=2",
+    "环路指纹的第一版把「同一角色连任」判成环，两个子问题的正常流程在第 4 轮被误杀、报告只剩一半还标着 plan_loop",
+    "步数如果按工具调用计数，空转角色会让守卫永远数到 0，循环转得很欢而守卫不触发",
+    "「多 Agent 的步数」与「工具调用次数」是两个数：一次角色交接可能含多次工具调用，混用会让成本对不上",
+    "_citation_of 用空白切分找 URL，遇到 JSON 包络（\"url\": \"https://…\",）就永远找不到；改成正则",
+    "检索结果的结构化载荷是 {query, results:[{title,url,snippet}]}，直接拿它当结论，报告里就是信封不是信",
+    "LCS 口径对「换序」扣分（[a,b] vs [b,a] 得 0.5），对「多调了」不敏感——后者由 invalid_call_rate 抓，两个指标分工不能混",
+    "第一次 A/B 四种编排全部 1.00：不是系统好，是任务集的回忆距离（2）小于默认窗口（3），机关根本没触发。没有区分度的实验比没做更危险",
+    "第二次 A/B 仍然全 1.00：这次是判据错了——答案文本由 compose 按任务书合成，天生含真值",
+    "langgraph 的 add_node 对 async 闭包过不了 mypy overload，需一处 type: ignore；同签名的节点走 Any 返回就能过",
+    "langgraph 的 graph state 装不下 SharedState：reducer 的默认语义（合并/追加）不会拒绝基于旧快照的写入，等于把乐观锁吃掉"
+  ],
+  "risks": [
+    "在线档一次没跑：所有模型侧结论都建立在「模型完全听话」的假设上，真实模型会在工具选择、参数、停止时机上引入新的失败面",
+    "多 Agent 档的检索词是替它构造的（有完整共享状态时本应提出的词），1.00 是它的能力上限而不是实测水平",
+    "任务集只用了一个工具（web_search），「选错成另一个合法工具」这类失败测不出来，因为它不存在",
+    "样本量小：复杂档 3 条 × 3 次，只能支撑机制层面的定性判断，不能支撑效果量级估计",
+    "LangGraph variant 是对照工件不是产品代码，langgraph v1→v2 若改 add_node 签名它会先烂（重写成本约 2h）",
+    "没装 extra 的 CI 跑不到那 8 条 parity 用例，主实现与对照实现的漂移只能在装了 extra 的那一档被发现",
+    "多 Agent 的 token 记账偏低（supervisor/validator 的推理成本未计），跨档成本对比现在没有可信数字",
+    "共享状态只在单测里模拟过并发（在 act 里抢先 commit），没有真正跑过 asyncio.gather 并发"
+  ],
+  "next": [
+    "W10：把「是否发布」这一格落成真的 HITL（现在是 STATUS_PENDING 占位）；三层 guardrail 用编排方法串",
+    "在线档补一次：LLMReasoner + 真模型跑复杂档 3 次，拿真正的极差；这是「稳定性」唯一的证据来源",
+    "统一 token 计价口径：让单 Agent 与多 Agent 的账可跨档比较（属于 W11 成本看板）",
+    "真正的并发：SharedState 的乐观锁已就位，但只模拟过；接 asyncio.gather 需要补一条「两个角色同时写」的用例",
+    "任务集补「角色需要不同工具面/权限」的 case，否则「分工是否有价值」永远无法证伪"
+  ]
+}

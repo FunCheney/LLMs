@@ -337,6 +337,24 @@ class TaskMetrics:
     # 这里取 `has_any` 的条数）。远小于 `total` 说明数据集缺 references。
     ragas_samples: int = 0
 
+    # -- W9 D5 填：Trajectory（过程）层 ---------------------------------------
+    # 这一层回答"怎么做到的"。缺了它，"多 Agent 成功率 +8%"无法归因——
+    # 分不清是分工对了、工具选对了，还是只是多花 token 多试了几次。
+    # 口径与取值规则见 `evals/scripts/trajectory_eval.py` 的模块 docstring。
+    #
+    # **谁会填它们**：`agent_paradigm_ab.py` + `trajectory_eval.py` 这条链，
+    # 因为只有规划器会产出 `RunTrace`。54 条 golden 是 chat / tool_call 形态，
+    # 跑的是 `LLMGateway`，压根没有轨迹——所以 `run_eval` 落盘里这四个字段是
+    # `null`，不是 0。**"字段存在"不等于"有数"**，看 history 时别读错。
+    tool_selection_acc: float | None = None
+    invalid_call_rate: float | None = None
+    # 平均工具执行次数（**不是**角色轮数：多 Agent 的一次交接可能含多次调用）。
+    steps_used: float | None = None
+    path_repeat_rate: float | None = None
+
+    # 各指标的实际样本数。均值不带样本数，读者就无从判断它可不可信。
+    trajectory_samples: int = 0
+
     def as_dict(self) -> dict[str, Any]:
         """落盘用的扁平字典。
 
@@ -373,6 +391,11 @@ class TaskMetrics:
             "answer_relevancy": self.answer_relevancy,
             "context_precision": self.context_precision,
             "ragas_samples": self.ragas_samples,
+            "tool_selection_acc": self.tool_selection_acc,
+            "invalid_call_rate": self.invalid_call_rate,
+            "steps_used": self.steps_used,
+            "path_repeat_rate": self.path_repeat_rate,
+            "trajectory_samples": self.trajectory_samples,
         }
 
 

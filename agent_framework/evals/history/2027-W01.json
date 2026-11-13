@@ -1,0 +1,339 @@
+{
+  "week": "2027-W01",
+  "period": {
+    "from": "2027-01-04",
+    "to": "2027-01-08"
+  },
+  "gate": "W11",
+  "status": "partial",
+  "note": "Gate 11 十三项判 10 通过 / 3 partial。partial 集中在「数字没在真实流量上标定」：可用性 7 天连续、延迟 p95、质量 judge 分、覆盖率。机制全部落地并实跑；成本这一条还缺 per-task 预算上限与超支熔断（不是没做，是根本没做——列在 DoD 缺口 #3）。",
+  "summary": "生产硬化周：SLO 三张图 + 7 场景混沌 + 九态执行模型（Run/Step/Attempt/Event）+ 幂等续跑与 Run Timeline + 5 篇 incident（含 1 篇解封皮消融实验）+ Feature Flag 与六类资产版本 + Kill Switch 实测 0.5s + 成本三手段单变量 A/B。",
+  "metrics": {
+    "tests": {
+      "offline_passed": 1446,
+      "offline_collected": 1476,
+      "live_skipped": 30,
+      "live_skipped_reason": "5 条 pgvector 真库记忆用例 + 既有 25 条（无 API 凭证 / 需真库 / 对抗样例）",
+      "static_checks": {
+        "ruff": "pass",
+        "mypy_files": 134,
+        "mypy": "pass"
+      },
+      "new_this_week": {
+        "framework_side": 195,
+        "note": "1250 → 1446（+196，其中 1 条是既有 test_injection 的追加）。test_slo(16) / test_circuit_breaker(22) / test_degradation(9) / test_runtime_model(26) / test_idempotency(14) / test_resume_timeline(12) / test_difficulty_router(18) / test_semantic_cache(26) / test_flags(25) / test_assets(17) / test_bootstrap(10) = 195"
+      }
+    },
+    "chaos": {
+      "runner": "evals/scripts/chaos.py",
+      "scenarios": 7,
+      "all_contained": true,
+      "upstream_calls_total": 82,
+      "wall_ms": 62,
+      "invariants": [
+        "熔断不叠加：calls_after_open == 0（ADR-003）",
+        "HALF_OPEN 只放行一个探测：飞行中其余请求快速拒绝",
+        "降级默认不兜底；开启必带 degraded=True"
+      ],
+      "success_rate_note": "未给出成功率百分比：混沌场景是「注入即全挂」，报出来是 0，没有信息量"
+    },
+    "resume": {
+      "runner": "evals/scripts/resume_drill.py",
+      "skipped": [
+        "step-1",
+        "step-2"
+      ],
+      "executed": [
+        "step-3",
+        "step-4"
+      ],
+      "final_state": "completed",
+      "timeline_rows": 13,
+      "note": "续跑不越过审批：WAITING_APPROVAL 的步骤记 blocked 并停下"
+    },
+    "incidents": {
+      "count": 5,
+      "files": "docs/w11/incidents/",
+      "with_ablation": 1,
+      "ablation": "解封皮消融：A2 正常放行率 0%（fake_delimiter x6）→ A3 100%/100%"
+    },
+    "assets": {
+      "runner": "runtime/assets.py::capture",
+      "digest": "73c0d2ec",
+      "missing_kinds": [
+        "skill"
+      ],
+      "kinds_present": [
+        "code",
+        "memory",
+        "model",
+        "prompt",
+        "rag"
+      ],
+      "rollback_table": "docs/w11/asset-versions.md §1"
+    },
+    "flags": {
+      "registered": [
+        "difficulty_router",
+        "semantic_cache"
+      ],
+      "all_default_off": true,
+      "kill_switch_s": 0.5,
+      "kill_switch_deadline_s": 300,
+      "drill": "evals/scripts/kill_switch_drill.py（真起 uvicorn + 真 HTTP + 真改 env 重启）",
+      "eval_after_rollback": "run_smoke.py 10/10 PASS"
+    },
+    "cost_ab": {
+      "runner": "evals/scripts/cost_ab.py",
+      "measurement_note": "token 为估算（字符数/2，与 usage.estimated 同口径），价格为 models.yaml 公开报价；结论是相对差，不是账单",
+      "semantic_cache": {
+        "upstream_calls_off": 16,
+        "upstream_calls_on": 10,
+        "hits": 6,
+        "requests": 16,
+        "cost_off": 0.000593,
+        "cost_on": 0.00037,
+        "saved_ratio": 0.376
+      },
+      "difficulty_router": {
+        "quality_first_baseline": {
+          "cost_off": 0.011118,
+          "cost_on": 0.00585,
+          "cheap_share_on": 0.5,
+          "simple_to_strong": 0,
+          "hard_to_cheap": 0
+        },
+        "current_yaml_baseline": {
+          "cost_off": 0.00045,
+          "cost_on": 0.00585,
+          "cheap_share_on": 0.5,
+          "simple_to_strong": 0,
+          "hard_to_cheap": 0
+        },
+        "reading": "分流不省钱，它把钱花在需要的请求上：质量优先基线 -47.4%，当前 chat→cheap 基线 x13"
+      },
+      "batching": {
+        "serial_s": 0.604,
+        "concurrent_s": 0.202,
+        "speedup": 2.99,
+        "calls_each": 3,
+        "reading": "并发省延迟不省钱；合并成一次调用 W8 已实测否决"
+      }
+    },
+    "dod": {
+      "passed": 2,
+      "partial": 7,
+      "missing": 0,
+      "file": "docs/w11/dod-self-assessment.md",
+      "top_gap": "per-task 预算上限 + 超支熔断未做"
+    }
+  },
+  "asset_snapshot": {
+    "digest": "73c0d2ec",
+    "captured_at": "2026-11-13T02:41:15.033377+00:00",
+    "missing_kinds": [
+      "skill"
+    ],
+    "versions": [
+      {
+        "kind": "code",
+        "name": "image",
+        "version": "dev",
+        "source": "环境变量 GIT_SHA（构建时注入）；缺省 dev 表示本地未构建镜像",
+        "rollback": "回退镜像 tag（ops/RUNBOOK.md §10）"
+      },
+      {
+        "kind": "model",
+        "name": "claude-sonnet-4-6",
+        "version": "anthropic:claude-sonnet-4-6",
+        "source": "models.yaml 的 alias → 厂商模型名",
+        "rollback": "改 alias 指向（models.yaml）后重启；RUNBOOK §11"
+      },
+      {
+        "kind": "model",
+        "name": "deepseek-flash",
+        "version": "deepseek:deepseek-flash",
+        "source": "models.yaml 的 alias → 厂商模型名",
+        "rollback": "改 alias 指向（models.yaml）后重启；RUNBOOK §11"
+      },
+      {
+        "kind": "model",
+        "name": "fixture",
+        "version": "mock:<empty>",
+        "source": "models.yaml 的 alias → 厂商模型名",
+        "rollback": "改 alias 指向（models.yaml）后重启；RUNBOOK §11"
+      },
+      {
+        "kind": "model",
+        "name": "gpt-4o-mini",
+        "version": "openai:gpt-4o-mini",
+        "source": "models.yaml 的 alias → 厂商模型名",
+        "rollback": "改 alias 指向（models.yaml）后重启；RUNBOOK §11"
+      },
+      {
+        "kind": "model",
+        "name": "qwen3.7-plus",
+        "version": "qwen:qwen3.7-plus-2026-05-26",
+        "source": "models.yaml 的 alias → 厂商模型名",
+        "rollback": "改 alias 指向（models.yaml）后重启；RUNBOOK §11"
+      },
+      {
+        "kind": "prompt",
+        "name": "agent_framework.llm.client",
+        "version": "9bea11a2",
+        "source": "client.py 的源码指纹（prompt 拼在代码里）",
+        "rollback": "回退该模块所在镜像 tag（模板尚未外置，见模块文档缺口）"
+      },
+      {
+        "kind": "prompt",
+        "name": "growth_agent.answer",
+        "version": "32b3017f",
+        "source": "answer.py 的源码指纹（prompt 拼在代码里）",
+        "rollback": "回退该模块所在镜像 tag（模板尚未外置，见模块文档缺口）"
+      },
+      {
+        "kind": "prompt",
+        "name": "growth_agent.pipeline.seo",
+        "version": "61ac3bee",
+        "source": "seo.py 的源码指纹（prompt 拼在代码里）",
+        "rollback": "回退该模块所在镜像 tag（模板尚未外置，见模块文档缺口）"
+      },
+      {
+        "kind": "prompt",
+        "name": "growth_agent.pipeline.style",
+        "version": "f2d2e781",
+        "source": "style.py 的源码指纹（prompt 拼在代码里）",
+        "rollback": "回退该模块所在镜像 tag（模板尚未外置，见模块文档缺口）"
+      },
+      {
+        "kind": "rag",
+        "name": "retrieval",
+        "version": "f9a0f862",
+        "source": "检索参数组（top_k / budget）的哈希",
+        "rollback": "切回上一组检索参数并重启（RUNBOOK §12）"
+      },
+      {
+        "kind": "memory",
+        "name": "policy",
+        "version": "off",
+        "source": "MEMORY 环境变量（W7 D5 建的开关）",
+        "rollback": "切回上一种 MEMORY 取值并重启"
+      }
+    ]
+  },
+  "gate_checklist": [
+    {
+      "item": "SLO 三张图可告警，延迟用 p95，成本区分 estimated",
+      "status": "pass",
+      "evidence": "ops/slo.py, ops/alerts.yml, docs/w11/slo-spec.md"
+    },
+    {
+      "item": "三类故障注入可复现且自愈，≥90% 不崩",
+      "status": "partial",
+      "evidence": "7 场景全部受控；成功率百分比未量化（见 chaos-report §6）"
+    },
+    {
+      "item": "熔断器未与 client 重试叠加（ADR-003）",
+      "status": "pass",
+      "evidence": "calls_after_open == 0；test_circuit_breaker 22 条"
+    },
+    {
+      "item": "Run/Step/Attempt/Event 统一，非法迁移抛错，码表复用 W4",
+      "status": "pass",
+      "evidence": "runtime/model.py, agent_framework/error_codes.py（唯一定义处）"
+    },
+    {
+      "item": "重复请求幂等，续跑跳过已完成步",
+      "status": "pass",
+      "evidence": "test_idempotency 14 条 + resume_drill"
+    },
+    {
+      "item": "任一失败 trace 只凭 Run Timeline 能讲清",
+      "status": "pass",
+      "evidence": "docs/w11/reliability-report.md 的 13 行 Timeline"
+    },
+    {
+      "item": "≥5 篇 incident，各带根因与回归用例",
+      "status": "pass",
+      "evidence": "docs/w11/incidents/incident-1..5.md"
+    },
+    {
+      "item": "≥1 条有 Fork/Ablation 对照实验，只改一个变量",
+      "status": "pass",
+      "evidence": "w11_fork_ablation.py 实验 A（三臂）+ 实验 B（max_attempts 1 vs 3）"
+    },
+    {
+      "item": "六类资产版本齐全，Kill Switch ≤5 分钟且回退后 eval 仍绿",
+      "status": "partial",
+      "evidence": "Kill Switch 0.5s ✅；skill 类缺失 / 镜像 tag 回退未实跑"
+    },
+    {
+      "item": "三手段单变量 A/B，成本下降且过门禁",
+      "status": "partial",
+      "evidence": "缓存 -37.6%、分流 -47.4%（质量优先基线）、并发 2.99x；当前 yaml 下分流更贵"
+    },
+    {
+      "item": "DoD 九条逐条达标/缺口 + 证据链接",
+      "status": "pass",
+      "evidence": "docs/w11/dod-self-assessment.md（2 达标 / 7 部分达标）"
+    },
+    {
+      "item": "P3 已判定",
+      "status": "pass",
+      "evidence": "docs/log.md W11 条目"
+    },
+    {
+      "item": "history 接上，端到端仍可跑",
+      "status": "pass",
+      "evidence": "本文件 + run_smoke.py 10/10"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "ADR-W11-001",
+      "decision": "熔断器挂在 LLMGateway 里，不挂在 4 个业务调用点",
+      "why": "业务层有 4 处 await gateway.chat()，包在调用点意味着新增一处就漏一处，而漏的那处不会有测试变红"
+    },
+    {
+      "id": "ADR-W11-002",
+      "decision": "降级里去掉「兜底模型（强→便宜）」",
+      "why": "那就是第二次重试，与 ADR-003 叠加；顺序改为 语义缓存 → 兜底话术（默认关）→ 原样抛出"
+    },
+    {
+      "id": "ADR-W11-003",
+      "decision": "DifficultyRouter 用可选增强 route_for(call)，不扩 Router 协议",
+      "why": "扩协议要改所有实现与所有测试；getattr 探测让 TaskRouter/StaticRouter 一行不动"
+    },
+    {
+      "id": "FLAG-001",
+      "decision": "两个 Feature Flag 默认 False，拼错的开关名启动即失败",
+      "why": "默认值是新行为等于回滚要发版；静默忽略拼错的开关等于「以为开了其实没开」"
+    },
+    {
+      "id": "P3",
+      "decision": "不解锁深入档",
+      "why": "余量不足以同时保 W12 主线（框架提取 + 文档）"
+    }
+  ],
+  "discovered": [
+    "语义缓存把「opts 非空」判成不可缓存，而产品端每个调用都带 temperature —— 它在真实路径上从未生效",
+    "skill_drift 把「改了内容也改了版本号」这种正确做法也报成漂移，一份整天误报的清单最后没人看",
+    "过期/版本不符的条目同时被记进 misses，lookups 分母重复计数，命中率失真",
+    "hard_intent 权重与「文本长度」同权时，6 条硬样本有 4 条落回便宜档",
+    "Kill Switch 演练最初用响应体 input_tokens 判断命中——不成立：那是「答案的出处」不是「本次花费」",
+    "tests/gateway_helpers.make_catalog 造不出 strong 档，DifficultyRouter 的接线测试差点写成假的"
+  ],
+  "risks": [
+    "成本没有事中闸门：反复重试 + 长上下文的请求可以安静花掉一天预算，看板第二天才显示",
+    "语义缓存是进程内缓存，多副本不共享，集群命中率被稀释且重启即清空",
+    "难度分流是词面启发式，没有质量数据标定，靠「偏向强档」兜底而不是靠准确率",
+    "镜像 tag 回退从未实跑：构建需要仓库外 06_rag/rag_mvp 作为额外上下文"
+  ],
+  "next": [
+    "W12 D1：从产品中提取框架公共接口 + 依赖注入",
+    "W12 D2：agent create 脚手架 + 覆盖率 + 本地打包",
+    "W12 D3：Decision Matrix + ADR 汇总 + README + 12 周趋势图",
+    "W12 D4：前沿笔记四节 + 五层归属表",
+    "W12 D5：按两份 JD 逐条模拟面试 + 收官验收"
+  ]
+}

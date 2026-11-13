@@ -102,11 +102,16 @@ slo-spec、alerts.yml、三张图。我会看：SLI 是否复用 RequestLog、�
 **目标**：模型超时 / 工具 500 / 限流三类故障注入可自愈（DoD 可靠性项），产出**混沌演练报告**。
 
 ### 你要做的事
-- [ ] `resilience/circuit_breaker.py`：熔断器（连续失败→打开→半开→闭合）
-- [ ] `resilience/degradation.py`：降级策略（兜底模型/缓存/精简输出）
-- [ ] `evals/scripts/chaos.py`：三类故障注入 + 自愈断言
-- [ ] `docs/w11/chaos-report.md`：注入项 / 预期 / 实际 / 自愈证据
-- [ ] 单测：熔断状态机、降级路径、恢复
+- [x] `resilience/circuit_breaker.py`：熔断器（连续失败→打开→半开→闭合）
+- [x] `resilience/degradation.py`：降级策略（缓存/兜底话术/明确降级说明）
+- [x] `evals/scripts/chaos.py`：三类故障注入 + 自愈断言
+- [x] `docs/w11/chaos-report.md`：注入项 / 预期 / 实际 / 自愈证据
+- [x] 单测：熔断状态机、降级路径、恢复（22 + 9 条）
+
+> **偏差 1：降级里没有"兜底模型（强→便宜）"。** 它就是第二次重试，而候选链已经试过一遍
+> （ADR-003）。落地顺序：语义缓存 → 兜底话术（默认关）→ 原样抛出。见 ADR-W11-002。
+> **偏差 2：熔断器挂在 `LLMGateway(breaker=...)` 上，不是包在 4 个业务调用点。**
+> 包在调用点意味着新增一处调用就漏一处保护，而漏掉的那处不会有测试变红。见 ADR-W11-001。
 
 ### 引导框架
 
@@ -133,10 +138,13 @@ class DegradationPolicy:
 5. 兜底模型走 `models.yaml` 的 fallback 链（W1 已定），别硬编码
 
 **自检**
-- [ ] `chaos.py` 三类注入全部可复现，输出自愈证据
-- [ ] 注入持续超时 → 熔断打开后快速失败，不再打上游（反向验证没被重试放大）
-- [ ] 故障恢复 → 半开试探成功后闭合
-- [ ] `make eval` 在演练后仍过门禁
+- [x] `chaos.py` 三类注入全部可复现，输出自愈证据（F1/F2/F3）
+- [x] 注入持续超时 → 熔断打开后快速失败，不再打上游（`calls_after_open == 0`，反向验证没被重试放大）
+- [x] 故障恢复 → 半开试探成功后闭合（F5：探测飞行中 4 个请求被拒、0 次上游调用）
+- [x] `make eval` 在演练后仍过门禁：全量 `1296 passed / 30 skipped`，`test_regression_gate.py` 全绿；
+      完整 54 条 eval 在 Gate 11 统一跑一次并落 `evals/history`（避免演练当天落一份半成品基线）
+- [ ] **故障期间"成功率 ≥90%"未在演练里量化**——注入的是 100% 失败，报出来是 0 没有信息量。
+      这条只能从真实 `RequestLog` 算，见 `chaos-report.md` §7 缺口 1
 
 ### 🔍 交给我的锚点
 chaos-report、CircuitBreaker、自愈断言输出。我会看：**熔断器有没有造第二次重试**（ADR-003）、三类是否都可复现、降级是否有明确标记。
@@ -149,12 +157,18 @@ chaos-report、CircuitBreaker、自愈断言输出。我会看：**熔断器有�
 今天不是"加一个断点续跑"，而是把散落在 W2/W9/W10 的执行状态收敛成**一套对象模型**。
 
 ### 你要做的事
-- [ ] `runtime/model.py`：**`Run` / `Step` / `Attempt` / `Event`** 四个对象 + 9 态状态机
-- [ ] `runtime/timeline.py`：`RunTimeline`（一次执行的时间线，能回答"第几步、哪个工具、为什么重试"）
-- [ ] `resilience/idempotency.py`：幂等键（请求/任务级）
-- [ ] 断点续跑：activity 完成态持久化，重启后跳过已完成步
-- [ ] `docs/w11/reliability-report.md`：执行模型 + 幂等 + 续跑 + Timeline 四项证据
-- [ ] 单测：状态机非法迁移被拒、重复请求幂等、续跑跳过已完成步、Timeline 可重建
+- [x] `runtime/model.py`：**`Run` / `Step` / `Attempt` / `Event`** 四个对象 + 9 态状态机
+- [x] `runtime/timeline.py`：`RunTimeline`（一次执行的时间线，能回答"第几步、哪个工具、为什么重试"）
+- [x] `resilience/idempotency.py`：幂等键（请求/任务级）
+- [x] 断点续跑：`runtime/resume.py`（事件流落盘 + 重启跳过已完成步 + 中断步重跑）
+- [x] `docs/w11/reliability-report.md`：执行模型 + 幂等 + 续跑 + Timeline 四项证据
+- [x] 单测：状态机非法迁移被拒、重复请求幂等、续跑跳过已完成步、Timeline 可重建（26 + 14 + 12）
+- [x] 附：码表从 `evals/scripts/classify_failures.py` 搬进 `agent_framework/error_codes.py`，
+      分类器改为 re-export——`Attempt.error_code` 要判"是不是厂商的锅"，而 runtime 不能 import 评测脚本
+
+> **偏差：断点续跑没走 Temporal。** 本项目没有真正的 Temporal 集群，
+> `ResumableRunner` 用"事件流落盘 + 从磁盘重建"实现同一性质，重启是真的重启（内存态全丢）。
+> **缺口：新模型尚未替换 `/v1/tasks` 的四态记录**，见 `reliability-report.md` §9 缺口 1。
 
 ### 引导框架
 
@@ -239,10 +253,13 @@ class RunTimeline:
 
 **自检**
 - [ ] 重复提交同一 `POST /v1/tasks` → 只执行一次，返回同一 task_id
-- [ ] 长任务跑到第 3 步时"重启" → 从第 4 步续跑，前 3 步不重跑（反向验证）
-- [ ] 构造非法迁移（`COMPLETED` → `RUNNING`）→ 抛错，不是静默
-- [ ] 一条失败 trace 只凭 Timeline 能讲清全过程（不打开原始日志）
-- [ ] `WAITING_APPROVAL` 在 SLO 图里单列，不计入"卡住"
+      **（限定：`InMemoryIdempotencyStore` 的语义已实测；接口层还没接，见缺口 1）**
+- [x] 长任务跑到第 3 步时"重启" → 从第 4 步续跑，前 3 步不重跑（反向验证）
+      实测：`skipped=('step-1','step-2')`、`executor 实际调用=['step-3','step-4']`
+- [x] 构造非法迁移（`COMPLETED` → `RUNNING`）→ 抛错，不是静默
+- [x] 一条失败 trace 只凭 Timeline 能讲清全过程（不打开原始日志）
+- [x] `WAITING_APPROVAL` 不计入"卡住"：`stuck_runs()` 排除它、`RunTimeline.summary()`
+      单独报"卡在等人审批"；**但 `ops/slo_report.py` 还没把 run 状态纳入周报**（缺口 5）
 
 ### 🔍 交给我的锚点
 `runtime/{model,timeline}.py`、idempotency、续跑与非法迁移测试、reliability-report。
@@ -255,12 +272,15 @@ class RunTimeline:
 **目标**：用 W10 收集的真实反馈，修 ≥5 条 bug，产出「线上问题 → 根因 → 修复」记录（证据包第 7 件）。
 
 ### 你要做的事
-- [ ] 从反馈渠道整理 ≥5 个真实问题
-- [ ] 每个用 W4 `root-cause-playbook` 定位根因（检索/提示词/工具/模型四层）
-- [ ] **至少 1 条用 Fork/Ablation 证明根因**（不是"我觉得是这个原因"）
-- [ ] 逐个修复 + `make eval` 验证；补一条回归用例防止复发
-- [ ] `docs/w11/incidents/incident-{1..5}.md`：五篇记录
-- [ ] 更新 `docs/log.md`
+- [x] 从反馈渠道整理 ≥5 个真实问题 → **限定：无外部用户，5 条来自 W10 上线打通时的实跑 + W11 演练**
+      （`docs/w11/incidents/README.md` §0 有口径声明）
+- [x] 每个用 W4 `root-cause-playbook` 定位根因 —— **结论是 5/5 都不在四层里**：
+      四层树的前提是"系统在跑、模型在答"，而这几条是"没跑起来 / 没设防"。见 README §2
+- [x] **至少 1 条用 Fork/Ablation 证明根因**：做了 2 条（INC-1 消融、INC-5 分叉），
+      `evals/scripts/w11_fork_ablation.py` 可复跑，结论已进门禁
+- [x] 逐个修复 + 补回归用例（`test_injection.py` / `test_article_route.py` / `test_auth.py` / `test_circuit_breaker.py`）
+- [x] `docs/w11/incidents/incident-{1..5}.md`：五篇记录 + `README.md` 索引
+- [ ] 更新 `docs/log.md` —— 留给 W11 合流那一刀统一写（避免一周写两次、两次不一致）
 
 ### 引导框架
 
@@ -302,10 +322,12 @@ Fork 出两条路径，**只改 A**，如果 B 路径指标不变、A 路径变�
    便宜的 bug 用规则归因就够——这个取舍本身也是面试可讲的判断力
 
 **自检**
-- [ ] ≥5 篇 incident 各有复现、根因、修复、验证四段
-- [ ] 至少 1 篇有 Fork/Ablation 对照实验，且写清了"只改了什么、另一条没变"
-- [ ] 每篇对应的回归用例在 `make eval` 中通过
-- [ ] 修复后 history 曲线的成功率/成本有可见改善
+- [x] ≥5 篇 incident 各有现象、根因、修复、验证四段
+- [x] 至少 1 篇有 Fork/Ablation 对照实验，且写清了"只改了什么、另一条没变"（做了 2 篇）
+- [x] 每篇对应的回归用例在全量门禁中通过（1350 passed / 30 skipped）
+- [ ] 修复后 history 曲线的成功率/成本有可见改善 —— **做不到**：这 5 条里 4 条离线档走不到，
+      第 5 条修的是证据链不是成功率。能报的数（`/v1/article` 500→200、deploy_check 3/5→5/5）
+      记在 README §4，不拿它冒充"曲线改善"
 
 ### 🔍 交给我的锚点
 5 篇 incident、对照实验、回归用例、修复前后指标。我会看：是否真实、根因是否用 playbook 归因、
@@ -322,17 +344,37 @@ Fork 出两条路径，**只改 A**，如果 B 路径指标不变、A 路径变�
 > **D3 解决"能不能恢复执行"，D5 解决"能不能退回行为"**。前者是运行时状态，后者是资产版本。
 
 ### 你要做的事
-- [ ] `runtime/flags.py`：Feature Flag（配置驱动，不改代码不发版）
-- [ ] **资产版本清单**：六类资产各自有版本号且可回滚
-- [ ] 灰度：按 principal/比例切新老逻辑（复用 W6 `Principal`）
-- [ ] **Kill Switch**：一条命令让某能力回到旧行为（演练并计时）
-- [ ] 回滚演练：镜像 tag 回退 + 配置回退（复用 W10 runbook）
-- [ ] `resilience/semantic_cache.py`：语义缓存（相似 query 复用结果）
-- [ ] 模型分流：按难度把简单任务路由到 cheap（实现 architecture §8 的 Router 策略）
-- [ ] 批处理：可并行的改写/检索合并
-- [ ] `docs/w11/dod-self-assessment.md`：DoD 九条逐条自评（达标/缺口/证据链接）
-- [ ] 更新 `evals/history/YYYY-Www.json`、`docs/log.md`；周五合流仪式
-- [ ] **W11 末 P3 决策**：余量 ≥15h 才解锁一个深入档（前端/多语言最佳挂载点）
+- [x] `runtime/flags.py`：Feature Flag（配置驱动，不改代码不发版）
+- [x] **资产版本清单**：六类资产各自有版本号且可回滚
+- [x] 灰度：按 principal/比例切新老逻辑（复用 W6 `Principal`）
+- [x] **Kill Switch**：一条命令让某能力回到旧行为（演练并计时）
+- [x] 回滚演练：镜像 tag 回退 + 配置回退（复用 W10 runbook）
+- [x] `resilience/semantic_cache.py`：语义缓存（相似 query 复用结果）
+- [x] 模型分流：按难度把简单任务路由到 cheap（实现 architecture §8 的 Router 策略）
+- [x] 批处理：可并行的改写/检索合并
+- [x] `docs/w11/dod-self-assessment.md`：DoD 九条逐条自评（达标/缺口/证据链接）
+- [x] 更新 `evals/history/YYYY-Www.json`、`docs/log.md`；周五合流仪式
+- [x] **W11 末 P3 决策**：余量 ≥15h 才解锁一个深入档（前端/多语言最佳挂载点）
+
+> **偏差 1：回滚演练只做了一半。** 配置回退（`FEATURES` 改值 + 重启）实跑到 **0.5s**；
+> **镜像 tag 回退没实跑**——本机没有既有镜像，`ops/Dockerfile` 的构建需要仓库外的
+> `06_rag/rag_mvp` 作为 `additional_contexts`，构建不起来。没有产物就没有"回退到上一版"，
+> 所以如实记为缺口（`asset-versions.md` §4 给了可执行步骤）。
+>
+> **偏差 2：批处理只取"并发"部分。** `StyleRewriter.rewrite_all` 的并发是 W8 就有的；
+> "合并成一次调用"W8 已实测否决（LinkedIn 段落结构污染 X，空行被 `validate()` 拦下），
+> 本周不重测——重测需要真实上游输出，离线造一个"串味文本"再断言它被拦是自证。
+> 于是 `FLAGS` 里**没有** `batched_rewrite`：给被否决的方案配开关，等于给没人敢开的代码办长期居留。
+>
+> **偏差 3：`circuit_breaker` 也没做成 Flag。** 已经有 `BREAKER_ENABLED`（D2）。
+> 同一行为两个开关必然出现"A 关了它还在跑"，而排查时两个人各看一个开关。
+>
+> **缺口：`skill` 这一类资产没进快照**（`missing_kinds=('skill',)`）。
+> W8 的 Skill 在 `tools_skills_dir` 里按需加载，`capture()` 只在显式传 `skills=` 时才有这一类。
+>
+> **发现（成本这条最贵的一处）**：语义缓存最初把"`opts` 非空"判成不可缓存，
+> 而产品端**每一个**调用都带 `temperature`——它在真实路径上从未生效，而测试全绿。
+> 改成"opts 进缓存键"之后才真正命中（`kill_switch_drill.py` 里 2 条请求 1 条命中）。
 
 ### 引导框架
 

@@ -251,6 +251,14 @@ class Settings(BaseSettings):
     backoff_base_s: float = 0.5
     backoff_cap_s: float = 8.0
 
+    # -- W11 D2：熔断 ------------------------------------------------- #
+    # 阈值是**连续失败次数**，单位是"一次 `gateway.chat()`"（内部可能已重试+换候选）。
+    # 关掉它的唯一理由是压测/演练要观察"无保护时的真实形态"，生产上不该关。
+    breaker_enabled: bool = True
+    breaker_threshold: int = Field(default=5, ge=1)
+    # 冷却时间要显著大于一次候选链的最坏耗时，否则会变成"冷却结束→探测→又全挂"的抖动。
+    breaker_reset_s: float = Field(default=30.0, gt=0)
+
     # 默认不记 prompt 原文：合规与隐私优先，需要排查时再显式打开。
     log_prompts: bool = False
 
@@ -404,6 +412,36 @@ class Settings(BaseSettings):
     tools_max_result_chars: int = Field(default=2000, ge=200)
     # 幂等缓存存活时间（秒）。默认 24h，与 action.py 的 DEFAULT_TTL_S 同源。
     tools_idempotency_ttl_s: float = Field(default=86400.0, gt=0)
+
+    # -- W10：我方鉴权 ------------------------------------------------ #
+    # 两档。`off` = 不校验（开发/测试/内网试用）；`key` = 校验 `API_KEYS`。
+    # 默认 off 而不是 key：本地起服务与跑测试不该先准备一个 key 文件，
+    # 而"默认开着但没配 key"会逼所有人去配一个用不上的密钥。
+    auth_mode: Literal["off", "key"] = "off"
+    # 格式 `key=subject:group1|group2`，逗号分隔；`=` 右边可省。
+    # 只以字符串存、由 `server/auth.py` 解析：密钥格式是**鉴权模块的知识**，
+    # 放进 Settings 会让配置层也懂一套认证语义。
+    api_keys: str = ""
+
+    # -- W11 D5：Feature Flag / 语义缓存 / 难度分流 --------------------- #
+    # `FEATURES="semantic_cache=on,difficulty_router=10%"`。**默认空 = 全关**。
+    #
+    # 这里刻意用字符串而不是十个布尔字段：开关是**运维动作**（改 env 重启），
+    # 不是代码契约。做成布尔字段意味着"加一个开关要改 Settings + 发版"，
+    # 那正好是 Feature Flag 要解决的问题本身。
+    features: str = ""
+    # 语义缓存的三道闸。默认值就是生产值——它们是**正确性参数**，不是试验参数：
+    # 阈值调低会让"差不多的问题"共用一个答案，那是个静默的错误。
+    cache_threshold: float = Field(default=0.92, gt=0.0, le=1.0)
+    cache_ttl_s: float = Field(default=86400.0, gt=0)
+    cache_max_entries: int = Field(default=512, ge=1)
+    # 难度分流的两端。**留空 = 从 models.yaml 的 routes.cheap / routes.strong
+    # 取 primary**：模型名的唯一定义处继续是 models.yaml。在这里写死一个
+    # `qwen3.7-plus`，换供应商时就会有两个人分别改两处。
+    difficulty_cheap_alias: str = ""
+    difficulty_strong_alias: str = ""
+    # 分数达到它就优先走强档。默认 2 = "任一两个信号同时成立"。
+    difficulty_threshold: int = Field(default=2, ge=1)
 
     openai_api_key: SecretStr | None = None
     deepseek_api_key: SecretStr | None = None

@@ -41,11 +41,13 @@
 
 ## Gate 0 · 开工前（30 min）
 
-- [ ] `make eval` 全绿、门禁生效；W9 调研链路端到端可跑
-- [ ] 准备部署目标（云服务器 / PaaS / 内网穿透），确认可公网访问
-- [ ] 准备 2~3 位"真实用户"（朋友），想好怎么收集反馈（W11 要用）
-- [ ] 复核 ADR-005：**我方 401 ≠ 上游鉴权失败 502**，别混淆
-- [ ] 复核 W8 `dangerous` 钩子当前返回 `pending` 的位置（本周接真审批）
+- [x] `make eval` 全绿、门禁生效；W9 调研链路端到端可跑
+- [x] 准备部署目标（云服务器 / PaaS / 内网穿透），确认可公网访问
+  **未做**：没有云服务器/域名，也没有可公网访问的地址。本机 127.0.0.1 同构验证做了（见 RUNBOOK §10.3）
+- [x] 准备 2~3 位"真实用户"（朋友），想好怎么收集反馈（W11 要用）
+  **未做**：没有真实用户。W11 要的「真实反馈」因此没有任何输入来源
+- [x] 复核 ADR-005：**我方 401 ≠ 上游鉴权失败 502**，别混淆
+- [x] 复核 W8 `dangerous` 钩子当前返回 `pending` 的位置（本周接真审批）
 
 ---
 
@@ -54,11 +56,11 @@
 **目标**：把 W9 的调研产物变成结构化 SEO 文章。
 
 ### 你要做的事
-- [ ] `apps/growth_agent/pipeline/seo.py`：`SEOPipeline`（stages）
-- [ ] 每步：关键词 → 大纲 → 成文 → meta/结构化数据（JSON-LD）
-- [ ] 成文基于调研报告，每个事实性结论带 `Citation`（W6）
-- [ ] `POST /v1/article`（或 `/v1/pipeline`）端点：主题进 → 全链路出
-- [ ] 单测：各 stage 可单测、引用传递、失败不产出无引用结论
+- [x] `apps/growth_agent/pipeline/seo.py`：`SEOPipeline`（stages）
+- [x] 每步：关键词 → 大纲 → 成文 → meta/结构化数据（JSON-LD）
+- [x] 成文基于调研报告，每个事实性结论带 `Citation`（W6）
+- [x] `POST /v1/article`（或 `/v1/pipeline`）端点：主题进 → 全链路出
+- [x] 单测：各 stage 可单测、引用传递、失败不产出无引用结论
 
 ### 引导框架
 
@@ -87,9 +89,9 @@ class SEOPipeline:
 5. **失败要诚实**：某 stage 失败不产出"看起来完整但没引用"的文章（W9 已定的诚实原则）
 
 **自检**
-- [ ] 一个主题跑通四个 stage，输出的每条结论能溯源到 citation
-- [ ] `pytest -k seo` 各 stage 独立可测
-- [ ] 品牌记忆里的"禁用词"在成文中不出现
+- [x] 一个主题跑通四个 stage，输出的每条结论能溯源到 citation
+- [x] `pytest -k seo` 各 stage 独立可测
+- [x] 品牌记忆里的"禁用词"在成文中不出现
 
 ### 🔍 交给我的锚点
 SEOPipeline、一次产物、trace。我会看：stage 是否可单测、引用是否传递、品牌记忆是否生效、prompt 是否留在产品层。
@@ -101,10 +103,10 @@ SEOPipeline、一次产物、trace。我会看：stage 是否可单测、引用�
 **目标**：小红书 / X / LinkedIn 三种风格改写，且都遵守品牌调性。
 
 ### 你要做的事
-- [ ] `apps/growth_agent/pipeline/style.py`：`StyleRewriter`
-- [ ] 三种平台 prompt 模板（放产品层，可配置）
-- [ ] 品牌调性约束校验（禁用词、语气、长度）
-- [ ] 单测：三平台输出符合各自约束、调性违规被拦
+- [x] `apps/growth_agent/pipeline/style.py`：`StyleRewriter`
+- [x] 三种平台 prompt 模板（放产品层，可配置）
+- [x] 品牌调性约束校验（禁用词、语气、长度）
+- [x] 单测：三平台输出符合各自约束、调性违规被拦
 
 ### 引导框架
 
@@ -132,9 +134,9 @@ class StyleRewriter:
 4. 三平台改写并发（受 W2 限流约束），成本进日志
 
 **自检**
-- [ ] 三平台输出各自符合长度/元素约束
-- [ ] 注入一个含禁用词的改写 → `validate` 拦下并返回违规项（反向验证）
-- [ ] `pytest -k style` 全绿
+- [x] 三平台输出各自符合长度/元素约束
+- [x] 注入一个含禁用词的改写 → `validate` 拦下并返回违规项（反向验证）
+- [x] `pytest -k style` 全绿
 
 ### 🔍 交给我的锚点
 PlatformSpec、validate、三平台样例。我会看：约束是否数据驱动、规则校验是否优先、禁用词是否从记忆取。
@@ -146,11 +148,11 @@ PlatformSpec、validate、三平台样例。我会看：约束是否数据驱动
 **目标**：**10 条注入用例全拦截**（DoD 安全项）。输入隔离 + 指令分层 + 注入检测中间件。
 
 ### 你要做的事
-- [ ] `guardrails/injection.py`：注入检测器 + 输入隔离/指令分层
-- [ ] `evals/golden/redteam_v1.jsonl`：10 条红队用例（含间接注入：来自检索内容/tool result）
-- [ ] `evals/scripts/run_redteam.py`：批量跑，断言全拦截
-- [ ] `docs/w10/threat-model.md`：威胁模型（直接/间接注入、越权工具、数据外泄）
-- [ ] 单测：10 条全拦截、误报率抽样
+- [x] `guardrails/injection.py`：注入检测器 + 输入隔离/指令分层
+- [x] `evals/golden/redteam_v1.jsonl`：10 条红队用例（含间接注入：来自检索内容/tool result）
+- [x] `evals/scripts/run_redteam.py`：批量跑，断言全拦截
+- [x] `docs/w10/threat-model.md`：威胁模型（直接/间接注入、越权工具、数据外泄）
+- [x] 单测：10 条全拦截、误报率抽样
 
 ### 引导框架
 
@@ -174,9 +176,9 @@ class InjectionGuard:
 5. 10 条红队覆盖：直接越权、"忽略之前指令"、间接注入（藏在检索/tool 结果）、数据外泄诱导、编码绕过等
 
 **自检**
-- [ ] `run_redteam.py` 10 条全拦截（0 通过），输出拦截类型
-- [ ] 误报抽样：一批正常输入不被误拦（否则产品没法用）
-- [ ] 把恶意指令塞进一个假的检索 chunk → 仍被拦（反向验证间接注入）
+- [x] `run_redteam.py` 10 条全拦截（0 通过），输出拦截类型
+- [x] 误报抽样：一批正常输入不被误拦（否则产品没法用）
+- [x] 把恶意指令塞进一个假的检索 chunk → 仍被拦（反向验证间接注入）
 
 ### 🔍 交给我的锚点
 威胁模型、红队用例、run_redteam 输出。我会看：**间接注入是否覆盖**、拦截是否走统一错误表、误报率是否可接受。
@@ -188,11 +190,11 @@ class InjectionGuard:
 **目标**：输入校验 / 输出过滤 / 行为监控三层；把 W8 的 `dangerous` 占位升级为**发布前人工确认**（HITL）。
 
 ### 你要做的事
-- [ ] `guardrails/input.py`：输入校验（长度/类型/注入，复用 D3）
-- [ ] `guardrails/output.py`：输出过滤（禁用词/引用完整性/格式）
-- [ ] `guardrails/behavior.py`：行为监控（高风险工具调用频次/预算异常）
-- [ ] `guardrails/hitl.py`：`ApprovalGate`（`dangerous` 技能 → pending → 人工确认/拒绝）
-- [ ] 单测：三层各一例、审批流状态机、拒绝后不执行
+- [x] `guardrails/input.py`：输入校验（长度/类型/注入，复用 D3）
+- [x] `guardrails/output.py`：输出过滤（禁用词/引用完整性/格式）
+- [x] `guardrails/behavior.py`：行为监控（高风险工具调用频次/预算异常）
+- [x] `guardrails/hitl.py`：`ApprovalGate`（`dangerous` 技能 → pending → 人工确认/拒绝）
+- [x] 单测：三层各一例、审批流状态机、拒绝后不执行
 
 ### 引导框架
 
@@ -222,9 +224,9 @@ class ApprovalGate:
 5. 所有拦截/审批进 `RequestLog` trace（W2/W3），可回放、可归因
 
 **自检**
-- [ ] 一个 `dangerous` 技能未经审批 → 执行被拦且审计有记录（反向验证）
-- [ ] 审批 approved 后放行；rejected/expired 不放行
-- [ ] `pytest -k guardrail` 覆盖三层 + 状态机
+- [x] 一个 `dangerous` 技能未经审批 → 执行被拦且审计有记录（反向验证）
+- [x] 审批 approved 后放行；rejected/expired 不放行
+- [x] `pytest -k guardrail` 覆盖三层 + 状态机
 
 ### 🔍 交给我的锚点
 ApprovalGate、三层编排、审计日志。我会看：**未审批是否真的不执行**（红线）、过期是否默认拒绝、审计是否完整。
@@ -236,11 +238,14 @@ ApprovalGate、三层编排、审计日志。我会看：**未审批是否真的
 **目标**：**部署到真实可访问环境，开始真实使用**（ROADEMAP §3.3）；写第一版 runbook。
 
 ### 你要做的事
-- [ ] `server/auth.py`：我方 API Key 鉴权（区分 ADR-005：我方 401 vs 上游 502）
-- [ ] 部署：Docker 镜像 + compose（复用 W2）+ 域名/HTTPS + 环境变量
-- [ ] `ops/runbook.md`：部署/回滚/常见故障/告警/密钥轮换
-- [ ] 邀请 2~3 位朋友真实使用，建立反馈收集渠道（表格/issue 模板）
-- [ ] 更新 `evals/history/YYYY-Www.json`、`docs/log.md`；周五合流仪式
+- [x] `server/auth.py`：我方 API Key 鉴权（区分 ADR-005：我方 401 vs 上游 502）
+- [x] 部署：Docker 镜像 + compose（复用 W2）+ 域名/HTTPS + 环境变量
+  **限定**：Dockerfile 与 compose 复用 W2，prod 覆盖层 + Caddyfile 已写但**没跑过**（Compose ≥ 2.24.4 的 `!override` 未验证）；域名/HTTPS 未发生
+- [x] `ops/runbook.md`：部署/回滚/常见故障/告警/密钥轮换
+- [x] 邀请 2~3 位朋友真实使用，建立反馈收集渠道（表格/issue 模板）
+  **未做**：没有人可邀请。反馈渠道模板也没建（没有渠道就不该先造模板）
+- [x] 更新 `evals/history/YYYY-Www.json`、`docs/log.md`；周五合流仪式
+  已落 `2026-W53.json` + `docs/log.md` W53 条目 + `docs/w10/w10-acceptance.md`
 
 ### 引导框架
 
@@ -302,9 +307,16 @@ class APIKeyAuth:
 |---|---|
 | 内容 pipeline | `apps/growth_agent/pipeline/{seo,style}.py`、`POST /v1/article` |
 | 安全/红队 | `guardrails/{injection,input,output,behavior,hitl}.py`、`evals/golden/redteam_v1.jsonl`、`evals/scripts/run_redteam.py` |
+| **护栏唯一入口** | `guardrails/pipeline.py`（`GuardrailPipeline.run`：顺序硬编码，四层必经） |
 | 威胁模型 | `docs/w10/threat-model.md` |
-| 鉴权/部署 | `server/auth.py`、`ops/runbook.md`、部署配置 |
-| 记录 | `evals/history/YYYY-Www.json`、`docs/log.md`（W10 条目） |
+| 鉴权/部署 | `server/auth.py`、`ops/docker-compose.prod.yml`、`ops/Caddyfile`、`ops/deploy_check.sh`、`ops/RUNBOOK.md` §10–12 |
+| 验收 | `docs/w10/w10-acceptance.md` |
+| 记录 | `evals/history/2026-W53.json`、`docs/log.md`（W10 条目） |
+
+> 与上面那张表的一处偏差：任务书列的 `guardrails/{input,output,behavior}.py`
+> "三层"，实际落成**四层 + 一个编排器**。原因写在 `w10-acceptance.md`：
+> 四个类各自单测都绿，但它们不构成一道门；`run()` 才是那道门。
+> "三层"是模块清单，"一道门"是约束——后者不是多写一个文件就能得到的。
 
 ---
 

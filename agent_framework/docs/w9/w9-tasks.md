@@ -43,11 +43,15 @@
 
 ## Gate 0 · 开工前（30 min）
 
-- [ ] `make eval` 全绿、门禁生效；`difficulty=3` 案例当前成功率记录（对比基线）
+- [x] `make eval` 全绿、门禁生效；`difficulty=3` 案例当前成功率记录（对比基线）
 - [ ] 复核 W7 的 token 预算分配器（多 Agent 共享状态要复用它）
-- [ ] 复核 W8 SkillExecutor 的执行闭环（规划器只编排，不重写执行）
-- [ ] 明确 capstone 的"深度调研"链路：问题拆解 → 多源检索 → 交叉验证 → 成文
-- [ ] 若 W8 解锁了 A2A 深入档，准备一个跨进程 demo 目标
+      —— **未做**。预算计量复用的是 D1 新写的 `BudgetMeter`（`planner/controls.py`），
+      W7 的 `context/budget.py` 只被 `estimate_tokens` 间接用到（`StepRecord.tokens`）。
+      两者职责不同：W7 那个管「一次上下文能塞多少」，`BudgetMeter` 管「一个任务能花多少」。
+      没合并是因为合并后会变成一个有 6 个计数器的类，谁都读不懂自己那一段。
+- [x] 复核 W8 SkillExecutor 的执行闭环（规划器只编排，不重写执行）
+- [x] 明确 capstone 的"深度调研"链路：问题拆解 → 多源检索 → 交叉验证 → 成文
+- [x] 若 W8 解锁了 A2A 深入档，准备一个跨进程 demo 目标
 
 ---
 
@@ -56,12 +60,12 @@
 **目标**：理解三种范式的取舍，实现 **Plan-and-Execute** 作为主范式（ROADEMAP D1）。
 
 ### 你要做的事
-- [ ] `planner/base.py`：`Plan`/`PlanStep` 数据结构 + `Planner` 协议
-- [ ] `planner/plan_execute.py`：Plan-and-Execute 实现
-- [ ] `planner/react.py`：朴素 ReAct 基线（**对齐 W9 检查点的对照组**，必须实现）
-- [ ] `planner/controls.py`：**控制权矩阵 + Autonomy Budget**（`max_steps` / `max_cost` / `max_seconds`）
-- [ ] `docs/w9/adr-w9-planner-choice.md`：**编排范式选型**（含 Workflow 六模式 + 何时不该用 Agent）
-- [ ] 单测：计划生成、步骤状态机、失败重规划、三道上限各触发一次
+- [x] `planner/base.py`：`Plan`/`PlanStep` 数据结构 + `Planner` 协议
+- [x] `planner/plan_execute.py`：Plan-and-Execute 实现
+- [x] `planner/react.py`：朴素 ReAct 基线（**对齐 W9 检查点的对照组**，必须实现）
+- [x] `planner/controls.py`：**控制权矩阵 + Autonomy Budget**（`max_steps` / `max_cost` / `max_seconds`）
+- [x] `docs/w9/adr-w9-planner-choice.md`：**编排范式选型**（含 Workflow 六模式 + 何时不该用 Agent）
+- [x] 单测：计划生成、步骤状态机、失败重规划、三道上限各触发一次
 
 ### 引导框架
 
@@ -143,11 +147,11 @@ CONTROL_MATRIX: dict[str, Literal["model", "code", "human"]] = {
 7. 控制权矩阵写进代码常量而不是文档——**它在运行时被 `controls.py` 引用**，才不是一句口号
 
 **自检**
-- [ ] `pytest -k planner` 覆盖：依赖阻塞、失败重规划、超预算中止、重复计划中止
-- [ ] 一个 `difficulty=3` 案例，Plan-and-Execute 与 ReAct 各跑一次，记录步数与结果（D5 基线）
-- [ ] 注入"永远失败"的步骤 → 在 `max_replans` 内中止，不死循环（反向验证）
-- [ ] `max_steps` / `max_cost` / `max_seconds` 各构造一次超限，都返回 `partial` 且不抛未捕获异常
-- [ ] ADR 里的选型表对 capstone 五条链路逐条给出形态判定（不是只写"我们选 Plan-and-Execute"）
+- [x] `pytest -k planner` 覆盖：依赖阻塞、失败重规划、超预算中止、重复计划中止
+- [x] 一个 `difficulty=3` 案例，Plan-and-Execute 与 ReAct 各跑一次，记录步数与结果（D5 基线）
+- [x] 注入"永远失败"的步骤 → 在 `max_replans` 内中止，不死循环（反向验证）
+- [x] `max_steps` / `max_cost` / `max_seconds` 各构造一次超限，都返回 `partial` 且不抛未捕获异常
+- [x] ADR 里的选型表对 capstone 五条链路逐条给出形态判定（不是只写"我们选 Plan-and-Execute"）
 
 ### 🔍 交给我的锚点
 `Plan`/`Planner`/`controls`、ADR、死循环与三道上限测试。我会看：**ReAct 对照组是否实现**、预算与死循环守卫是否今天埋、
@@ -163,13 +167,20 @@ Planner 有没有越界重写执行、选型表是否对五条链路都给了判
 > 换句话说，W5 是单轮召回，今天开始是多轮收敛。名字写清楚很重要——两者的评测指标完全不同。
 
 ### 你要做的事
-- [ ] `planner/research_planner.py`：`ResearchPlanner`（继承 Plan-and-Execute，注入领域拆解逻辑）
-- [ ] 拆解策略：主题 → 子问题 → 检索/验证子任务
-- [ ] **信息缺口驱动的检索**：记录"还缺什么"，据此决定下一轮搜什么
-- [ ] **检索预算与停止条件**：`max_searches` / 边际收益阈值 / 证据足够判定
-- [ ] 与 W5 `RetrievalPipeline`、W8 Skill 集成
+- [x] `planner/research_planner.py`：`ResearchPlanner`（继承 Plan-and-Execute，注入领域拆解逻辑）
+- [x] 拆解策略：主题 → 子问题 → 检索/验证子任务
+- [x] **信息缺口驱动的检索**：记录"还缺什么"，据此决定下一轮搜什么
+- [x] **检索预算与停止条件**：`max_searches` / 边际收益阈值 / 证据足够判定
+- [x] 与 W5 `RetrievalPipeline`、W8 Skill 集成
 - [ ] 长任务走 W2 的 **Temporal workflow**（architecture §7 明令：长任务才走工作流）
-- [ ] 单测：拆解合理性、子任务并行、部分失败降级、预算耗尽时停止
+      —— **未做**。W9 的规划器与多智能体全部在进程内跑（`asyncio`），没有接 Temporal。
+      理由：W9 的任务是秒级到分钟级，Temporal 的价值在「跨小时、要断点续跑、要跨进程重试」，
+      现在接进来只是给一条 3 秒的链路加一个集群。**这是真缺口，不是省掉的工**：
+      真正需要它的是 W10 带人工审批的长流程（人可能明天才批）。
+- [x] 单测：拆解合理性、子任务并行、部分失败降级、预算耗尽时停止
+      —— **限定**：「并行」当前是**顺序**检索（`for` 循环里 `await`）。
+      子问题之间存在「搜到什么决定下一个搜什么」的依赖，真并行要先证明它们独立。
+      写成并行会让「第 2 个问题的词来自第 1 个问题的结论」这条链路静默失效。
 
 ### 引导框架
 
@@ -215,12 +226,15 @@ class SearchBudget:
 7. 停止条件要**可断言**：构造一个"永远有缺口"的假检索器，断言在 `max_searches` 处停下
 
 **自检**
-- [ ] 一个调研主题跑通：拆解 → 并发检索 → 汇总，报告有引用
-- [ ] 注入一个子任务失败 → 报告标注"证据不足"而非编造（反向验证）
+- [x] 一个调研主题跑通：拆解 → 并发检索 → 汇总，报告有引用
+      —— **限定**：同上，「并发」实际是顺序。跑通的是顺序版：3 个子问题 → 3 条带 URL 的结论。
+- [x] 注入一个子任务失败 → 报告标注"证据不足"而非编造（反向验证）
 - [ ] 长任务通过 `/v1/tasks` 走 workflow，短 `chat` 仍直连（边界验证）
-- [ ] 构造"永远搜不满"的假检索器 → 在 `max_searches` 处停止，不无限循环
-- [ ] 同义重复 query 被去重（相似度 > 0.8 不再发起）
-- [ ] 报告里 `hypothesis` 与 `evidence` 分区可辨，结论段无未引用断言
+      —— **未做**，同上：没有 Temporal 就没有 `/v1/tasks` 的分流。
+      边界判据本身已经写在 `adr-w9-planner-choice.md` §3（五条红旗），只是没落地成路由。
+- [x] 构造"永远搜不满"的假检索器 → 在 `max_searches` 处停止，不无限循环
+- [x] 同义重复 query 被去重（相似度 > 0.8 不再发起）
+- [x] 报告里 `hypothesis` 与 `evidence` 分区可辨，结论段无未引用断言
 
 ### 🔍 交给我的锚点
 ResearchPlanner、`Gap`/`SearchBudget`、一次调研产物、workflow 接线。我会看：子问题是否正交、部分失败是否诚实标注、
@@ -233,12 +247,12 @@ ResearchPlanner、`Gap`/`SearchBudget`、一次调研产物、workflow 接线。
 **目标**：实现 handoff 协议、共享状态、**防死循环与预算控制**（ROADEMAP D3 明确点名这三件）。这是稀缺能力③的核心。
 
 ### 你要做的事
-- [ ] `multi_agent/roles.py`：三种角色 + `AgentRole` 协议
-- [ ] `multi_agent/handoff.py`：handoff 消息结构 + 协议
-- [ ] `multi_agent/shared_state.py`：共享状态（带版本/预算）
-- [ ] `multi_agent/supervisor.py`：调度 + 防死循环/预算守卫
-- [ ] `docs/w9/adr-w9-multi-agent.md`：何时拆多 Agent、handoff 语义、预算模型
-- [ ] 单测：handoff 环路检测、预算超限、共享状态一致性
+- [x] `multi_agent/roles.py`：三种角色 + `AgentRole` 协议
+- [x] `multi_agent/handoff.py`：handoff 消息结构 + 协议
+- [x] `multi_agent/shared_state.py`：共享状态（带版本/预算）
+- [x] `multi_agent/supervisor.py`：调度 + 防死循环/预算守卫
+- [x] `docs/w9/adr-w9-multi-agent.md`：何时拆多 Agent、handoff 语义、预算模型
+- [x] 单测：handoff 环路检测、预算超限、共享状态一致性
 
 ### 引导框架
 
@@ -282,9 +296,9 @@ class Supervisor:
 5. 终止条件明确：达成目标 / 步数超限 / 预算超限 / 环路 → 都要有确定结果和原因（可归因）
 
 **自检**
-- [ ] 注入"两个角色互相 handoff"的死循环 → 在 MAX_STEPS/指纹检测内中止（反向验证）
-- [ ] 设一个小预算 → 超限中止且 `budget_used` 累计正确（不是每跳清零）
-- [ ] 并发 commit 共享状态，版本号能检出冲突
+- [x] 注入"两个角色互相 handoff"的死循环 → 在 MAX_STEPS/指纹检测内中止（反向验证）
+- [x] 设一个小预算 → 超限中止且 `budget_used` 累计正确（不是每跳清零）
+- [x] 并发 commit 共享状态，版本号能检出冲突
 
 ### 🔍 交给我的锚点
 Supervisor 三道守卫、ADR、死循环/预算测试。我会看：**预算是否跨 handoff 累计**、环路检测是否真生效、角色职责是否单一。
@@ -296,10 +310,10 @@ Supervisor 三道守卫、ADR、死循环/预算测试。我会看：**预算是
 **目标**：同样的图用 LangGraph 实现一遍，比较自研 vs 框架的取舍（ROADEMAP D4）；了解 A2A 协议。
 
 ### 你要做的事
-- [ ] `multi_agent/langgraph_variant.py`：用 LangGraph 表达同一张图（若引入依赖，记进 ADR）
-- [ ] `docs/w9/langgraph-vs-inhouse.md`：取舍对比（可控性/可观测/成本/迭代速度）
-- [ ] A2A 认知笔记：`docs/w9/a2a-notes.md`（协议分层、与 MCP 的区别）
-- [ ] 单测：两种实现在 golden 子集上结果可比
+- [x] `multi_agent/langgraph_variant.py`：用 LangGraph 表达同一张图（若引入依赖，记进 ADR）
+- [x] `docs/w9/langgraph-vs-inhouse.md`：取舍对比（可控性/可观测/成本/迭代速度）
+- [x] A2A 认知笔记：`docs/w9/a2a-notes.md`（协议分层、与 MCP 的区别）
+- [x] 单测：两种实现在 golden 子集上结果可比
 
 ### 引导框架
 
@@ -319,9 +333,9 @@ Supervisor 三道守卫、ADR、死循环/预算测试。我会看：**预算是
 4. 若 W8 解锁了 A2A 深入档，本周做一次跨进程 handoff demo；否则只写笔记
 
 **自检**
-- [ ] 两种实现在同一 golden 子集上跑通，结果可对比
-- [ ] 对比表每格有结论（不是只列维度）
-- [ ] `pytest` 不因 langgraph 依赖引入而破坏离线档（若引入，要能 skip）
+- [x] 两种实现在同一 golden 子集上跑通，结果可对比
+- [x] 对比表每格有结论（不是只列维度）
+- [x] `pytest` 不因 langgraph 依赖引入而破坏离线档（若引入，要能 skip）
 
 ### 🔍 交给我的锚点
 langgraph-vs-inhouse.md、a2a-notes.md、对照测试。我会看：对比有没有真实结论、A2A 与 MCP 分层是否讲清、依赖引入是否有 ADR。
@@ -338,12 +352,12 @@ langgraph-vs-inhouse.md、a2a-notes.md、对照测试。我会看：对比有没
 > "为什么高？"——答不上来，因为不知道是**分工对了**、**工具选对了**，还是**只是多花了 3 倍 token 多试了几次**。
 
 ### 你要做的事
-- [ ] `evals/scripts/trajectory_eval.py`：从 trace 算过程指标（**新脚本，本周唯一的新增工时**）
-- [ ] `evals/metrics.py` 回填：`TaskMetrics` 增加 `tool_selection_acc` / `invalid_call_rate` / `steps_used` / `path_repeat_rate`
-- [ ] `docs/w9/single-vs-multi-ab.md`：**三层对比报告**（不是只有成功率）
-- [ ] 用 golden `difficulty` 分层跑：1/2 档与 3 档分别对比
-- [ ] **Multi-Trial**：复杂档每个配置跑 3 次，报均值与极差（单次偶然成功没有说服力）
-- [ ] 更新 `evals/history/YYYY-Www.json`、`docs/log.md`；周五合流仪式
+- [x] `evals/scripts/trajectory_eval.py`：从 trace 算过程指标（**新脚本，本周唯一的新增工时**）
+- [x] `evals/metrics.py` 回填：`TaskMetrics` 增加 `tool_selection_acc` / `invalid_call_rate` / `steps_used` / `path_repeat_rate`
+- [x] `docs/w9/single-vs-multi-ab.md`：**三层对比报告**（不是只有成功率）
+- [x] 用 golden `difficulty` 分层跑：1/2 档与 3 档分别对比
+- [x] **Multi-Trial**：复杂档每个配置跑 3 次，报均值与极差（单次偶然成功没有说服力）
+- [x] 更新 `evals/history/YYYY-Www.json`、`docs/log.md`；周五合流仪式
 
 ### 引导框架
 

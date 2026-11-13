@@ -1,0 +1,251 @@
+{
+ "week": "2026-W51",
+ "period": {
+  "from": "2026-12-14",
+  "to": "2026-12-18"
+ },
+ "gate": "W8",
+ "status": "skills-and-mcp-boundary-shipped",
+ "note": "记录于 2026-11-11 本地实跑：MCP Client + 搜索/抓取 Server + 录制回放 + Skill 六层规范 + 沙箱三道边界 + 最小可见面 + Action Runtime 全部落地；Gate 8 证据脚本 23/23 全绿（零密钥零联网）。工具未接进 /v1/draft 主链路，真 API 未跑过——#11 因此只判部分通过。",
+ "summary": "Skills 系统与 MCP：把 W1 只做归一化的 ToolCall 真正跑起来，但落点不是「能调工具」，而是「调工具这件事有边界」。MCP 只做传输与翻译（业务层 AST 扫不到 import mcp），工具名走 server__tool 命名空间（点号在 OpenAI/Anthropic 都非法）；外部工具一律经录制回放，未命中抛 ReplayMissError 绝不联网，回放标记与成本走 _meta 回流（顶层加字段会被严格 server 拒）。Skill 定成六层，第 2 层强制写「不负责什么」，第 6 层只允许四种机器可判的完成标准——让模型自评是 W4 已经证伪过的做法。执行侧五道门顺序固定（存在→可见面→A14→权限→沙箱→执行→回注），沙箱在副作用之前；可见面按 (principal, stage) 双维度裁剪，实测最大 50%，渐进式加载 19.1%。Action Runtime 把 ToolCall 从意图变成受控事实：幂等键带 intent_id 而不是 ToolCall.id（后者每次重试都变，等于幂等失效），并发靠 per-key 锁 + 双重检查，验真只回读状态不信 200，死循环预警只报警不阻断。三个 badcase 全部拦住，其中「参数篡改」用业务规则而非 schema maximum——把给模型看的说明书当成授权系统是这类设计最常见的塌方点。",
+ "metrics": {
+  "tests": {
+   "offline_passed": 994,
+   "offline_collected": 1024,
+   "live_skipped": 30,
+   "live_skipped_reason": "5 条 pgvector 真库记忆用例 + 既有 25 条（无 API 凭证 / 需真库 / 对抗样例）",
+   "static_checks": {
+    "ruff": "pass",
+    "mypy_files": 97,
+    "mypy": "pass"
+   },
+   "new_this_week": {
+    "framework_side": 184,
+    "app_side": 16,
+    "note": "824 → 1024。新增 test_mcp_client(13) / test_mcp_boundary(8) / test_tool_replay(13) / test_skill_spec(25) / test_skill_validator(12) / test_sandbox(39) / test_visibility(40) / test_skill_executor(14) / test_action_runtime(20) / test_tools_routes(16)"
+   }
+  },
+  "gate8_evidence_script": {
+   "script": "evals/scripts/tool_boundary_check.py",
+   "checks": 23,
+   "passed": 23,
+   "mode": "offline",
+   "network": "none",
+   "secrets": "none",
+   "fixtures_root": "packages/agent_framework/tests/fixtures/tools",
+   "fixture_files": 3,
+   "note": "默认离线档全绿；--record 仅在需要重录夹具时用（桩上游，仍不联网）"
+  },
+  "mcp_boundary": {
+   "internal_tool_names": [
+    "search__search_web",
+    "search__trend_chart"
+   ],
+   "namespace_separator": "__",
+   "separator_reason": "OpenAI 与 Anthropic 工具名都限制在 ^[a-zA-Z0-9_-]{1,64}$，点号与冒号都非法",
+   "long_name_policy": "截 server 前缀不截 tool（tool 名是模型选工具的依据）",
+   "business_layer_import_mcp": false,
+   "scan_method": "AST 扫 src/ 全部源码（grep 字符串会被注释与文档骗过）",
+   "error_codes": [
+    "tool_not_found",
+    "tool_timeout",
+    "tool_error",
+    "tool_protocol_error"
+   ],
+   "retry": "none（ADR-003：重试只在 LLM client；工具失败可能是参数就错了）"
+  },
+  "replay": {
+   "fixture_key": "sha256(tool + '\\x00' + canonical_args)[:16]",
+   "canonical_args": "json.dumps(sort_keys=True, ensure_ascii=False, separators=(',',':'))",
+   "miss_behavior": "抛 ReplayMissError，绝不联网",
+   "cost_when_replayed": 0.0,
+   "replay_flag_location": "_meta.replayed（协议预留位；顶层加字段会被 additionalProperties=false 的 server 拒）",
+   "redacted_on_write": true,
+   "max_fixture_chars": 200000,
+   "measured": {
+    "replayed": true,
+    "cost": 0.0
+   }
+  },
+  "visibility": {
+   "total_skills": 6,
+   "coarse_permissions": [
+    "publish",
+    "shell"
+   ],
+   "stages": [
+    "research",
+    "draft",
+    "publish",
+    "maintenance"
+   ],
+   "matrix_ratio": {
+    "research": 0.333,
+    "draft": 0.5,
+    "publish": 0.333,
+    "maintenance": 0.333
+   },
+   "max_ratio": 0.5,
+   "threshold": 0.6,
+   "progressive": {
+    "describe_chars": 531,
+    "instructions_chars": 2778,
+    "ratio": 0.191,
+    "threshold": 0.2
+   }
+  },
+  "action_runtime": {
+   "stages": 6,
+   "idempotency_key": "sha256(tool + canonical_args + intent_id)[:24]",
+   "ttl_s": 86400,
+   "concurrency": "per-key asyncio.Lock + 双重检查",
+   "verify": "只回读状态；skipped 不算失败",
+   "badcases": {
+    "duplicate": {
+     "statuses": [
+      "verified",
+      "duplicate",
+      "duplicate"
+     ],
+     "side_effects": 1,
+     "verdict": "pass"
+    },
+    "tamper": {
+     "status": "invalid_action",
+     "detail": "业务规则 numeric_cap 拒绝：budget=1000000 超过业务上限 200000（schema 允许不等于业务批准）",
+     "verdict": "pass"
+    },
+    "fake_success": {
+     "status": "unverified",
+     "posts_created": 0,
+     "log": "工具返回 ok=false（审核未通过）：HTTP 成功不等于生效",
+     "verdict": "pass"
+    },
+    "no_hitl": {
+     "status": "pending",
+     "posts_created": 0,
+     "verdict": "pass"
+    }
+   }
+  },
+  "sandbox": {
+   "boundaries": 3,
+   "path": "root 子树 + .ssh/.env*/.git/config 硬拒 + resolve() 破符号链接",
+   "command": "链式符号先拒 → 参数黑名单 → 前缀白名单",
+   "network": "默认拒 + 内网/169.254.169.254 硬拒 + 域名后缀白名单",
+   "timeout_s": 10,
+   "kill": "os.killpg（进程组，防子进程逃逸）",
+   "measured": {
+    "path_denied": true,
+    "escaped": false,
+    "command_denied": true,
+    "network_denied": true
+   }
+  },
+  "e2e": {
+   "mode": "offline",
+   "total": 54,
+   "passed": 50,
+   "failed": 0,
+   "interrupted": 0,
+   "skipped": 4,
+   "success_rate": 1.0,
+   "tool_calls": 14,
+   "tool_errors": 0,
+   "tool_error_rate": 0.0,
+   "tool_error_rate_caveat": "只统计 arguments_error（参数 JSON 没解开），不含执行结果——执行层未接主链路",
+   "judge_mean": null,
+   "by_difficulty": {
+    "1": {
+     "total": 12,
+     "passed": 12
+    },
+    "2": {
+     "total": 26,
+     "passed": 24,
+     "skipped": 2
+    },
+    "3": {
+     "total": 16,
+     "passed": 14,
+     "skipped": 2
+    }
+   },
+   "ragas": {
+    "samples": 9,
+    "faithfulness": 0.0,
+    "answer_relevancy": 0.0543,
+    "context_precision": 1.0
+   },
+   "regression_gate": {
+    "verdict": "pass",
+    "compared": [
+     "success_rate",
+     "latency_p95_ms"
+    ],
+    "latency_p95_ms": 2.414,
+    "skipped": [
+     "cost_per_task",
+     "judge_score",
+     "faithfulness",
+     "tool_error_rate"
+    ],
+    "skip_reason": "base == 0 或无值时不判（从 0 到有既非劣化也非改进）"
+   }
+  }
+ },
+ "gate_checklist": {
+  "1_mcp_boundary": "pass（业务只拿内部 ToolSpec；AST 扫 src/ 断言无 import mcp，test_mcp_boundary.py 8 条）",
+  "2_dynamic_discovery": "pass（server 新增 trend_chart 后重新 list 即可见；SkillRegistry.reload 落盘即生效，主流程零改动）",
+  "3_record_replay": "pass（默认档 replayed=True cost=0.0；未命中抛 ReplayMissError；脚本零联网）",
+  "4_redaction": "pass（扫 fixtures/tools/**/*.json 无 sk-live/supersecret；键名命中换 *** 不 pop）",
+  "5_execution_order": "pass（tool_not_visible / invalid_arguments 先于权限 / permission_denied / ok+role=tool；executor.py 门序号固定）",
+  "6_full_audit": "pass（13 个字段齐全；参数只留 args_digest 12 位 + arg_keys，正文前 20 字符不出现在 dump 里）",
+  "7_skill_verifiable": "pass（无证据的「已完成」被拦，回 2 条缺失；contains 可被否定句骗过，已记录为已知缺口）",
+  "8_visibility": "pass（矩阵最大 50% < 60%；渐进式 531/2778 = 19.1% < 20%）",
+  "9_sandbox": "pass（路径/命令/网络三类各拦一次且在副作用之前；escaped=False；test_sandbox.py 39 条）",
+  "10_action_runtime": "pass（重复请求副作用 1 次 / 参数篡改 numeric_cap 拒 / 假成功 unverified 且 0 posts / 无 HITL 则 pending）",
+  "11_quality_gate": "partial（54 条 50 passed / 0 failed，success_rate 100%，但离线夹具只证明管道通；工具未进 /v1/draft 主链路，真 API 未跑）",
+  "12_p3_decision": "pass（判定不解锁，理由见 decisions.P3）"
+ },
+ "decisions": {
+  "ADR-W8-001": "MCP = 外部工具传输协议，Skill = 内部能力封装；中间必须有翻译层，业务层不 import mcp",
+  "ADR-W8-002": "录制回放未命中抛错绝不联网；回放标记与成本走 _meta；脱敏时键不 pop（否则夹具看起来像「本来没这个字段」）",
+  "ADR-W8-003": "ToolCall 是意图不是执行；幂等键带 intent_id 而非 ToolCall.id；验真只回读状态；死循环只报警不阻断",
+  "business_rule_vs_schema": "业务上限用 NumericCapRule 而非 schema maximum：schema 是给模型看的契约，业务上限是我们的规矩，混在一起等于把说明书当授权系统",
+  "visibility_coarse": "主体维度只用粗粒度权限（publish/shell），read/net/write 交给阶段裁剪——否则匿名用户看不到任何检索工具",
+  "not_visible_vs_denied": "tool_not_visible 是安全事件，permission_denied 是运营事件；混了没法归因",
+  "sandbox_check_before_sideeffect": "沙箱是第 5 步，执行在其后；放在副作用之后等于只有日志没有边界",
+  "loop_warning_before_idempotency": "预警必须在幂等检查之前算，否则「连发 3 次」永远先被拦成 duplicate，预警永不出现",
+  "verify_skipped_not_failure": "VerifyOutcome 只把 unverified 算失败；skipped 算失败会让每次搜索都变 unverified，信号处处出现等于没有信号",
+  "P3": "不解锁。W8 预算 12–15h 用满并溢出（15 个模块 + 200 用例 + 产品层 4 端点 + 4 份文档 + 收尾修 3 处自检失败），余量为负；且 skill-spec §5 还有 3 个已知缺口待收。A2A 默认档留在 W9 多智能体周，那才是它的自然挂载点"
+ },
+ "discovered": [
+  "`contains` 会被否定句误命中：「本文没有结论」能通过「必须包含结论」。想做对得引入句法分析（假精确）或让模型再判一次（让被验的人给自己打分）；暂用 cites/min_items 兜，弱点写进 skill-spec §5.1 并留一条显式用例记录它",
+  "`VerifyOutcome.ok` 把 skipped 当失败，导致每次只读工具调用都变成 unverified——信号处处出现等于没有信号，这类过度告警比漏报更难发现",
+  "死循环预警放在幂等检查之后等于不存在：同一动作连发 3 次永远先被幂等拦成 duplicate，预警代码一次都不会执行",
+  "自检脚本里存在两份 _env 装配，badcase-参数篡改被一个没装业务规则的 runtime 验，红了但原因不在被测逻辑——「验证通过了」有两种，一种是被验对象选错了，那种绿看起来完全正常",
+  "沙箱相对路径按进程 cwd 解析时，本地跑得通、容器里会写到根目录；改为按第一个 root 解析",
+  "regression_gate 在基线值为 0 时静默跳过该指标（设计如此），但结果是 cost/judge/faithfulness/tool_error_rate 四项当前没有趋势保护——门禁说「通过」时，也得看它比了几个",
+  "MCP 回放标记放响应顶层会被严格 server 拒（additionalProperties=false），_meta 是协议里唯一合法的外挂位",
+  "业务规则与 schema maximum 分开写不是洁癖：schema 会照着模型的意思改，业务上限不会；混在一起时改上限要动 schema，等于授权系统被说明书绑架"
+ ],
+ "risks": [
+  "工具未接进 /v1/draft 主链路：W8 交付的是「能力 + 约束」，端到端价值尚未证明（#11 因此只判 partial）",
+  "真 API 一次没跑过：HttpSearchUpstream/HttpFetchUpstream 写好了但没配凭证，MCP「接得上真 server」缺实测",
+  "幂等缓存是进程内的（24h TTL），多副本部署会重复执行；接口按可替换存储设计，但本周没换",
+  "sandbox=container 未实现，只有本地三道白名单；契约已立，容器化留 W11",
+  "录制夹具需要手工维护：server 改返回结构时夹具不会自动跟着变（这是想要的，但意味着改契约必忘不了它）",
+  "Visible 面上的 skill 只有 6 个，50% 的收敛比例在小集合上说服力有限；30 个 Skill 时的矩阵未实测",
+  "tool_error_rate 口径不含执行结果，真正的工具失败率要等主链路接上才有",
+  "verify 只做「读回状态」，复杂对账（金额、多表一致）没有；W11 接真实业务系统前，假成功的覆盖是局部的"
+ ],
+ "next": [
+  "W9：把 SkillExecutor 挂进 /v1/draft 多轮循环，让工具真正产生端到端价值；同时接 tool_error_rate（按执行结果统计）",
+  "配凭证跑一次真 API（-m live），把「MCP 接得上真 server」从纸面变成实测",
+  "A2A 协议默认档：读规范 + 一次跨进程 handoff demo（P3 未解锁，只做默认档）",
+  "多 Agent 场景下把死循环预警升级成终止策略（W8 只报警，因为当时没有多 Agent 上下文）",
+  "把幂等缓存挪进可替换存储（Redis），解决多副本重复执行",
+  "W6 assemble 的丢弃项仍待并入统一 Debug Report（W7 遗留）"
+ ]
+}

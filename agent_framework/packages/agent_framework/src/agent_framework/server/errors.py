@@ -35,7 +35,19 @@ def error_body(code: str, message: str, **extra: Any) -> dict[str, Any]:
 
 
 def install_error_handlers(app: FastAPI) -> None:
-    """把三类异常挂到 app 上。框架与产品应用都调这一个函数。"""
+    """把四类异常挂到 app 上。框架与产品应用都调这一个函数。
+
+    第四类是 W10 加的安全类（`BlockedInput` / `OutputRejected` / `ApprovalRequired`）。
+    加在这里而不是让每个路由自己 `try/except`，理由与文件头那条一样：
+    安全拦截若各自翻译，同一次拦截在不同端点会得到不同状态码，
+    而值班同学是按状态码分流的。**安全类的 400/422/202 只能有一处定义。**
+    """
+
+    # 局部导入：`guardrails` 依赖 `skills`（拿 risk 级），把它提到模块顶层
+    # 会让 `server.errors` 变成一条通往工具链的路径，而错误表本身该是最小依赖。
+    from ..guardrails.hitl import ApprovalRequired
+    from ..guardrails.input import BlockedInput
+    from ..guardrails.output import OutputRejected
 
     @app.exception_handler(LLMError)
     async def _on_llm_error(request: Request, exc: LLMError) -> JSONResponse:
@@ -55,6 +67,40 @@ def install_error_handlers(app: FastAPI) -> None:
             ),
             status_code=http_status_for(exc),
             headers=headers,
+        )
+
+    @app.exception_handler(BlockedInput)
+    async def _on_blocked_input(request: Request, exc: BlockedInput) -> JSONResponse:
+        # 400 而不是 422：输入在**处理之前**就被拒了，还没到"能不能处理"。
+        return JSONResponse(
+            error_body(exc.code, exc.message, violations=list(exc.violations)),
+            status_code=400,
+        )
+
+    @app.exception_handler(OutputRejected)
+    async def _on_output_rejected(request: Request, exc: OutputRejected) -> JSONResponse:
+        # 422：请求合法、处理也跑了，是**产物**不能交付。与 SEOError 的
+        # `draft/evidence/outline` 阶段失败同一个语义档位。
+        return JSONResponse(
+            error_body(exc.code, "生成结果未通过输出检查", violations=list(exc.violations)),
+            status_code=422,
+        )
+
+    @app.exception_handler(ApprovalRequired)
+    async def _on_approval_required(
+        request: Request, exc: ApprovalRequired
+    ) -> JSONResponse:
+        # 202：动作**合法但尚未执行**，等等审人。用 202 而不是 403——
+        # 403 会让调用方以为"这事儿不能做"，而它其实只是"还没批"。
+        return JSONResponse(
+            error_body(
+                exc.code,
+                str(exc),
+                approval_id=exc.request.id,
+                summary=exc.request.summary,
+                skill=exc.request.skill,
+            ),
+            status_code=202,
         )
 
     @app.exception_handler(ConfigError)

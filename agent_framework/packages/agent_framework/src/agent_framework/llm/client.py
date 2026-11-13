@@ -16,12 +16,14 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import logging
 import random
 import time
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import httpx
 
@@ -55,6 +57,10 @@ from .types import (
     ToolSpec,
     Usage,
 )
+
+if TYPE_CHECKING:  # 只为注解：运行时不 import，避免 client ↔ resilience 的环
+    from ..resilience.circuit_breaker import CircuitBreaker
+    from ..resilience.semantic_cache import SemanticCache
 
 _LOG = logging.getLogger("agent_framework.llm")
 
@@ -101,6 +107,12 @@ class ChatOutcome:
     alias: str
     retry_count: int = 0
     fallback_from: str | None = None
+    # W11 D2：降级的**结构化标记**。不靠文案判断——
+    # 靠文案判断的降级在换一次措辞之后就失效了，而失效时没有测试会红。
+    degraded: bool = False
+    # W11 D5：语义缓存命中。与 degraded 分开：命中缓存是"答案是对的但没花钱"，
+    # 降级是"答案不是真答案"。合成一个字段会让成本报告与质量报告互相污染。
+    cache_hit: bool = False
 
 
 class LLMGateway:
@@ -115,6 +127,8 @@ class LLMGateway:
         settings: Settings,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         clock: Callable[[], float] = time.perf_counter,
+        breaker: CircuitBreaker | None = None,
+        cache: SemanticCache | None = None,
     ) -> None:
         self._registry = registry
         self._router = router
@@ -122,6 +136,17 @@ class LLMGateway:
         self._settings = settings
         self._sleep = sleep
         self._clock = clock
+        # W11 D2：熔断器。**在这里而不是在 4 个业务调用点**——
+        # 业务代码要关心的是"结果对不对"，"上游还能不能打"是链路自己的事；
+        # 放在调用点意味着新增一个调用点就漏一个。
+        #
+        # 它包的是**整条候选链**，不是单次尝试：失败计数单位是"一次 chat()"，
+        # 而那次内部可能已经重试 3 次、换过 2 个候选（ADR-003，不造第二次重试）。
+        self._breaker = breaker
+        # W11 D5：语义缓存。同样挂在链路里——业务层不该知道"这条答案是不是复用的"。
+        # 它**在熔断器之内**（`_chat_impl` 里），所以命中缓存不消耗熔断配额：
+        # 一个已经被上游打成 OPEN 的系统，仍然应该能靠缓存返回老答案。
+        self._cache = cache
 
     # -- 预检 ------------------------------------------------------------ #
 
@@ -141,6 +166,27 @@ class LLMGateway:
 
     # -- 非流式 ---------------------------------------------------------- #
     async def chat(self, call: ChatCall) -> ChatOutcome:
+        """熔断器**唯一**的挂载点。
+
+        没配熔断器时行为与 W10 完全一致（`self._breaker is None` → 直通），
+        这样"加了一层保护"不会变成"改了所有既有行为"。
+
+        打开期间抛 `CircuitOpenError`（503 `CIRCUIT_OPEN`）而不进候选链：
+        重试与换候选在上游全挂时只是把 3 倍流量打到一个已经挂了的地方。
+        """
+
+        if self._breaker is None:
+            return await self._chat_impl(call)
+
+        return await self._breaker.call(lambda: self._chat_impl(call))
+
+    async def _chat_impl(self, call: ChatCall) -> ChatOutcome:
+        # ── 阶段 0：语义缓存。命中就不路由、不花钱、不打上游。
+        cached = await self._cache_lookup(call)
+        if cached is not None:
+            self._emit_cache_hit(call, cached)
+            return cached
+
         # ── 阶段 1：路由。_plan 内部已经做完结构校验：
         #    call.model 拼错（调用方输入问题）→ BadRequestError(400)
         #    路由里的 alias 在 models.yaml 里不存在（我方配置问题）→ ConfigError(500)
@@ -254,12 +300,15 @@ class LLMGateway:
 
                     # 成功即返回，不再尝试后续候选；ChatOutcome 携带路由/重试元信息，
                     # 这些是"客户端层运营信息"，不塞进契约层 LLMResponse。
-                    return ChatOutcome(
+                    outcome = ChatOutcome(
                         response=response,
                         alias=alias,
                         retry_count=attempt - 1,
                         fallback_from=fallback_from,
                     )
+                    await self._cache_store(call, outcome)
+
+                    return outcome
 
             # ── 阶段 5：该候选彻底失败（重试用尽或不可重试）→ 换下一个候选
             # 单向：fallback 链只绕一圈，绝不回头（避免 primary/fb 互相踢皮球形成活锁）
@@ -532,11 +581,13 @@ class LLMGateway:
     # -- 内部：路由与能力 ------------------------------------------------ #
 
     def _plan(self, call: ChatCall) -> list[str]:
-        aliases = [call.model] if call.model else self._router.route(call.task)
+        aliases = [call.model] if call.model else self._route(call)
 
         if not aliases:
             raise BadRequestError(
-                f"task '{call.task}' 没有任何候选模型", provider="gateway"
+                f"task '{call.task}' 没有任何候选模型"
+                f"（router={getattr(self._router, 'name', type(self._router).__name__)}）",
+                provider="gateway",
             )
 
         # 结构错误在这里就暴露，别等到请求发出后。
@@ -560,6 +611,107 @@ class LLMGateway:
 
     def _tier(self, call: ChatCall) -> str:
         return self._catalog.tasks.get(call.task, "default")
+
+    def _route(self, call: ChatCall) -> list[str]:
+        """`Router` 协议只回答 "task → 候选"。会看**这一次请求内容**的 Router
+        （如 `DifficultyRouter`）额外实现 `route_for(call)`——实现了就走它，
+        没实现就退回 `route(task)`。
+
+        用 `getattr` 探测而不是扩协议，是为了让 `TaskRouter` / `StaticRouter`
+        一行都不用改，也不给第三方 Router 增加必须实现的成员。
+
+        空结果**不回落**：`route_for` 亲手过滤掉了所有候选（比如两个 alias 都不在
+        catalog 里），回落会让这个配置错误被默认路由悄悄掩盖。
+        """
+        route_for = getattr(self._router, "route_for", None)
+        if callable(route_for):
+            return list(route_for(call))
+        return self._router.route(call.task)
+
+    # -- 内部：语义缓存 -------------------------------------------------- #
+
+    def _cacheable(self, call: ChatCall) -> bool:
+        """哪些请求**不许**走缓存。
+
+        两条硬性排除，都是"缓存会给出错答案"而不是"缓存不划算"：
+
+        - **带 tools**：答案取决于工具那一刻的真实返回（天气、库存、用户余额），
+          复用一份旧答案等于编造数据；
+        - **钉了 model**：调用方明确要某个模型的结果（评测/调试），
+          缓存里的 alias 可能不是它，返回过去就是答非所问。
+
+        `opts`（temperature / max_tokens）**不在这里排除，而是进缓存键**。
+        原因很实际：产品端每一个调用都带 `temperature`，把它当成"不许缓存"
+        等于让语义缓存只在一张白纸请求上生效——那和没做一样。
+        不同采样参数 = 不同的键 = 命中不了，这比"整条路径都不缓存"精确得多。
+        """
+
+        if self._cache is None:
+            return False
+
+        excluded = bool(call.tools or call.model)
+        return not excluded
+
+    def _cache_key(self, call: ChatCall) -> str:
+        """缓存键 = 最后一问 + 采样参数的指纹。"""
+
+        from ..resilience.semantic_cache import last_user_text
+
+        text = last_user_text(call)
+        if not call.opts:
+            return text
+
+        payload = json.dumps(call.opts, sort_keys=True, ensure_ascii=False, default=str)
+        digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:8]
+        return f"{text}\x00opts:{digest}"
+
+    async def _cache_lookup(self, call: ChatCall) -> ChatOutcome | None:
+        if not self._cacheable(call):
+            return None
+
+        assert self._cache is not None  # _cacheable 已保证
+        return await self._cache.get(self._cache_key(call))
+
+    async def _cache_store(self, call: ChatCall, outcome: ChatOutcome) -> None:
+        if not self._cacheable(call):
+            return
+
+        assert self._cache is not None
+        await self._cache.put(self._cache_key(call), outcome)
+
+    def _emit_cache_hit(self, call: ChatCall, outcome: ChatOutcome) -> None:
+        """命中也必须发**恰好一条** RequestLog。
+
+        少了它，请求量会凭空少一截（看板上的 QPS 与网关实际收到的对不上），
+        而"缓存省了多少钱"也失去分母。字段刻意填 0 而不是"沿用上次的数字"：
+        这条请求今天确实没花这笔钱。
+        """
+
+        try:
+            currency = self._catalog.get_model(outcome.alias).pricing.currency
+        except ConfigError:
+            currency = "USD"  # alias 已从 catalog 里消失（换配置后未清缓存）
+
+        emit(RequestLog(
+            request_id=current_request_id(),
+            task=call.task,
+            tier=self._tier(call),
+            provider=outcome.response.provider or "cache",
+            model=outcome.alias,
+            fallback_from=None,
+            prompt_tokens=0,
+            completion_tokens=0,
+            cost=0.0,
+            currency=currency,
+            latency_ms=0.0,
+            first_token_ms=None,
+            retry_count=0,
+            finish_reason=str(outcome.response.finish_reason),
+            error_code=None,
+            stream=False,
+            usage_estimated=False,
+            cache_hit=True,
+        ))
 
     def _ensure_capabilities(
         self, alias: str, call: ChatCall, *, stream: bool

@@ -1,0 +1,225 @@
+{
+ "week": "2026-W50",
+ "period": {
+  "from": "2026-12-07",
+  "to": "2026-12-11"
+ },
+ "gate": "W7",
+ "status": "context-engineering-and-memory-shipped",
+ "note": "记录于 2026-11-10 本地实跑：上下文预算/组装/漂移检测落地，记忆作为可开关能力接进 /v1/answer；两档对照实验（off vs governed）与 20 轮压缩实验均真跑。记忆用词面哈希 embedder（本机无 torch），生产应注入 bge-m3。",
+ "summary": "上下文工程与记忆：把「喂给模型什么」从各链路各自拼字符串，收敛成一条可预算、可裁剪、可解释的流水线。ContextItem 五件套（来源/版本/权威度/信任级/生命周期）+ 五槽预算 + 六类互斥排斥原因，任一候选没进上下文都能报出唯一原因；工作记忆按阈值滚动摘要、tool result 截断留可重取句柄；长期记忆四阶段 + 写入五闸（污染/置信度/幂等/顶替/原子提交）；U 形排布升级到整条消息序列，Drift 三指标纯规则、命中只重注入。实验一（20 轮 × 3 arm）：摘要 arm 平均 input tokens -31.1%、p95 -37.2%、净成本 -14.8%（含摘要自身开销），但真正的收益是「增长有上限」而不是「更便宜」；naive 斜率 139 token/轮，window=8000 的爆窗点约在第 57 轮。实验二（off vs governed）：跨会话召回从答不出变成「专业克制。」，通过 3/4 → 4/4，成本 +22%（基线仅 63 token，换成 RAG 真实 payload 约 +1.5%）。本周最重要的两件事都不是代码：摘要调用的用量从没被记过（字段恒为 0），不补上就会得出「压缩免费」；qwen 默认思考让同一条 26 字答案的 output tokens 从 14 涨到 876，不钉住这个开关，输入侧的改进会被输出侧噪声淹没。",
+ "metrics": {
+  "tests": {
+   "offline_passed": 794,
+   "offline_collected": 824,
+   "live_skipped": 30,
+   "live_skipped_reason": "5 条 pgvector 真库记忆用例（需 PGVECTOR_DSN）+ 既有 25 条（无 API 凭证 / 需真库 / 对抗样例）",
+   "static_checks": {
+    "ruff": "pass",
+    "mypy_files": 74,
+    "mypy": "pass"
+   },
+   "new_this_week": {
+    "framework_side": 70,
+    "app_side": 14,
+    "note": "740 → 824。新增 test_context_{budget,builder,drift} / test_{working,long_term}_memory / test_memory_extract / test_answer_memory / test_memory_pgvector_e2e / test_memory_isolation"
+   }
+  },
+  "experiment_1_compression": {
+   "rounds": 20,
+   "model_alias": "qwen3.7-plus",
+   "budget": {
+    "window": 8000,
+    "history_slot": 2000,
+    "summary_threshold": 1500,
+    "keep_recent": 6
+   },
+   "arms": {
+    "naive": {
+     "avg_input_tokens": 1451.2,
+     "last_round_input_tokens": 2758,
+     "p95_input_tokens": 2596.5,
+     "growth_x": 22.24,
+     "avg_output_tokens": 50.4,
+     "cost_cny": 0.066102,
+     "summary_cost_cny": 0.0,
+     "net_cost_cny": 0.066102,
+     "over_budget_rounds": 0,
+     "dropped_history": 0,
+     "avg_latency_ms": 2993.9
+    },
+    "budget": {
+     "avg_input_tokens": 1433.5,
+     "last_round_input_tokens": 2486,
+     "p95_input_tokens": 2487.05,
+     "growth_x": 20.05,
+     "avg_output_tokens": 50.5,
+     "cost_cny": 0.065428,
+     "summary_cost_cny": 0.0,
+     "net_cost_cny": 0.065428,
+     "over_budget_rounds": 0,
+     "dropped_history": 4,
+     "avg_latency_ms": 2865.2
+    },
+    "summary": {
+     "avg_input_tokens": 999.1,
+     "last_round_input_tokens": 1630,
+     "p95_input_tokens": 1631.9,
+     "growth_x": 13.15,
+     "avg_output_tokens": 50.1,
+     "cost_cny": 0.047982,
+     "summary_cost_cny": 0.00828,
+     "net_cost_cny": 0.056262,
+     "over_budget_rounds": 0,
+     "dropped_history": 0,
+     "avg_latency_ms": 2887.5
+    }
+   },
+   "deltas": {
+    "avg_input_tokens_pct": -31.1,
+    "p95_input_tokens_pct": -37.2,
+    "net_cost_pct": -14.9,
+    "output_tokens_pct": -0.6
+   },
+   "compression_calls": 3,
+   "compression_tokens": {
+    "input": 2704,
+    "output": 359
+   },
+   "extrapolated_overflow_round": 57,
+   "thinking": false,
+   "note": "所有调用钉住 thinking=False；不钉住时 qwen 的推理 token 会让输出侧成本翻数十倍"
+  },
+  "experiment_2_memory": {
+   "cases": 4,
+   "written_keys": [
+    "brand_tone",
+    "forbidden_words"
+   ],
+   "off": {
+    "passed": 3,
+    "pass_rate": 0.75,
+    "avg_input_tokens": 62.8,
+    "cost_cny": 0.001598
+   },
+   "governed": {
+    "passed": 4,
+    "pass_rate": 1.0,
+    "avg_input_tokens": 118.8,
+    "cost_cny": 0.00195,
+    "memory_hit_cases": 4
+   },
+   "delta_pass": 1,
+   "delta_cost_pct": 22.0,
+   "delta_input_tokens_pct": 89.2,
+   "only_discriminating_case": "tone_recall（off 答不出，governed 答「专业克制。」）"
+  },
+  "e2e": {
+   "mode": "offline",
+   "total": 54,
+   "passed": 50,
+   "failed": 0,
+   "interrupted": 0,
+   "skipped": 4,
+   "success_rate": 1.0,
+   "judge_mean": 1.922,
+   "by_difficulty": {
+    "1": {
+     "total": 12,
+     "passed": 12
+    },
+    "2": {
+     "total": 26,
+     "passed": 24,
+     "skipped": 2
+    },
+    "3": {
+     "total": 16,
+     "passed": 14,
+     "skipped": 2
+    }
+   },
+   "ragas": {
+    "samples": 9,
+    "faithfulness": 0.0,
+    "answer_relevancy": 0.0543,
+    "context_precision": 1.0
+   },
+   "regression_gate": {
+    "verdict": "pass",
+    "compared": [
+     "success_rate",
+     "latency_p95_ms"
+    ],
+    "latency_p95_ms": 2.193
+   }
+  },
+  "context_pipeline": {
+   "slots": {
+    "system": 400,
+    "retrieved": 3000,
+    "memory": 600,
+    "history": 2000,
+    "tool_results": 0
+   },
+   "window": 8000,
+   "reserve_output": 600,
+   "exclusion_reasons": 6,
+   "tokenizer": "char-estimate (1.6 chars/token, ADR-W7-01)"
+  },
+  "memory": {
+   "backend": "pgvector (table=agent_memories, 与 rag_chunks 表级隔离)",
+   "write_gates": 5,
+   "ttl": {
+    "brand_tone": "never",
+    "forbidden_words": "90d",
+    "past_topics": "14d"
+   },
+   "real_db_cases": 5,
+   "embedder_in_experiment": "lexical-hash 256d（本机无 torch；生产注入 bge-m3）"
+  }
+ },
+ "gate_checklist": {
+  "1_budget_slots": "pass（ContextBudget.validate：五槽之和 ≤ window、reserve_output 不可侵占；裁剪顺序 (score, authority, id) 全序确定）",
+  "2_twenty_rounds_no_overflow": "pass-with-caveat（20 轮在 window=8000 下未撞窗；demo_long_session.py 用 window=2000 演示档显示 naive 第 18 轮起爆窗、budget/summary 0 次；真机 256K 窗口未出现过 400）",
+  "3_working_memory": "pass（摘要带 [会话摘要…非用户原话] 标签、tool result 截断留 refetch 句柄；test_working_memory.py 14 条）",
+  "4_long_term_memory": "pass（四阶段闭环；真库 5 条；实验二跨会话召回成功）",
+  "5_boundary": "pass（docs/w7/memory-vs-knowledge.md 判据表 + 5 个案例；test_memory_isolation.py 构造期拒绝共用 rag_chunks）",
+  "6_quality_no_regression": "pass-offline（54 条 50 passed / 0 failed；judge 1.922 与 W49 持平；difficulty=3 14 passed / 0 failed；live judge 未跑）",
+  "7_cost_quantified": "pass（实验一三 arm 真实 usage + 摘要成本单列；净成本 -14.9%，拐点约 12 轮）",
+  "8_explainable_context": "pass（六类排除原因互斥穷尽；AllocatedContext.explain() 四态含 not_in_candidates）",
+  "9_memory_write_trust": "pass（真库验证：幂等行数不变 / 冲突顶替保留旧行 / external 未确认拒绝 / forget 连向量一起删）",
+  "10_drift_detectable": "pass（三指标各 2 正反例；命中给 reinject 内容，自动重注入留给调用方）",
+  "11_memory_worth_it": "pass（off 3/4 → governed 4/4，成本 +22%；唯一区分度任务 tone_recall）",
+  "12_merge": "pass（本文件 + evals/history/2026-W50-ab-run.json + docs/log.md W50 条目）"
+ },
+ "decisions": {
+  "ADR-W7-01": "预算 token 用字符粗估，不引 tiktoken（分词器跨模型不通用，精确感是假的）",
+  "ADR-W7-02": "槽位间不挪用预算（保证 Debug Report 可复算）",
+  "ADR-W7-03": "记忆不进 system 消息（防记忆槽发号施令，W10 注入防护提前落地）",
+  "ADR-W7-04": "摘要按阈值触发，不每轮摘（每轮摘 19/20 次会被下一轮推翻）",
+  "ADR-W7-05": "Drift 阈值写死在常量里（阈值漂移会让历史报告不可比）",
+  "ADR-W7-06": "记忆的 embedding 下沉到 store 实现（框架零 ML 依赖；MemoryStore 与 Retriever 同语义）"
+ },
+ "discovered": [
+  "摘要调用的用量从未被记录：CompressResult.input_tokens 字段存在但恒为 0，导致「压缩免费」的错觉；补 SummarizerUsage 后 20 轮净收益从表面 -27% 修正为 -14.9%",
+  "qwen3.7-plus 默认开思考：同一条 26 字答案 output_tokens 876（默认）vs 14（thinking=False），不钉住会把输入侧的改进完全淹没",
+  "提取器的 key 边界比冲突检测更重要：把「以后用短句」归到 brand_tone 会顶替掉真正的调性，且顶替不可见",
+  "历史 ContextItem 的 score 若全部相同，裁剪会退化成按 id 字典序，裁掉的既不是最旧也不是最不相关（已改为按新旧递增）",
+  "记忆的价值集中在「用户私有信息」上：4 个任务里 3 个靠常识就能过，设计评测任务时它们只是噪声"
+ ],
+ "risks": [
+  "断言「20+ 轮不爆」的证据是预算口径判定，不是真的收到过厂商 400（真机窗口 256K）",
+  "记忆两档实验样本量小（4 任务、单次跑），结论是方向不是幅度",
+  "工作记忆的压缩状态在进程内，多副本不同步（W11 需挪进 SessionStore）",
+  "W6 assemble 的裁剪原因尚未并入 Debug Report，查「第 6 块为什么没进」要翻两块报告",
+  "/v1/draft 仍未接预算与记忆",
+  "实验用词面哈希 embedder，与生产 bge-m3 的召回口径不同"
+ ],
+ "next": [
+  "W8：Skills 系统与 MCP —— 工具结果进 tool_result 槽位，复用 Drift 的 repeat_action 做死循环预警",
+  "补 live judge（有配额时），把质量结论从「夹具档」升级为「模型档」",
+  "把工作记忆状态挪进 SessionStore，解决多副本不一致",
+  "W6 assemble 的丢弃项映射成 budget_squeezed，合并成一份 Debug Report"
+ ]
+}

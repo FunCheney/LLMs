@@ -1,0 +1,922 @@
+{
+ "week": "2026-W50",
+ "generated_at": "2026-11-10T22:35:05+0800",
+ "model_alias": "qwen3.7-plus",
+ "temperature": 0.2,
+ "budget": {
+  "window": 8000,
+  "system": 400,
+  "history": 2000,
+  "summary_threshold": 1500,
+  "keep_recent": 6
+ },
+ "notes": [
+  "token 数全部取网关 usage（厂商计费口径），payload token 为粗估口径（1.6 chars/token）",
+  "爆窗按 ContextBudget.window=8000 的产品预算口径判；本机模型真实窗口更大，未触发厂商 400",
+  "实验一三个 arm 共用同一份 naive 答案作为历史，保证单变量",
+  "所有调用钉住 thinking=False：qwen 默认思考会让 output tokens 涨 60 倍，输出侧开销会盖过输入侧对比",
+  "实验二与实验一同一批次跑（同日同 alias），记忆表 agent_memories_w7ab",
+  "实验二每题两档各一次调用，规则判定（不含 judge）"
+ ],
+ "exp1": {
+  "rows": [
+   {
+    "round": 1,
+    "arm": "naive",
+    "payload_tokens": 100,
+    "input_tokens": 124,
+    "output_tokens": 46,
+    "cost": 0.000616,
+    "latency_ms": 4640.7,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 1,
+    "arm": "budget",
+    "payload_tokens": 100,
+    "input_tokens": 124,
+    "output_tokens": 46,
+    "cost": 0.000616,
+    "latency_ms": 2292.2,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 1,
+    "arm": "summary",
+    "payload_tokens": 100,
+    "input_tokens": 124,
+    "output_tokens": 51,
+    "cost": 0.000656,
+    "latency_ms": 2737.7,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 2,
+    "arm": "naive",
+    "payload_tokens": 214,
+    "input_tokens": 258,
+    "output_tokens": 52,
+    "cost": 0.000932,
+    "latency_ms": 2347.7,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 2,
+    "arm": "budget",
+    "payload_tokens": 214,
+    "input_tokens": 258,
+    "output_tokens": 57,
+    "cost": 0.000972,
+    "latency_ms": 3247.1,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 2,
+    "arm": "summary",
+    "payload_tokens": 214,
+    "input_tokens": 258,
+    "output_tokens": 52,
+    "cost": 0.000932,
+    "latency_ms": 3013.2,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 3,
+    "arm": "naive",
+    "payload_tokens": 330,
+    "input_tokens": 396,
+    "output_tokens": 55,
+    "cost": 0.001232,
+    "latency_ms": 2525.8,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 3,
+    "arm": "budget",
+    "payload_tokens": 330,
+    "input_tokens": 396,
+    "output_tokens": 52,
+    "cost": 0.001208,
+    "latency_ms": 2434.6,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 3,
+    "arm": "summary",
+    "payload_tokens": 330,
+    "input_tokens": 396,
+    "output_tokens": 57,
+    "cost": 0.001248,
+    "latency_ms": 3106.2,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 4,
+    "arm": "naive",
+    "payload_tokens": 448,
+    "input_tokens": 542,
+    "output_tokens": 67,
+    "cost": 0.00162,
+    "latency_ms": 2738.5,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 4,
+    "arm": "budget",
+    "payload_tokens": 448,
+    "input_tokens": 542,
+    "output_tokens": 70,
+    "cost": 0.001644,
+    "latency_ms": 3743.9,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 4,
+    "arm": "summary",
+    "payload_tokens": 448,
+    "input_tokens": 542,
+    "output_tokens": 74,
+    "cost": 0.001676,
+    "latency_ms": 2747.0,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 5,
+    "arm": "naive",
+    "payload_tokens": 573,
+    "input_tokens": 696,
+    "output_tokens": 58,
+    "cost": 0.001856,
+    "latency_ms": 3439.4,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 5,
+    "arm": "budget",
+    "payload_tokens": 573,
+    "input_tokens": 696,
+    "output_tokens": 49,
+    "cost": 0.001784,
+    "latency_ms": 2241.7,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 5,
+    "arm": "summary",
+    "payload_tokens": 582,
+    "input_tokens": 694,
+    "output_tokens": 57,
+    "cost": 0.001844,
+    "latency_ms": 2510.1,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 6,
+    "arm": "naive",
+    "payload_tokens": 687,
+    "input_tokens": 839,
+    "output_tokens": 55,
+    "cost": 0.002118,
+    "latency_ms": 2564.8,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 6,
+    "arm": "budget",
+    "payload_tokens": 687,
+    "input_tokens": 839,
+    "output_tokens": 55,
+    "cost": 0.002118,
+    "latency_ms": 2950.0,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 6,
+    "arm": "summary",
+    "payload_tokens": 696,
+    "input_tokens": 837,
+    "output_tokens": 54,
+    "cost": 0.002106,
+    "latency_ms": 2411.2,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 7,
+    "arm": "naive",
+    "payload_tokens": 803,
+    "input_tokens": 980,
+    "output_tokens": 58,
+    "cost": 0.002424,
+    "latency_ms": 2789.4,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 7,
+    "arm": "budget",
+    "payload_tokens": 803,
+    "input_tokens": 980,
+    "output_tokens": 52,
+    "cost": 0.002376,
+    "latency_ms": 2779.3,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 7,
+    "arm": "summary",
+    "payload_tokens": 812,
+    "input_tokens": 978,
+    "output_tokens": 45,
+    "cost": 0.002316,
+    "latency_ms": 2288.8,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 8,
+    "arm": "naive",
+    "payload_tokens": 921,
+    "input_tokens": 1125,
+    "output_tokens": 49,
+    "cost": 0.002642,
+    "latency_ms": 3436.0,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 8,
+    "arm": "budget",
+    "payload_tokens": 921,
+    "input_tokens": 1125,
+    "output_tokens": 45,
+    "cost": 0.00261,
+    "latency_ms": 3484.7,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 8,
+    "arm": "summary",
+    "payload_tokens": 930,
+    "input_tokens": 1123,
+    "output_tokens": 47,
+    "cost": 0.002622,
+    "latency_ms": 4777.3,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 9,
+    "arm": "naive",
+    "payload_tokens": 1037,
+    "input_tokens": 1266,
+    "output_tokens": 50,
+    "cost": 0.002932,
+    "latency_ms": 3477.0,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 9,
+    "arm": "budget",
+    "payload_tokens": 1037,
+    "input_tokens": 1266,
+    "output_tokens": 46,
+    "cost": 0.0029,
+    "latency_ms": 2401.5,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 9,
+    "arm": "summary",
+    "payload_tokens": 1046,
+    "input_tokens": 1264,
+    "output_tokens": 46,
+    "cost": 0.002896,
+    "latency_ms": 2709.1,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 10,
+    "arm": "naive",
+    "payload_tokens": 1151,
+    "input_tokens": 1401,
+    "output_tokens": 52,
+    "cost": 0.003218,
+    "latency_ms": 2636.1,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 10,
+    "arm": "budget",
+    "payload_tokens": 1151,
+    "input_tokens": 1401,
+    "output_tokens": 49,
+    "cost": 0.003194,
+    "latency_ms": 2688.8,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 10,
+    "arm": "summary",
+    "payload_tokens": 1160,
+    "input_tokens": 1399,
+    "output_tokens": 46,
+    "cost": 0.003166,
+    "latency_ms": 3955.4,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 11,
+    "arm": "naive",
+    "payload_tokens": 1265,
+    "input_tokens": 1541,
+    "output_tokens": 44,
+    "cost": 0.003434,
+    "latency_ms": 3082.7,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 11,
+    "arm": "budget",
+    "payload_tokens": 1265,
+    "input_tokens": 1541,
+    "output_tokens": 44,
+    "cost": 0.003434,
+    "latency_ms": 2376.8,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 11,
+    "arm": "summary",
+    "payload_tokens": 1274,
+    "input_tokens": 1539,
+    "output_tokens": 41,
+    "cost": 0.003406,
+    "latency_ms": 3012.6,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 12,
+    "arm": "naive",
+    "payload_tokens": 1369,
+    "input_tokens": 1670,
+    "output_tokens": 52,
+    "cost": 0.003756,
+    "latency_ms": 3126.9,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 12,
+    "arm": "budget",
+    "payload_tokens": 1369,
+    "input_tokens": 1670,
+    "output_tokens": 68,
+    "cost": 0.003884,
+    "latency_ms": 2778.6,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 12,
+    "arm": "summary",
+    "payload_tokens": 1378,
+    "input_tokens": 1668,
+    "output_tokens": 48,
+    "cost": 0.00372,
+    "latency_ms": 2435.2,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 13,
+    "arm": "naive",
+    "payload_tokens": 1478,
+    "input_tokens": 1807,
+    "output_tokens": 48,
+    "cost": 0.003998,
+    "latency_ms": 2702.4,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 13,
+    "arm": "budget",
+    "payload_tokens": 1478,
+    "input_tokens": 1807,
+    "output_tokens": 50,
+    "cost": 0.004014,
+    "latency_ms": 3467.4,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 13,
+    "arm": "summary",
+    "payload_tokens": 562,
+    "input_tokens": 679,
+    "output_tokens": 53,
+    "cost": 0.001782,
+    "latency_ms": 2533.5,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 14,
+    "arm": "naive",
+    "payload_tokens": 1589,
+    "input_tokens": 1944,
+    "output_tokens": 40,
+    "cost": 0.004208,
+    "latency_ms": 3356.3,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 14,
+    "arm": "budget",
+    "payload_tokens": 1589,
+    "input_tokens": 1944,
+    "output_tokens": 31,
+    "cost": 0.004136,
+    "latency_ms": 2629.1,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 14,
+    "arm": "summary",
+    "payload_tokens": 673,
+    "input_tokens": 816,
+    "output_tokens": 34,
+    "cost": 0.001904,
+    "latency_ms": 3102.9,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 15,
+    "arm": "naive",
+    "payload_tokens": 1700,
+    "input_tokens": 2076,
+    "output_tokens": 42,
+    "cost": 0.004488,
+    "latency_ms": 2618.4,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 15,
+    "arm": "budget",
+    "payload_tokens": 1700,
+    "input_tokens": 2076,
+    "output_tokens": 42,
+    "cost": 0.004488,
+    "latency_ms": 4092.1,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 15,
+    "arm": "summary",
+    "payload_tokens": 784,
+    "input_tokens": 948,
+    "output_tokens": 41,
+    "cost": 0.002224,
+    "latency_ms": 2707.6,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 16,
+    "arm": "naive",
+    "payload_tokens": 1808,
+    "input_tokens": 2205,
+    "output_tokens": 46,
+    "cost": 0.004778,
+    "latency_ms": 2865.1,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 16,
+    "arm": "budget",
+    "payload_tokens": 1808,
+    "input_tokens": 2205,
+    "output_tokens": 48,
+    "cost": 0.004794,
+    "latency_ms": 2723.5,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 16,
+    "arm": "summary",
+    "payload_tokens": 892,
+    "input_tokens": 1077,
+    "output_tokens": 50,
+    "cost": 0.002554,
+    "latency_ms": 2663.2,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 17,
+    "arm": "naive",
+    "payload_tokens": 1921,
+    "input_tokens": 2339,
+    "output_tokens": 43,
+    "cost": 0.005022,
+    "latency_ms": 3004.8,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 17,
+    "arm": "budget",
+    "payload_tokens": 1921,
+    "input_tokens": 2339,
+    "output_tokens": 43,
+    "cost": 0.005022,
+    "latency_ms": 2628.6,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 17,
+    "arm": "summary",
+    "payload_tokens": 1005,
+    "input_tokens": 1211,
+    "output_tokens": 42,
+    "cost": 0.002758,
+    "latency_ms": 2563.9,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 18,
+    "arm": "naive",
+    "payload_tokens": 2028,
+    "input_tokens": 2468,
+    "output_tokens": 29,
+    "cost": 0.005168,
+    "latency_ms": 2496.0,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 18,
+    "arm": "budget",
+    "payload_tokens": 2028,
+    "input_tokens": 2468,
+    "output_tokens": 29,
+    "cost": 0.005168,
+    "latency_ms": 2394.9,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 18,
+    "arm": "summary",
+    "payload_tokens": 1112,
+    "input_tokens": 1340,
+    "output_tokens": 29,
+    "cost": 0.002912,
+    "latency_ms": 2669.2,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 19,
+    "arm": "naive",
+    "payload_tokens": 2126,
+    "input_tokens": 2588,
+    "output_tokens": 82,
+    "cost": 0.005832,
+    "latency_ms": 3070.0,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 19,
+    "arm": "budget",
+    "payload_tokens": 2060,
+    "input_tokens": 2507,
+    "output_tokens": 96,
+    "cost": 0.005782,
+    "latency_ms": 3491.1,
+    "over_budget": false,
+    "dropped_history": 1,
+    "ok": true
+   },
+   {
+    "round": 19,
+    "arm": "summary",
+    "payload_tokens": 1210,
+    "input_tokens": 1460,
+    "output_tokens": 100,
+    "cost": 0.00372,
+    "latency_ms": 3178.6,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 20,
+    "arm": "naive",
+    "payload_tokens": 2270,
+    "input_tokens": 2758,
+    "output_tokens": 39,
+    "cost": 0.005828,
+    "latency_ms": 2959.2,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   },
+   {
+    "round": 20,
+    "arm": "budget",
+    "payload_tokens": 2090,
+    "input_tokens": 2486,
+    "output_tokens": 39,
+    "cost": 0.005284,
+    "latency_ms": 2459.2,
+    "over_budget": false,
+    "dropped_history": 3,
+    "ok": true
+   },
+   {
+    "round": 20,
+    "arm": "summary",
+    "payload_tokens": 1354,
+    "input_tokens": 1630,
+    "output_tokens": 35,
+    "cost": 0.00354,
+    "latency_ms": 2628.1,
+    "over_budget": false,
+    "dropped_history": 0,
+    "ok": true
+   }
+  ],
+  "final_answer": "以“全拆洗”为差异化核心，直击通勤族卫生痛点，用316材质与便捷设计支撑199元品质定位，打造高效洁净的饮水体验。",
+  "summary": {
+   "naive": {
+    "rounds": 20,
+    "errors": 0,
+    "avg_input_tokens": 1451.2,
+    "max_input_tokens": 2758,
+    "p95_input_tokens": 2596.5,
+    "first_round_input": 124,
+    "last_round_input": 2758,
+    "growth_x": 22.24,
+    "avg_output_tokens": 50.4,
+    "total_cost": 0.066102,
+    "avg_cost": 0.003305,
+    "avg_latency_ms": 2993.9,
+    "over_budget_rounds": 0,
+    "total_dropped_history": 0
+   },
+   "budget": {
+    "rounds": 20,
+    "errors": 0,
+    "avg_input_tokens": 1433.5,
+    "max_input_tokens": 2507,
+    "p95_input_tokens": 2487.05,
+    "first_round_input": 124,
+    "last_round_input": 2486,
+    "growth_x": 20.05,
+    "avg_output_tokens": 50.5,
+    "total_cost": 0.065428,
+    "avg_cost": 0.003271,
+    "avg_latency_ms": 2865.2,
+    "over_budget_rounds": 0,
+    "total_dropped_history": 4
+   },
+   "summary": {
+    "rounds": 20,
+    "errors": 0,
+    "avg_input_tokens": 999.1,
+    "max_input_tokens": 1668,
+    "p95_input_tokens": 1631.9,
+    "first_round_input": 124,
+    "last_round_input": 1630,
+    "growth_x": 13.15,
+    "avg_output_tokens": 50.1,
+    "total_cost": 0.047982,
+    "avg_cost": 0.002399,
+    "avg_latency_ms": 2887.5,
+    "over_budget_rounds": 0,
+    "total_dropped_history": 0
+   },
+   "_compression": {
+    "summary_calls": 3,
+    "summary_input_tokens": 2704,
+    "summary_output_tokens": 359,
+    "summary_cost": 0.008280000000000001
+   }
+  }
+ },
+ "exp2": {
+  "summary": {
+   "cases": 4,
+   "written_keys": [
+    "brand_tone",
+    "forbidden_words"
+   ],
+   "off": {
+    "passed": 3,
+    "pass_rate": 0.75,
+    "avg_input_tokens": 62.8,
+    "total_cost": 0.001598
+   },
+   "on": {
+    "passed": 4,
+    "pass_rate": 1.0,
+    "avg_input_tokens": 118.8,
+    "total_cost": 0.00195,
+    "memory_hit_cases": 4
+   },
+   "delta_pass": 1,
+   "delta_cost_pct": 22.0,
+   "delta_tokens_pct": 89.2,
+   "write_notes": [
+    "turn1: {'written': 1, 'superseded': 0, 'actions': ['written'], 'details': [['brand_tone', 'mem_b7a044dcd3668d6c', '新写入']]}",
+    "turn2: {'written': 1, 'superseded': 0, 'actions': ['written'], 'details': [['forbidden_words', 'mem_aae0f78a07f37aa4', '新写入']]}",
+    "turn3: 没有提取到候选（parsed=True）"
+   ]
+  },
+  "cases": [
+   {
+    "id": "title_3",
+    "expect": "no_banned",
+    "off": {
+     "answer": "长效锁温24h，500ml黄金容量，316不锈钢内胆，办公通勤便携首选\n高颜值极简风，500ml轻量设计，一键开盖防漏，学生党必备喝水神器\n母婴级材质认证，500ml精准控温，茶隔分离设计，商务送礼高端之选",
+     "pass": true,
+     "input_tokens": 71,
+     "cost": 0.00071
+    },
+    "on": {
+     "answer": "500ml真空保温杯，长效锁温设计，商务通勤便携之选\n316不锈钢内胆，500ml容量，简约外观适配办公场景\n双层隔热工艺，500ml随身杯，保持饮品适宜温度",
+     "pass": true,
+     "input_tokens": 127,
+     "cost": 0.00067,
+     "memory_keys": [
+      "forbidden_words",
+      "brand_tone"
+     ],
+     "memory_hit": true,
+     "payload_tokens": 133
+    }
+   },
+   {
+    "id": "tone_recall",
+    "expect": "tone_words",
+    "off": {
+     "answer": "请提供品牌名称、核心产品或目标受众，以便我为您精准提炼品牌调性。",
+     "pass": false,
+     "input_tokens": 57,
+     "cost": 0.000274
+    },
+    "on": {
+     "answer": "品牌调性为专业克制，行文需严谨客观，避免使用“最”“第一”等绝对化词汇，保持理性与克制。",
+     "pass": true,
+     "input_tokens": 113,
+     "cost": 0.000466,
+     "memory_keys": [
+      "forbidden_words",
+      "brand_tone"
+     ],
+     "memory_hit": true,
+     "payload_tokens": 126
+    }
+   },
+   {
+    "id": "banned_check",
+    "expect": "says_no",
+    "off": {
+     "answer": "不可以。违反《广告法》关于禁止使用绝对化用语的规定，面临高额罚款风险。建议替换为“口碑优选”、“高效实用”等合规表述。",
+     "pass": true,
+     "input_tokens": 64,
+     "cost": 0.000408
+    },
+    "on": {
+     "answer": "不可以。「最好用」属于绝对化用语，违反广告法及团队禁用词规范，建议替换为「高效」「优选」等客观描述。",
+     "pass": true,
+     "input_tokens": 120,
+     "cost": 0.000496,
+     "memory_keys": [
+      "brand_tone",
+      "forbidden_words"
+     ],
+     "memory_hit": true,
+     "payload_tokens": 133
+    }
+   },
+   {
+    "id": "slogan",
+    "expect": "no_banned",
+    "off": {
+     "answer": "极速上手，效果翻倍，让增长简单可见。",
+     "pass": true,
+     "input_tokens": 59,
+     "cost": 0.000206
+    },
+    "on": {
+     "answer": "数据驱动增长，精准触达目标客群。",
+     "pass": true,
+     "input_tokens": 115,
+     "cost": 0.000318,
+     "memory_keys": [
+      "forbidden_words",
+      "brand_tone"
+     ],
+     "memory_hit": true,
+     "payload_tokens": 126
+    }
+   }
+  ]
+ }
+}

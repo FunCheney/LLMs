@@ -1,0 +1,147 @@
+{
+  "week": "2026-W53",
+  "period": { "from": "2026-12-28", "to": "2027-01-01" },
+  "gate": "W10",
+  "status": "partial",
+  "note": "Gate 10 九项判 7 通过 / 2 partial（#1 端到端真实性、#7 真实上线）。两项 partial 都不是「没做」：端到端在端点级用脚本化网关照跑了，真实模型没跑（无凭证）；上线在进程级验证了（本机 127.0.0.1 + 真 HTTP + 真 401），公网/域名/证书/真实用户没发生。",
+  "summary": "内容 pipeline（SEO 四段 + 三平台改写）接上 W9 调研与 W6 引用；安全线四层护栏 + HITL 收在一个入口；注入红队 10/10 拦截、误报 6/6 放行；我方鉴权落地并实测 401 分流。上线这一步只做到「本机进程同构验证」，公网与真实用户未发生。",
+  "metrics": {
+    "tests": {
+      "offline_passed": 1250,
+      "offline_collected": 1280,
+      "live_skipped": 30,
+      "live_skipped_reason": "5 条 pgvector 真库记忆用例 + 既有 25 条（无 API 凭证 / 需真库 / 对抗样例）",
+      "static_checks": {
+        "ruff": "pass",
+        "mypy_files": 122,
+        "mypy": "pass"
+      },
+      "new_this_week": {
+        "framework_side": 89,
+        "app_side": 65,
+        "note": "1096 → 1250（+154，与逐文件收集数一致）。框架侧 test_injection(45) / test_guardrails(31) / test_guardrail_pipeline(13)；产品侧 test_seo_pipeline(18) / test_style_rewriter(15) / test_article_route(12) / test_auth(12) / test_hitl_flow(8)"
+      }
+    },
+    "redteam": {
+      "dataset": "evals/golden/redteam_v1.jsonl",
+      "runner": "evals/scripts/run_redteam.py",
+      "injection_cases": 10,
+      "injection_blocked": 10,
+      "normal_cases": 6,
+      "normal_allowed": 6,
+      "by_shape": {
+        "boundary_escape": "1/1",
+        "data_exfiltration": "2/2",
+        "instruction_override": "2/2",
+        "obfuscation": "2/2",
+        "prompt_leak": "1/1",
+        "role_switch": "1/1",
+        "tool_hijack": "1/1"
+      },
+      "rule_hit_distribution": {
+        "override_zh": 3,
+        "prompt_leak": 2,
+        "role_switch_zh": 2,
+        "secret_exfil": 2,
+        "fake_delimiter": 2,
+        "override_en": 1,
+        "shell_exec": 1,
+        "base64_blob": 1,
+        "decoded:override_en": 1,
+        "invisible_chars": 1
+      },
+      "single_point_dependency": false,
+      "single_point_note": "10 条用例分布在 10 条规则上，任一条规则被改坏都不会让整体仍显示 10/10——这是看命中分布的唯一理由",
+      "precision": "6/6 正常用例放行；precision 与 recall 一起报，只报 recall 的红队报告是不完整的"
+    },
+    "guardrails": {
+      "layers": ["input", "approval", "execute", "output", "behavior"],
+      "entry": "guardrails/pipeline.py::GuardrailPipeline.run",
+      "order_is_hardcoded": true,
+      "skipped_is_reported": "GuardedRun.skipped 如实列出「没评估过」的层；policy=None 时输出层 ok=True 但 skipped=True",
+      "hitl": {
+        "trigger": "只对 dangerous 技能",
+        "states": ["pending", "approved", "rejected", "expired"],
+        "expired_default": "reject",
+        "unapproved_execution": "抛 ApprovalRequired + 审计一条 blocked；无任何参数可绕过",
+        "tests": "test_guardrails(22) + test_hitl_flow(8) + test_guardrail_pipeline(13)"
+      }
+    },
+    "auth": {
+      "module": "server/auth.py",
+      "middleware_order": "APIKeyAuth 在内、RequestID 在外（401 响应体里 request_id 有值，已实测）",
+      "our_401_vs_upstream_502": {
+        "our": "401 + AUTH_REQUIRED / AUTH_INVALID",
+        "upstream": "502 + UPSTREAM_AUTH",
+        "test": "test_our_401_is_not_upstream_502 以 ERROR_HTTP 映射表为参照，不另写一份期望值"
+      },
+      "deploy_check": {
+        "script": "ops/deploy_check.sh",
+        "run": "2026-11-13 本机 127.0.0.1:8199（AUTH_MODE=key）",
+        "result": "5/5 通过（/health 200 · 无 key 401 AUTH_REQUIRED · 错 key 401 AUTH_INVALID · 带 key 200 · X-Request-Id 存在）",
+        "not_verified": "镜像构建 / caddy 证书 / 公网 DNS / 真实厂商 key 全链路"
+      }
+    },
+    "golden_run": {
+      "week": "2026-W53",
+      "mode": "offline",
+      "cases": 54,
+      "passed": 50,
+      "failed": 0,
+      "interrupted": 0,
+      "skipped": 4,
+      "success_rate": 1.0,
+      "note": "离线夹具只证明执行管道通，不代表模型质量；quality 块保持 null",
+      "judge": { "calls": 50, "parsed": 50, "avg_score": 1.922 },
+      "ragas_samples": 9,
+      "ragas": { "faithfulness": 0.0, "answer_relevancy": 0.0543, "context_precision": 1.0 },
+      "regression_gate": {
+        "baseline": "2026-W46",
+        "compared_metrics": ["success_rate", "latency_p95_ms"],
+        "skipped_metrics": ["cost_per_task", "judge_score", "faithfulness", "tool_error_rate"],
+        "result": "pass"
+      }
+    }
+  },
+  "gate_checklist": {
+    "1_end_to_end": "partial（端点级：主题进 → 文章出 → 三平台扇出，全程 stages[] 有 trace，用脚本化网关照跑；**真实模型全链路没跑**，无厂商凭证。差距不在代码在凭证）",
+    "2_citation": "pass（成文 prompt 强制标号；coverage 做引用体检，悬空编号是硬错；无证据直接拒写而不是「凭常识写一篇」；`_CLAIM_SIGNALS` 只对带事实信号的句子要求标号，是一条会漏的判据，理由写在模块头）",
+    "3_brand": "pass（PlatformSpec 数据驱动；禁用词来自 LongTermMemory 并与平台 spec 合并；规则校验优先于再调一次 LLM；三平台输出各自符合长度/元素约束，含反向用例）",
+    "4_injection": "pass（10/10 拦截，含 3 条间接注入：检索内容 1 条、tool result 2 条；误报 6/6 放行；规则命中分散在 10 条规则上）",
+    "5_hitl": "pass（未审批 → 抛 ApprovalRequired 且 execute 从未被调用，用「计数为 0」断言而不是「没抛异常」；rejected/expired 都不放行；过期默认拒绝）",
+    "6_auth": "pass（我方 401 与上游 502 严格区分，且有测试以 ERROR_HTTP 表为唯一参照；本机进程实测 401/200 分流）",
+    "7_real_deploy": "partial（本机 127.0.0.1 同构验证 5/5；**公网不可访问、没有域名/证书、没有真实用户**。ROADEMAP §3.3 的「朋友开始用」未发生）",
+    "8_runbook": "pass（RUNBOOK §10 上线 / §11 密钥轮换（我方 key 双写过渡、上游 key 顺序不能反）/ §12 状态码分流；每条都写了「失败的含义」而不只是命令）",
+    "9_merge": "pass（make eval WEEK=2026-W53：50 passed / 0 failed，judge 1.922，regression_gate pass；本 history 与 docs/log.md 同批落盘）"
+  },
+  "decisions": {
+    "ADR-W10-001": "四层护栏收在一个入口 `GuardrailPipeline.run`：分开写时「新链路漏一层」不报错，只是防线不存在（ADR-008 在安全域的复现）；顺序硬编码，审批在执行之前而不是执行前检查",
+    "ADR-W10-002": "审批的归属点在 ActionRuntime（ToolRuntime.approvals），GuardrailPipeline 不注入 ApprovalGate：两个 gate 会让同一动作各挂一条 pending，人被问两遍且批一边另一边仍拦",
+    "ADR-W10-003": "隔离必须可逆且幂等（unwrap + idempotent isolate）：两层护栏串联时，fake_delimiter 会把自家封皮判成越界，实测导致 /v1/article 500",
+    "ADR-W10-004": "鉴权用中间件而不是 Depends：Depends 要求每个路由显式写一次，新路由忘了写端点就是公开的且没有测试会红；中间件只有一个插口，免鉴权路径必须显式进 PUBLIC_PATHS",
+    "why_auth_default_off": "默认 off 而不是 key：本地起服务与跑测试不该先准备 key 文件；而「默认开但没配 key」会逼所有人配一个用不上的密钥。生产档在 prod 覆盖层强制 key",
+    "why_no_text_field_on_401": "401 响应只给 code/message/request_id：把命中的原文回显给调用方，等于把「你的载荷出现在我们的运维面板上」这件事送给攻击者",
+    "rule_before_llm": "规则先跑不是为了省钱，是为了可测：规则命中可断言可聚合，LLM 判定是概率结论且它自己也是被注入目标。suspicious 与 allowed 分成两个字段，合并会让人为降误报去调 suspicious 顺手把 allowed 调松"
+  },
+  "discovered": [
+    "护栏与自己的封皮互相指认：外层隔离后内层再检，fake_delimiter 把 `<untrusted>` 判成越界 → /v1/article 第一次跑就 500。这类缺陷只在「两层串联」时出现，任何单层测试都是绿的",
+    "隔离标签会流进标题：`<untrusted source=\"user\">内容营销怎么做</untrusted>：为什么…`。红队不会发现（不是攻击），误报率也不会（不影响拦截），只有人打开页面才看得到",
+    "AUTH_MODE 没生效：pydantic-settings 的 env 名取自字段名，字段叫 `auth` 时读的是 `AUTH` 而不是 `AUTH_MODE`。写错名字不报错，只是静默用默认值——而默认值是 off，也就是「以为开了其实没开」",
+    "deploy_check.sh 第 2 项抓到的正是上面那条：脚本在鉴权真没开时给红，而如果只测「带 key 能通」，两档都会绿",
+    "parse_api_keys 第一版对 `=alice` 是静默跳过（key 为空就 continue）：写错一条的表现是「某个人突然 401」，日志里什么都没有。改成启动即抛",
+    "`!override` 而不是覆盖 ports：compose 对 ports 是多值字段拼接不是替换，不写 !override 时基础文件的 8000:8000 仍在生效，而 `docker compose config` 里两行都在，容易被读成配好了"
+  ],
+  "risks": [
+    "真实模型一次没跑：所有安全结论都建立在「规则层」上，模型自身被 jailbreak 的路径完全没有数据；端到端质量（文章是否可读、引用是否贴合）也没有任何证据",
+    "上线只到本机进程：公网、证书、DNS、镜像构建全部未验证。W11 要的「真实反馈修 bug」目前没有输入来源",
+    "语义级注入与多轮渐进完全没防（threat-model §6 已列）；10/10 是「10 条我们知道怎么打」",
+    "误报判据靠 6 条手工正常用例：样本太少，真实流量的误报率未知",
+    "审批端点无鉴权整合验证：`/v1/approvals` 目前靠中间件整体保护，但没有单独的「谁能批」的角色校验——任何持有效 key 的人都能批"
+  ],
+  "next": [
+    "W11：SLO + 误差预算，把本周的 401/502 分流、CONTENT_BLOCKED 比例、审批积压变成可告警的指标",
+    "W11：用故障注入找 ≥5 个真缺陷——本周已经暴露了三个「只在组合时才出现」的缺陷，说明单层测试的盲区是系统性的",
+    "补一次真实模型的全链路（需要凭证）：这是 Gate 10 #1 与 #7 从 partial 变 pass 的唯一路径",
+    "线上跑一周看 CONTENT_BLOCKED 的真实比例：现在只有一个 6 条样本的误报率，不足以支撑「误报可接受」这句话"
+  ]
+}
