@@ -1,0 +1,105 @@
+{
+  "week": "2027-W02",
+  "gate": "W12",
+  "status": "pass",
+  "note": "Gate 12: 10 pass / 2 partial / 0 missing",
+  "summary": "Framework extraction + scaffold + coverage + ADR + Decision Matrix + trends + frontier notes + interview prep",
+  "metrics": {
+    "tests": {
+      "offline_passed": 1471,
+      "offline_collected": 1501,
+      "live_skipped": 30,
+      "static_checks": {
+        "ruff": "pass",
+        "mypy_files": 134,
+        "mypy": "pass"
+      },
+      "new_this_week": {
+        "count": 25,
+        "note": "test_cli(14) + test_public_api"
+      }
+    },
+    "coverage": {
+      "core_pct": 88.6,
+      "overall_pct": 85.2,
+      "threshold": 70.0
+    },
+    "scaffold": {
+      "total_s": 21.4,
+      "files": 8,
+      "answer_ok": true
+    },
+    "api_audit": {
+      "top_level": 13,
+      "modules_used": 54,
+      "leaks": 0,
+      "unused": 0
+    },
+    "trends": {
+      "w1": 278,
+      "w12": 1471
+    }
+  },
+  "gate_checklist": [
+    {
+      "item": "框架可用",
+      "status": "pass",
+      "evidence": "api_audit --check"
+    },
+    {
+      "item": "脚手架",
+      "status": "pass",
+      "evidence": "scaffold_drill 21.4s"
+    },
+    {
+      "item": "覆盖率",
+      "status": "pass",
+      "evidence": "88.6%"
+    },
+    {
+      "item": "独立仓库",
+      "status": "partial",
+      "evidence": "monorepo 12 weeks; not split"
+    },
+    {
+      "item": "文档",
+      "status": "pass",
+      "evidence": "arch + 5 ADR + README + trends"
+    },
+    {
+      "item": "证据包",
+      "status": "pass",
+      "evidence": "evidence-index 8 links"
+    },
+    {
+      "item": "趋势图",
+      "status": "pass",
+      "evidence": "278->1471 12 points"
+    },
+    {
+      "item": "DoD",
+      "status": "pass",
+      "evidence": "dod-self-assessment.md"
+    },
+    {
+      "item": "Decision Matrix",
+      "status": "pass",
+      "evidence": "12 rows"
+    },
+    {
+      "item": "五层归属",
+      "status": "pass",
+      "evidence": "frontier-notes.md"
+    },
+    {
+      "item": "面试准备",
+      "status": "pass",
+      "evidence": "interview-prep.md"
+    },
+    {
+      "item": "合流",
+      "status": "pass",
+      "evidence": "2027-W02.json + log.md"
+    }
+  ]
+}
