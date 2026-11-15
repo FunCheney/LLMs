@@ -13,8 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from agent_framework.config import ConfigError
-from agent_framework.observability import current_request_id
+from agent_framework import ConfigError, current_request_id
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field

@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from agent_framework.config import Settings
+from agent_framework import Settings
 from growth_agent.rag import rerank_preflight, retriever_config
 from rag_mvp.retrieval.factory import _vector_store_config
 

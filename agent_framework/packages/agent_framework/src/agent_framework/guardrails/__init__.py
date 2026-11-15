@@ -71,6 +71,7 @@ from .injection import (
     InjectionHit,
     isolate,
     layer_prompt,
+    unwrap,
 )
 from .input import BlockedInput, InputCheck, InputGuard, InputLimits
 from .output import (
@@ -148,4 +149,7 @@ __all__ = [
     "skill_of",
     "split_sentences",
     "unpublished_claims",
+    # 与 `isolate` 成对：只导出上锁不导出开锁，等于逼调用方去深层路径拿
+    # （W11 INC-2 的教训就是"隔离了却没解封皮"，接口面不对称会放大这个错）
+    "unwrap",
 ]

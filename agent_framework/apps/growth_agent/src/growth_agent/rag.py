@@ -25,10 +25,9 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from agent_framework.bootstrap import build_gateway
-from agent_framework.config import Settings
+from agent_framework import Settings, build_gateway
 from agent_framework.knowledge import GovernancePolicy
-from agent_framework.llm.client import LLMGateway
+from agent_framework.llm import LLMGateway
 from agent_framework.retrieval import MultiQueryRewriter, QueryRewriter, RetrievalPipeline
 from rag_mvp.contrib.agent_framework import (
     DEFAULT_MAX_WORKERS,

@@ -15,8 +15,7 @@ from typing import Any
 
 import httpx
 import pytest
-from agent_framework.bootstrap import build_gateway
-from agent_framework.config import Settings
+from agent_framework import Settings, build_gateway
 from growth_agent.app import create_app
 
 FORBIDDEN_KEYS = {

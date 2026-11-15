@@ -28,26 +28,22 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
 
-from agent_framework.config import Settings
-from agent_framework.llm.client import LLMGateway
-from agent_framework.llm.types import Message, MessageRole
+from agent_framework import Settings
+from agent_framework.llm import LLMGateway, Message, MessageRole
 from agent_framework.memory import (
+    LongTermMemory,
     MemoryExtractor,
     MemoryItem,
     MemoryRecord,
     SummarizerUsage,
+    WorkingMemory,
     WriteOutcome,
+    is_explicit_instruction,
+    make_gateway_summarizer,
 )
-from agent_framework.memory.extract import _EXPLICIT_MARKERS
-from agent_framework.memory.long_term import LongTermMemory
-from agent_framework.memory.working import WorkingMemory, make_gateway_summarizer
-from agent_framework.session.factory import build_session_store
+from agent_framework.session import build_session_store
 
 logger = logging.getLogger(__name__)
-
-# 提取的字面预筛（与 extract.py 的显式指令识别同源——
-# 这里导入同一个正则，不允许两份"什么算显式"各自演化）。
-EXPLICIT_MEMORY_MARKER = _EXPLICIT_MARKERS
 
 
 def _vec_literal(vector: Sequence[float]) -> str:
@@ -334,7 +330,7 @@ class MemoryRuntime:
 
     def should_extract(self, question: str) -> bool:
         """提取的字面预筛：只有出现显式记忆指令才调 LLM 提取。"""
-        return bool(EXPLICIT_MEMORY_MARKER.search(question or ""))
+        return is_explicit_instruction(question)
 
     async def extract_and_write(
         self, messages: list[Message], *, source_session: str

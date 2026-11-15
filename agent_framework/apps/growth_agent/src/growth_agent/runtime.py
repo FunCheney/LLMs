@@ -21,8 +21,8 @@ import asyncio
 import logging
 from typing import Any
 
-from agent_framework.config import ConfigError, Settings
-from agent_framework.llm.client import LLMGateway
+from agent_framework import ConfigError, Settings
+from agent_framework.llm import LLMGateway
 from fastapi import FastAPI
 
 from growth_agent.answer import KnowledgeAnswerer

@@ -19,9 +19,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from agent_framework.config import Settings
+from agent_framework import Settings, current_request_id
 from agent_framework.knowledge import citation_payload
-from agent_framework.observability import current_request_id
 from agent_framework.retrieval import Principal
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse

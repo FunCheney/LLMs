@@ -25,10 +25,10 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+from agent_framework import current_request_id
 from agent_framework.guardrails import OutputPolicy
 from agent_framework.knowledge import citation_payload
-from agent_framework.observability import current_request_id
-from agent_framework.server.errors import error_body
+from agent_framework.server import error_body
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field

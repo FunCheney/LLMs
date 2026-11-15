@@ -121,10 +121,32 @@ def create_app(
     return app
 
 
-app = create_app()
+# ── 模块级 `app` 改成 PEP 562 惰性属性（W12 D2）──────────────────────────
+#
+# 原来这里写的是 `app = create_app()`：任何 `import agent_framework.server.app`
+# 都会读一次 `models.yaml`、建一次 registry、开一个 Redis/内存 session store。
+# 于是"想拿一个 `create_app` 来自己装配"的调用方，被迫先付一次它并不需要的初始化——
+# 脚手架项目就是这么死的：`from ... import create_app` 那一刻，宿主进程里多了一个
+# 谁也没在用、但已经连着资源池的 app。
+#
+# 改成惰性之后，`uvicorn agent_framework.server.app:app`（ops/Dockerfile 的 CMD）
+# 与 `from ... import app`（既有冒烟测试）都照旧可用——它们本来就是"取属性"，
+# 只是现在这个属性的生成时机从 import 挪到了第一次被取。
+_app: FastAPI | None = None
+
+
+def __getattr__(name: str) -> Any:
+    global _app
+    if name == "app":
+        if _app is None:
+            _app = create_app()
+        return _app
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def main() -> None:
     import uvicorn
 
-    uvicorn.run("agent_framework.server.app:app", host="0.0.0.0", port=8000)
+    # 用工厂字符串而不是模块属性：`--reload` / 多 worker 时由 uvicorn 自己
+    # 在子进程里构造，父进程不必先建一个用不上的 app。
+    uvicorn.run("agent_framework.server.app:create_app", factory=True, host="0.0.0.0", port=8000)

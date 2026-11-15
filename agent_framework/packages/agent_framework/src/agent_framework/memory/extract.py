@@ -72,6 +72,23 @@ _EXTRACT_PROMPT = """从下面的对话记录中提取值得长期记住的品�
 _EXPLICIT_MARKERS = re.compile(r"记住|以后(要|请|别|不要)|从今往后|务必|禁止使用")
 
 
+def is_explicit_instruction(text: str) -> bool:
+    """这段文本里有没有显式记忆指令（"记住：…"）。
+
+    ## 为什么要一个函数，而不是把正则暴露出去
+
+    产品侧在**写入前**要做一次预筛（`apps/growth_agent/memory.py` 决定这次提问
+    值不值得进提取管线）。这个预筛的判据必须和提取时**完全一致**——两份正则
+    各自演化的话，会出现"预筛放过了、提取又判它不是显式指令"这种前后矛盾，
+    而两边都不会报错。
+
+    上一版的做法是 `from agent_framework.memory.extract import _EXPLICIT_MARKERS`：
+    意图是对的（共用一份），手段是错的（借用私有符号）。暴露正则会诱使调用方
+    自己 `.search()` 并顺手改写它；暴露判断则把"什么算显式"留在框架里。
+    """
+    return bool(_EXPLICIT_MARKERS.search(text or ""))
+
+
 @dataclass(frozen=True)
 class ExtractionResult:
     """一次提取的产物。candidates 按置信度降序、截到 EXTRACT_MAX_ITEMS。"""

@@ -24,8 +24,7 @@ from __future__ import annotations
 import os
 
 import pytest
-from agent_framework.memory import MemoryItem, WriteAction
-from agent_framework.memory.long_term import LongTermMemory
+from agent_framework.memory import LongTermMemory, MemoryItem, WriteAction
 from growth_agent.memory import PgVectorMemoryStore
 
 DSN = os.getenv("PGVECTOR_DSN", "")

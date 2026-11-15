@@ -25,7 +25,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from agent_framework.config import Settings
+from agent_framework import Settings, current_request_id
 from agent_framework.context import (
     ContextBudget,
     ContextBuilder,
@@ -43,9 +43,7 @@ from agent_framework.knowledge import (
     conflict_note,
     render_prompt,
 )
-from agent_framework.llm.client import ChatCall, LLMGateway
-from agent_framework.llm.types import Message, MessageRole
-from agent_framework.observability import current_request_id
+from agent_framework.llm import ChatCall, LLMGateway, Message, MessageRole
 from agent_framework.retrieval import (
     ACLPolicy,
     AssembledContext,

@@ -14,6 +14,8 @@ dependencies = [
 
 [project.scripts]
 agent-server = "agent_framework.server.app:main"
+# W12 D2：脚手架入口。`agent create <name>` —— 见 cli.py 顶部三条约束。
+agent = "agent_framework.cli:main"
 
 [project.optional-dependencies]
 # W9 D4 的 LangGraph 对照实现。**刻意做成 extra 而不是主依赖**：

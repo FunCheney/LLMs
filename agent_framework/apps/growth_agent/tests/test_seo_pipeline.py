@@ -14,7 +14,7 @@
 from __future__ import annotations
 
 import pytest
-from agent_framework.knowledge.citation import Citation, CitationContext
+from agent_framework.knowledge import Citation, CitationContext
 from growth_agent.pipeline import (
     BrandProfile,
     SEOError,

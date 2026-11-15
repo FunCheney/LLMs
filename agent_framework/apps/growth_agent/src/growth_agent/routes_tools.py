@@ -20,14 +20,14 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from agent_framework import current_request_id
 from agent_framework.guardrails import (
     EVENT_APPROVAL_PENDING,
     EVENT_DANGEROUS_CALL,
     EVENT_TOOL_CALL,
     ApprovalError,
 )
-from agent_framework.llm.types import ToolCall
-from agent_framework.observability import current_request_id
+from agent_framework.llm import ToolCall
 from agent_framework.retrieval import Principal
 from agent_framework.skills import TaskStage, registry_snapshot
 from fastapi import APIRouter, Query, Request

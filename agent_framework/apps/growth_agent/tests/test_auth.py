@@ -15,8 +15,8 @@ import logging
 
 import httpx
 import pytest
-from agent_framework.config import Settings
-from agent_framework.server.auth import (
+from agent_framework import Settings
+from agent_framework.server import (
     AUTH_INVALID,
     AUTH_REQUIRED,
     APIKeyAuth,

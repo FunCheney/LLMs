@@ -26,14 +26,10 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
+from agent_framework import Settings, build_gateway, configure_logging
 from agent_framework import __version__ as framework_version
-from agent_framework.bootstrap import build_gateway
-from agent_framework.config import Settings
-from agent_framework.llm.client import LLMGateway
-from agent_framework.observability import configure_logging
-from agent_framework.server.auth import install_api_key_auth
-from agent_framework.server.errors import install_error_handlers
-from agent_framework.server.middleware import RequestIDMiddleware
+from agent_framework.llm import LLMGateway
+from agent_framework.server import RequestIDMiddleware, install_api_key_auth, install_error_handlers
 from fastapi import FastAPI
 
 import growth_agent

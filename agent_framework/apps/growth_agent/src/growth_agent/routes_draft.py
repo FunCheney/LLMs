@@ -37,7 +37,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from agent_framework.config import ConfigError
+from agent_framework import ConfigError, current_request_id
 from agent_framework.guardrails import (
     SOURCE_USER,
     InputGuard,
@@ -45,10 +45,8 @@ from agent_framework.guardrails import (
     OutputPolicy,
     layer_prompt,
 )
-from agent_framework.llm.client import ChatCall, ChatOutcome, LLMGateway
-from agent_framework.llm.types import Message, MessageRole
-from agent_framework.observability import current_request_id
-from agent_framework.server.errors import error_body
+from agent_framework.llm import ChatCall, ChatOutcome, LLMGateway, Message, MessageRole
+from agent_framework.server import error_body
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field

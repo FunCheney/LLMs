@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agent_framework.config import Settings
+from agent_framework import Settings
 from fastapi.testclient import TestClient
 from growth_agent.app import create_app
 

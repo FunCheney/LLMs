@@ -12,8 +12,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any
 
-from agent_framework.config import Settings
-from agent_framework.llm.types import Message, MessageRole
+from agent_framework import Settings
+from agent_framework.llm import Message, MessageRole
 from growth_agent.answer import ANSWER_SYSTEM_PROMPT, KnowledgeAnswerer
 from test_answer import FakeGateway, FakePipeline, _scored  # noqa: I001 - 复用桩件
 

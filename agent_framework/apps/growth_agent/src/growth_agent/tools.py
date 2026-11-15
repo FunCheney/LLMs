@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from agent_framework.config import ConfigError, Settings
+from agent_framework import ConfigError, Settings
 from agent_framework.guardrails import (
     ApprovalGate,
     BehaviorMonitor,
@@ -48,6 +48,9 @@ from agent_framework.skills import (
     TaskStage,
     VisibilityDecision,
 )
+
+# `servers` 是独立的能力子包（有自己的 `__init__` 与上游接法），
+# 不从 `skills` 顶层摊平——摊平会丢掉"这是内置 server"这层语义。
 from agent_framework.skills.servers import (
     FetchServer,
     SearchServer,
