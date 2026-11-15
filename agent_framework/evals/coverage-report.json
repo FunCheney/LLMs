@@ -1,0 +1,666 @@
+{
+  "overall_pct": 85.2,
+  "core_pct": 88.6,
+  "total_exec": 13312,
+  "total_hit": 11345,
+  "files": [
+    {
+      "file": "session/redis.py",
+      "exec": 82,
+      "hit": 31,
+      "pct": 37.8,
+      "core": false
+    },
+    {
+      "file": "error_codes.py",
+      "exec": 37,
+      "hit": 17,
+      "pct": 45.9,
+      "core": false
+    },
+    {
+      "file": "skills/servers/fetch_server.py",
+      "exec": 82,
+      "hit": 45,
+      "pct": 54.9,
+      "core": false
+    },
+    {
+      "file": "skills/servers/upstream.py",
+      "exec": 170,
+      "hit": 94,
+      "pct": 55.3,
+      "core": false
+    },
+    {
+      "file": "memory/extract.py",
+      "exec": 120,
+      "hit": 71,
+      "pct": 59.2,
+      "core": false
+    },
+    {
+      "file": "planner/reasoners.py",
+      "exec": 231,
+      "hit": 137,
+      "pct": 59.3,
+      "core": false
+    },
+    {
+      "file": "skills/redact.py",
+      "exec": 68,
+      "hit": 44,
+      "pct": 64.7,
+      "core": false
+    },
+    {
+      "file": "workflow/research_workflow.py",
+      "exec": 45,
+      "hit": 32,
+      "pct": 71.1,
+      "core": false
+    },
+    {
+      "file": "skills/mcp/client.py",
+      "exec": 209,
+      "hit": 153,
+      "pct": 73.2,
+      "core": false
+    },
+    {
+      "file": "session/factory.py",
+      "exec": 15,
+      "hit": 11,
+      "pct": 73.3,
+      "core": false
+    },
+    {
+      "file": "skills/contract.py",
+      "exec": 42,
+      "hit": 31,
+      "pct": 73.8,
+      "core": false
+    },
+    {
+      "file": "skills/mcp/types.py",
+      "exec": 116,
+      "hit": 87,
+      "pct": 75.0,
+      "core": false
+    },
+    {
+      "file": "skills/sandbox.py",
+      "exec": 268,
+      "hit": 206,
+      "pct": 76.9,
+      "core": false
+    },
+    {
+      "file": "llm/difficulty_router.py",
+      "exec": 81,
+      "hit": 63,
+      "pct": 77.8,
+      "core": false
+    },
+    {
+      "file": "llm/registry.py",
+      "exec": 158,
+      "hit": 123,
+      "pct": 77.8,
+      "core": true
+    },
+    {
+      "file": "runtime/timeline.py",
+      "exec": 191,
+      "hit": 149,
+      "pct": 78.0,
+      "core": true
+    },
+    {
+      "file": "planner/base.py",
+      "exec": 420,
+      "hit": 330,
+      "pct": 78.6,
+      "core": false
+    },
+    {
+      "file": "skills/spec.py",
+      "exec": 318,
+      "hit": 250,
+      "pct": 78.6,
+      "core": false
+    },
+    {
+      "file": "planner/controls.py",
+      "exec": 150,
+      "hit": 118,
+      "pct": 78.7,
+      "core": false
+    },
+    {
+      "file": "session/base.py",
+      "exec": 75,
+      "hit": 59,
+      "pct": 78.7,
+      "core": false
+    },
+    {
+      "file": "context/builder.py",
+      "exec": 75,
+      "hit": 61,
+      "pct": 81.3,
+      "core": true
+    },
+    {
+      "file": "resilience/semantic_cache.py",
+      "exec": 184,
+      "hit": 150,
+      "pct": 81.5,
+      "core": true
+    },
+    {
+      "file": "runtime/resume.py",
+      "exec": 186,
+      "hit": 152,
+      "pct": 81.7,
+      "core": true
+    },
+    {
+      "file": "resilience/idempotency.py",
+      "exec": 88,
+      "hit": 72,
+      "pct": 81.8,
+      "core": true
+    },
+    {
+      "file": "multi_agent/handoff.py",
+      "exec": 67,
+      "hit": 55,
+      "pct": 82.1,
+      "core": false
+    },
+    {
+      "file": "llm/errors.py",
+      "exec": 202,
+      "hit": 166,
+      "pct": 82.2,
+      "core": true
+    },
+    {
+      "file": "server/errors.py",
+      "exec": 73,
+      "hit": 60,
+      "pct": 82.2,
+      "core": true
+    },
+    {
+      "file": "guardrails/behavior.py",
+      "exec": 148,
+      "hit": 122,
+      "pct": 82.4,
+      "core": true
+    },
+    {
+      "file": "server/app.py",
+      "exec": 86,
+      "hit": 71,
+      "pct": 82.6,
+      "core": true
+    },
+    {
+      "file": "skills/servers/workspace_server.py",
+      "exec": 198,
+      "hit": 165,
+      "pct": 83.3,
+      "core": false
+    },
+    {
+      "file": "memory/long_term.py",
+      "exec": 232,
+      "hit": 194,
+      "pct": 83.6,
+      "core": false
+    },
+    {
+      "file": "multi_agent/shared_state.py",
+      "exec": 62,
+      "hit": 52,
+      "pct": 83.9,
+      "core": false
+    },
+    {
+      "file": "server/routes_chat.py",
+      "exec": 56,
+      "hit": 47,
+      "pct": 83.9,
+      "core": true
+    },
+    {
+      "file": "llm/base.py",
+      "exec": 46,
+      "hit": 39,
+      "pct": 84.8,
+      "core": false
+    },
+    {
+      "file": "tracing.py",
+      "exec": 93,
+      "hit": 79,
+      "pct": 84.9,
+      "core": false
+    },
+    {
+      "file": "llm/types.py",
+      "exec": 208,
+      "hit": 177,
+      "pct": 85.1,
+      "core": false
+    },
+    {
+      "file": "skills/guard.py",
+      "exec": 141,
+      "hit": 120,
+      "pct": 85.1,
+      "core": false
+    },
+    {
+      "file": "skills/library.py",
+      "exec": 198,
+      "hit": 169,
+      "pct": 85.4,
+      "core": false
+    },
+    {
+      "file": "guardrails/hitl.py",
+      "exec": 236,
+      "hit": 203,
+      "pct": 86.0,
+      "core": true
+    },
+    {
+      "file": "guardrails/injection.py",
+      "exec": 315,
+      "hit": 271,
+      "pct": 86.0,
+      "core": true
+    },
+    {
+      "file": "guardrails/output.py",
+      "exec": 108,
+      "hit": 93,
+      "pct": 86.1,
+      "core": true
+    },
+    {
+      "file": "multi_agent/langgraph_variant.py",
+      "exec": 201,
+      "hit": 173,
+      "pct": 86.1,
+      "core": false
+    },
+    {
+      "file": "skills/action.py",
+      "exec": 378,
+      "hit": 326,
+      "pct": 86.2,
+      "core": false
+    },
+    {
+      "file": "skills/mcp/inmemory.py",
+      "exec": 58,
+      "hit": 50,
+      "pct": 86.2,
+      "core": false
+    },
+    {
+      "file": "context/drift.py",
+      "exec": 76,
+      "hit": 66,
+      "pct": 86.8,
+      "core": true
+    },
+    {
+      "file": "runtime/assets.py",
+      "exec": 198,
+      "hit": 172,
+      "pct": 86.9,
+      "core": true
+    },
+    {
+      "file": "knowledge/governance.py",
+      "exec": 160,
+      "hit": 140,
+      "pct": 87.5,
+      "core": false
+    },
+    {
+      "file": "context/schema.py",
+      "exec": 123,
+      "hit": 108,
+      "pct": 87.8,
+      "core": true
+    },
+    {
+      "file": "memory/working.py",
+      "exec": 211,
+      "hit": 186,
+      "pct": 88.2,
+      "core": false
+    },
+    {
+      "file": "skills/servers/search_server.py",
+      "exec": 77,
+      "hit": 68,
+      "pct": 88.3,
+      "core": false
+    },
+    {
+      "file": "observability.py",
+      "exec": 129,
+      "hit": 114,
+      "pct": 88.4,
+      "core": false
+    },
+    {
+      "file": "skills/visibility.py",
+      "exec": 87,
+      "hit": 77,
+      "pct": 88.5,
+      "core": false
+    },
+    {
+      "file": "resilience/circuit_breaker.py",
+      "exec": 115,
+      "hit": 102,
+      "pct": 88.7,
+      "core": true
+    },
+    {
+      "file": "runtime/flags.py",
+      "exec": 126,
+      "hit": 112,
+      "pct": 88.9,
+      "core": true
+    },
+    {
+      "file": "skills/executor.py",
+      "exec": 317,
+      "hit": 283,
+      "pct": 89.3,
+      "core": false
+    },
+    {
+      "file": "skills/replay.py",
+      "exec": 160,
+      "hit": 143,
+      "pct": 89.4,
+      "core": false
+    },
+    {
+      "file": "planner/research_planner.py",
+      "exec": 286,
+      "hit": 256,
+      "pct": 89.5,
+      "core": false
+    },
+    {
+      "file": "server/auth.py",
+      "exec": 134,
+      "hit": 120,
+      "pct": 89.6,
+      "core": true
+    },
+    {
+      "file": "skills/loader.py",
+      "exec": 129,
+      "hit": 116,
+      "pct": 89.9,
+      "core": false
+    },
+    {
+      "file": "retrieval/context_assemble.py",
+      "exec": 137,
+      "hit": 124,
+      "pct": 90.5,
+      "core": true
+    },
+    {
+      "file": "server/schemas.py",
+      "exec": 139,
+      "hit": 126,
+      "pct": 90.6,
+      "core": true
+    },
+    {
+      "file": "multi_agent/roles.py",
+      "exec": 107,
+      "hit": 97,
+      "pct": 90.7,
+      "core": false
+    },
+    {
+      "file": "guardrails/input.py",
+      "exec": 87,
+      "hit": 79,
+      "pct": 90.8,
+      "core": true
+    },
+    {
+      "file": "retrieval/acl.py",
+      "exec": 87,
+      "hit": 79,
+      "pct": 90.8,
+      "core": true
+    },
+    {
+      "file": "bootstrap.py",
+      "exec": 99,
+      "hit": 90,
+      "pct": 90.9,
+      "core": false
+    },
+    {
+      "file": "retrieval/base.py",
+      "exec": 34,
+      "hit": 31,
+      "pct": 91.2,
+      "core": true
+    },
+    {
+      "file": "session/memory.py",
+      "exec": 57,
+      "hit": 52,
+      "pct": 91.2,
+      "core": false
+    },
+    {
+      "file": "knowledge/citation.py",
+      "exec": 248,
+      "hit": 227,
+      "pct": 91.5,
+      "core": false
+    },
+    {
+      "file": "queue/inmemory.py",
+      "exec": 145,
+      "hit": 133,
+      "pct": 91.7,
+      "core": false
+    },
+    {
+      "file": "runtime/model.py",
+      "exec": 475,
+      "hit": 437,
+      "pct": 92.0,
+      "core": true
+    },
+    {
+      "file": "skills/validator.py",
+      "exec": 88,
+      "hit": 81,
+      "pct": 92.0,
+      "core": false
+    },
+    {
+      "file": "queue/base.py",
+      "exec": 52,
+      "hit": 48,
+      "pct": 92.3,
+      "core": false
+    },
+    {
+      "file": "skills/audit.py",
+      "exec": 108,
+      "hit": 100,
+      "pct": 92.6,
+      "core": false
+    },
+    {
+      "file": "knowledge/incremental.py",
+      "exec": 149,
+      "hit": 139,
+      "pct": 93.3,
+      "core": false
+    },
+    {
+      "file": "exporters/langfuse.py",
+      "exec": 151,
+      "hit": 141,
+      "pct": 93.4,
+      "core": false
+    },
+    {
+      "file": "knowledge/base.py",
+      "exec": 63,
+      "hit": 59,
+      "pct": 93.7,
+      "core": false
+    },
+    {
+      "file": "retrieval/query_rewrite.py",
+      "exec": 159,
+      "hit": 149,
+      "pct": 93.7,
+      "core": true
+    },
+    {
+      "file": "resilience/degradation.py",
+      "exec": 81,
+      "hit": 76,
+      "pct": 93.8,
+      "core": true
+    },
+    {
+      "file": "multi_agent/supervisor.py",
+      "exec": 278,
+      "hit": 261,
+      "pct": 93.9,
+      "core": false
+    },
+    {
+      "file": "llm/client.py",
+      "exec": 484,
+      "hit": 455,
+      "pct": 94.0,
+      "core": true
+    },
+    {
+      "file": "resilience/concurrency.py",
+      "exec": 101,
+      "hit": 95,
+      "pct": 94.1,
+      "core": true
+    },
+    {
+      "file": "config.py",
+      "exec": 228,
+      "hit": 215,
+      "pct": 94.3,
+      "core": true
+    },
+    {
+      "file": "guardrails/pipeline.py",
+      "exec": 209,
+      "hit": 197,
+      "pct": 94.3,
+      "core": true
+    },
+    {
+      "file": "server/routes_task.py",
+      "exec": 54,
+      "hit": 51,
+      "pct": 94.4,
+      "core": true
+    },
+    {
+      "file": "llm/router.py",
+      "exec": 37,
+      "hit": 35,
+      "pct": 94.6,
+      "core": true
+    },
+    {
+      "file": "server/middleware.py",
+      "exec": 37,
+      "hit": 35,
+      "pct": 94.6,
+      "core": true
+    },
+    {
+      "file": "planner/plan_execute.py",
+      "exec": 124,
+      "hit": 118,
+      "pct": 95.2,
+      "core": false
+    },
+    {
+      "file": "retrieval/fusion.py",
+      "exec": 46,
+      "hit": 44,
+      "pct": 95.7,
+      "core": true
+    },
+    {
+      "file": "retrieval/pipeline.py",
+      "exec": 197,
+      "hit": 189,
+      "pct": 95.9,
+      "core": true
+    },
+    {
+      "file": "context/degradation.py",
+      "exec": 27,
+      "hit": 26,
+      "pct": 96.3,
+      "core": true
+    },
+    {
+      "file": "server/sse.py",
+      "exec": 36,
+      "hit": 35,
+      "pct": 97.2,
+      "core": true
+    },
+    {
+      "file": "context/budget.py",
+      "exec": 76,
+      "hit": 74,
+      "pct": 97.4,
+      "core": true
+    },
+    {
+      "file": "planner/react.py",
+      "exec": 64,
+      "hit": 63,
+      "pct": 98.4,
+      "core": false
+    },
+    {
+      "file": "resilience/errors.py",
+      "exec": 3,
+      "hit": 3,
+      "pct": 100.0,
+      "core": true
+    }
+  ]
+}
