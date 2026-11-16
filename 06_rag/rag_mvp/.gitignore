@@ -1,0 +1,15 @@
+# 本目录是独立项目（不属于 agent_framework 的 workspace 成员）
+# 只忽略本地生成物，不忽略源码与语料
+
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# pytest 临时目录（受限环境用 --basetemp 落在原地时产生）
+.pytest_tmp/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/

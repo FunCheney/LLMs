@@ -1,0 +1,14 @@
+# 作为 docker build 的具名上下文（additional_contexts: ragmvp）使用。
+# 不排除 .venv/data 的话，每次构建都要上传 1.4G，缓存基本失效。
+
+.venv
+data
+__pycache__
+*.py[cod]
+.pytest_cache
+.ruff_cache
+.mypy_cache
+test
+docs
+*.md
+!README.md
