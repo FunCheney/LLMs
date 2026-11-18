@@ -37,13 +37,17 @@ def build_gateway(
     而两个判定点迟早会出现一个 on 一个 off 的中间态。
     """
 
+    # 1. 初始化设置
     resolved_settings = settings or Settings()
+    # 2. 加载 models.yaml 配置
     resolved_catalog = catalog or load_catalog(resolved_settings.models_yaml)
     flags = FlagSet.from_settings(resolved_settings)
+    # 3. 初始化 Registry
     registry = Registry(resolved_catalog, resolved_settings)
-
+    # 4. 初始化 LLMGateway
     return LLMGateway(
         registry=registry,
+        # 构造任务调度路由
         router=build_router(resolved_catalog, resolved_settings, flags=flags),
         catalog=resolved_catalog,
         settings=resolved_settings,

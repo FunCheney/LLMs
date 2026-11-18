@@ -10,3 +10,26 @@ chat_router 和 task_router 的关系是什么。
 7. 重写查询不能再 06_rag/rag_mvp/src/rag_mvp/pre_query 中实现吗？
 8. 给w5和w6中用到的类的字段添加注释
 9. 梳理一个整体的架构图出来
+10. InMemoryTaskQueue 为什么没有实现 agent_framework/packages/agent_framework/src/agent_framework/queue/base.py 类
+11. memory 系统是怎么在 agent 框架中起作用的
+12. RAG 系统是怎么在 agent 框架中起作用的
+13. 如何加载并使用三方的 mcp 服务
+14. 多轮对话是怎么设计的
+15. 如何解决幻觉问题的
+16. 上下文是如何管理的
+17. token 成本如何计算的
+
+
+### 场景问题
+1. RAG 召回不准怎么办
+2. Agent 为什么会死循环，如何解决的
+3. 工具吊桶失败怎么处理
+4. 上下文太长怎么优化
+
+
+### 实战题
+每个题按照
+需求分析-->技术方案-->核心流程--> 异常处理 --> 优化方向，最好能够结合本项目的实现
+1. 给你一个业务，设计 Agent 方案
+2. RAG 效果不好，怎么排查和优化
+3. Agent 工具调用失败，超时，死循环，怎么做异常兜底
