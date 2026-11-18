@@ -13,11 +13,15 @@ chat_router 和 task_router 的关系是什么。
 10. InMemoryTaskQueue 为什么没有实现 agent_framework/packages/agent_framework/src/agent_framework/queue/base.py 类
 11. memory 系统是怎么在 agent 框架中起作用的
 12. RAG 系统是怎么在 agent 框架中起作用的
-13. 如何加载并使用三方的 mcp 服务
+13. 如何加载并使用三方的 mcp 服务, 比如：我要在本项目中使用 GitHub 的 mcp 服务
 14. 多轮对话是怎么设计的
 15. 如何解决幻觉问题的
 16. 上下文是如何管理的
 17. token 成本如何计算的
+18. functionCall 功能是如何实现的，如何区分是自己的工具，还是 mcp 服务提供的工具
+19. MCPClient（如何连接 server 的，鉴权握手式如何做的）
+20. mcp server 需要提供的 resource 和 prompt 应该如何在项目中使用
+21. 能不能输出一个 mcp 和 skill 在本项目中的设计方案
 
 
 ### 场景问题
