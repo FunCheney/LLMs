@@ -506,3 +506,11 @@ class TaskQueue(Protocol):
 2. **优先按函数名定位**：`create_app` / `build_limiter` / `_chat_impl` / `_run_one` / `build_memory_runtime` 这些名字比行号稳定。
 3. **改了这几处就要回来改本文**：`server/app.py` 的装配顺序、`LLMGateway` 的公开入口或 `__init__` 字段、`TaskQueue` 契约、`SessionStore` 的真正消费者。
 4. **不要在这里写「计划」**：计划项（Redis 队列、Temporal、多副本）只写「现在没有 + 接入要做什么」，不写预期时间。
+
+---
+
+## 续篇
+
+原文第 10–21 问（队列契约 / 记忆 / RAG / MCP / 多轮 / 幻觉 / 上下文 / 成本 /
+functionCall / MCPClient / resource&prompt / Skill 方案）、四道场景题、三道实战题，
+见 **`docs/server-question-answers-2.md`**。
