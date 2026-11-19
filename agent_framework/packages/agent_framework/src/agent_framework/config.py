@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any, Literal
 
@@ -45,6 +46,7 @@ _KEY_ENV_TO_FIELD: dict[str, str] = {
 # 录到真实的鉴权失败体（错误路径不能靠编，否则 401→502 的映射等于没验过）。
 KEY_ENV_TO_FIELD = _KEY_ENV_TO_FIELD
 
+_LOG = logging.getLogger("agent_framework.config")
 
 class ConfigError(ValueError):
     """配置错误。
@@ -469,6 +471,7 @@ class Settings(BaseSettings):
 
         secret: SecretStr | None = getattr(self, field_name)
 
+        _LOG.info("field_name=%s, path=%s", field_name, Path(".env.local").resolve())
         if secret is None or not secret.get_secret_value():
             raise ConfigError(
                 f"缺少凭据 {env_name}：请在 .env.local 中设置 {env_name}=..."

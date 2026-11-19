@@ -321,3 +321,4 @@ cython_debug/
 06_rag/rag_mvp/.workbuddy
 /06_rag/rag_mvp/src/embedding/visual_bge/Visualized_base_en_v1.5.pth
 /agent_framework/.workbuddy/
+.env.local
