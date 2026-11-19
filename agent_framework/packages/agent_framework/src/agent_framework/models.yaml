@@ -32,9 +32,9 @@ providers:
 #      并在此注明，W11 做成本看板时改为按 (上下文长度, 时段) 取价
 models:
   # alias（左）≠ wire 名（model 字段）：Qwen 必须钉日期快照，否则 12 周指标曲线不可比
-  qwen3.7-plus:
+  qwen3.8-flash:
     provider: qwen
-    model: qwen3.7-plus-2026-05-26
+    model: qwen3.8-flash
     tier: cheap
     capabilities: [stream, tools, parallel_tools]
     # 阶梯计价：输入 ≤256K 时 2/8，>256K 时 6/24。此处取 ≤256K 档。
@@ -74,8 +74,8 @@ models:
     pricing: { input: 0, output: 0, currency: CNY, per: 1000000 }
 
 routes:
-  default: { primary: qwen3.7-plus, fallback: [deepseek-flash, gpt-4o-mini] }
-  cheap:  { primary: qwen3.7-plus, fallback: [deepseek-flash, gpt-4o-mini] }
+  default: { primary: qwen3.8-flash, fallback: [deepseek-flash, gpt-4o-mini] }
+  cheap:  { primary: qwen3.8-flash, fallback: [deepseek-flash, gpt-4o-mini] }
   strong: { primary: claude-sonnet-4-6, fallback: [gpt-4o-mini] }
 
 tasks:

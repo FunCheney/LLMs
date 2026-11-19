@@ -113,7 +113,7 @@ class Registry:
 
         api_key = self._settings.api_key(provider.api_key_env)
 
-        _LOG.debug("credential provider=%s key=%s", provider_name, mask_secret(api_key))
+        _LOG.info("credential provider=%s key=%s", provider_name, mask_secret(api_key))
 
         return OpenAICompatClient(
             name=provider_name,
