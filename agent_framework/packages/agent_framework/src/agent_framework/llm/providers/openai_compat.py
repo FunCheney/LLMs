@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -57,6 +58,8 @@ __all__ = [
     "ThinkingStyle",
 ]
 
+
+_LOG = logging.getLogger("agent_framework.llm.providers.openai_compat")
 
 class ThinkingStyle(StrEnum):
     """思考模式在 wire 上的表达方式。"""
@@ -700,8 +703,8 @@ class OpenAICompatClient(LLMClient):
             stream=False,
             **filter_opts(opts, _NETWORK_OPTS),
         )
-
         response = await self._http.post(self._path, json=prepared.body)
+        _LOG.debug(f"prepared request {prepared.body} response {response.json()}")
         self._ensure_success(response)
 
         return self.parse_response(

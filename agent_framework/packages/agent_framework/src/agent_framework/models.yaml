@@ -9,7 +9,7 @@ providers:
     api_key_env: DEEPSEEK_API_KEY
   qwen:
     type: openai_compat
-    base_url: "https://llm-wj4otmfjyzw0g8ro.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/responses"
+    base_url: "https://llm-wj4otmfjyzw0g8ro.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
     api_key_env: DASHSCOPE_API_KEY
     flags:
       send_parallel_tool_calls: true      # Qwen 默认 false，不显式开就静默串行
