@@ -1085,3 +1085,10 @@ tool_protocol_error / invalid_arguments / permission_denied / sandbox_denied / r
 - `AutonomyBudget` / `StopReason`（→ 场景 2、实战 3）
 
 行号会漂，**函数名不会**。
+
+---
+
+## 续篇
+
+原文第 22 问（MCP 工具如何注入上下文）与场景 5（多 server 时如何确定会话用哪些工具），
+见 **`docs/server-question-answers-3.md`**。
