@@ -126,7 +126,7 @@ def test_resolve_targets_excludes_mock_by_default() -> None:
     models, providers = bench.resolve_targets(catalog, None)
 
     assert "fixture" not in models
-    assert set(models) == {"qwen3.7-plus", "deepseek-flash", "gpt-4o-mini", "claude-sonnet-4-6"}
+    assert set(models) == {"qwen3.8-flash", "deepseek-flash", "gpt-4o-mini", "claude-sonnet-4-6"}
     assert providers["deepseek-flash"] == "deepseek"
 
 

@@ -229,9 +229,10 @@ def cost_of(gateway: LLMGateway, alias: str, record: CallRecord) -> float:
     )
 
 
-# 思考模式必须钉死：qwen3.7-plus 默认开思考，同一条 26 字答案实测
+# 思考模式必须钉死：当时实测的 qwen3.7-plus 默认开思考，同一条 26 字答案实测
 # 876 output tokens（思考）vs 14（不思考）。不钉住，输出侧噪声会完全盖过
 # 输入侧的优化——实验会得出"压缩没用"，而真相是"测量被另一种开销淹了"。
+# 注意：alias 已切到 qwen3.8-flash，上面这组数字**未重测**，不要当成 3.8 的结论。
 PIN_OPTS: dict[str, Any] = {"thinking": False}
 
 

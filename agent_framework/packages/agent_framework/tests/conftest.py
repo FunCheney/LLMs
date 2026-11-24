@@ -47,7 +47,7 @@ PROVIDERS: tuple[str, ...] = ("openai", "deepseek", "qwen", "anthropic")
 PROVIDER_MODEL: dict[str, str] = {
     "openai": "gpt-test",
     "deepseek": "deepseek-flash",
-    "qwen": "qwen3.7-plus",
+    "qwen": "qwen3.8-flash",
     "anthropic": "claude-test",
 }
 

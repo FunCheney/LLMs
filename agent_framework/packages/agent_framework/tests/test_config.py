@@ -61,9 +61,13 @@ def test_repository_models_yaml_is_valid() -> None:
     catalog: Catalog = load_catalog(DEFAULT_MODELS_YAML)
 
     assert "default" in catalog.routes
-    assert catalog.resolve("chat")[0] == "qwen3.7-plus"
-    # alias ≠ wire 名（ADR-009）：Qwen 的滚动别名必须钉成日期快照。
-    assert catalog.get_model("qwen3.7-plus").model == "qwen3.7-plus-2026-05-26"
+    assert catalog.resolve("chat")[0] == "qwen3.8-flash"
+    # ADR-009 附注二：qwen3.8-flash 厂商没有给带日期的快照 ID，wire 名只能等于 alias。
+    # 所以这条断言钉的是「yaml 里的 wire 名没被人偷偷改掉」，**不是**「钉了日期快照」。
+    # 厂商放出快照名后，这里要改成 `!= alias` 并断言日期后缀，否则等于放弃可复现性。
+    assert catalog.get_model("qwen3.8-flash").model == "qwen3.8-flash"
+    # 别名与 wire 名分离的机制本身由 test_good_yaml_loads 守着（gpt-mini → gpt-4o-mini），
+    # 不靠仓库这份 yaml 演示——否则厂商一改 id，机制测试就跟着红。
 
 
 def test_missing_pricing_reports_field_path(tmp_path: Path) -> None:

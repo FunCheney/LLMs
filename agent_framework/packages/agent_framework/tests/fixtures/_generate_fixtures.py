@@ -43,7 +43,7 @@ MAX_TOKENS = 512
 MODEL = {
     "openai": "gpt-test",
     "deepseek": "deepseek-flash",
-    "qwen": "qwen3.7-plus",
+    "qwen": "qwen3.8-flash",
     "anthropic": "claude-test",
 }
 

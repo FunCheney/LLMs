@@ -191,6 +191,15 @@ insufficient_quota | Arrearage | BIL.UserArrears  →  UpstreamAuthError（retry
 
 **结论**：**评测（W3–W4）一定要钉日期快照**，不能用 `qwen3.7-plus` 这种滚动别名 —— 否则第 6 周的评测分数和第 2 周不可比，你那张"12 周指标曲线"就失去因果性。这是本家对 DoD 影响最大的一条。
 
+> **2026-11-24 现实校正**：仓库 `models.yaml` 的 cheap 首选已从 `qwen3.7-plus` 切到
+> `qwen3.8-flash`，而 Qwen 侧**没有放出 3.8-flash 的带日期快照 ID**。也就是说上面这条
+> 「必须钉快照」在最关键的一档上**当前做不到**，只能 `model: qwen3.8-flash`（alias == wire 名）。
+> 这不是笔误，已记为 ADR-009 附注二。可执行的对策有两条：跨周报告必须手写模型版本号；
+> 或者给每期快照记 `catalog_sha256`（`docs/w4/adr-w4-gate-threshold.md` 已有此先例），
+> 用"配置指纹"代替"厂商快照"做可复现锚点。后者的已知瑕疵：`regression_gate.py:346`
+> 哈希的是 `models.yaml` **整个文件的字节**，改一行注释指纹也会变，所以它只能用来发现
+> "配置动过"，不能用来断言"模型没换"。
+
 **补充（选型）**：
 
 | 模型 | 上下文 | 最大输出 | 价格（元/百万 tokens，进/出） | 用途 |

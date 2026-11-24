@@ -14,7 +14,7 @@
 | 资产 | 版本从哪来 | 本周实测值 | 回滚动作 | 实跑？ |
 |---|---|---|---|---|
 | 代码 | `GIT_SHA` 环境变量 | `dev`（本地未构建镜像） | 回退镜像 tag（RUNBOOK §10） | ❌ 未实跑 |
-| 模型 | `models.yaml` 的 alias → 厂商模型名 | 5 个 alias，如 `qwen3.7-plus → qwen:qwen3.7-plus-2026-05-26` | 改 alias 指向后重启 | ✅ |
+| 模型 | `models.yaml` 的 alias → 厂商模型名 | 5 个 alias。注意：`qwen3.8-flash → qwen3.8-flash` 目前 **alias == wire 名**（厂商无日期快照，见 ADR-009 附注二），其余同理 | 改 alias 指向后重启 | ✅ |
 | Prompt | 构造 prompt 的模块源码指纹 | `client 9bea11a2` / `answer 32b3017f` / `seo 61ac3bee` / `style f2d2e781` | 回退该模块所在镜像 tag | ⚠️ 见缺口 1 |
 | 工具 / Skill | `SkillSpec.version` + 内容指纹 | **缺失**（`missing_kinds=('skill',)`） | 切回上一版 spec 文件 | ❌ W8 的 Skill 未接入快照 |
 | RAG 策略 | 检索参数组哈希 | `f9a0f862` | 切回上一组参数并重启 | ✅ |

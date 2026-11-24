@@ -439,7 +439,7 @@ class Settings(BaseSettings):
     cache_max_entries: int = Field(default=512, ge=1)
     # 难度分流的两端。**留空 = 从 models.yaml 的 routes.cheap / routes.strong
     # 取 primary**：模型名的唯一定义处继续是 models.yaml。在这里写死一个
-    # `qwen3.7-plus`，换供应商时就会有两个人分别改两处。
+    # `qwen3.8-flash`，换供应商时就会有两个人分别改两处。
     difficulty_cheap_alias: str = ""
     difficulty_strong_alias: str = ""
     # 分数达到它就优先走强档。默认 2 = "任一两个信号同时成立"。

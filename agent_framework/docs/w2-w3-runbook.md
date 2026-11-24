@@ -2,7 +2,9 @@
 
 > **给谁看**：想亲手把 W2（运行底座）和 W3（评测体系）跑一遍的人，包括三个月后的自己。
 > **两条前提**：不需要任何 API key；不需要联网（`make up` / `make load` 除外）。
-> **本文所有输出都是 2026-11-23 在本仓库实跑贴的**，不是回忆。数字会随代码变，命令不会。
+> **本文所有输出都是在本仓库实跑贴的**，不是回忆：主体写于 2026-11-23，
+> 2026-11-24 因 `models.yaml` 别名迁移（§8.1）整篇复跑过一次，改动处都标了日期。
+> 数字会随代码变，命令不会。
 
 W2 的交付物是「能扛并发、能追全链路、能一键起来、能自动证明没坏」的底座；
 W3 的交付物是「一条命令说清当前多好、且数字可复现」的评测体系。
@@ -69,16 +71,18 @@ env | grep -i proxy
 curl -s --noproxy '*' http://127.0.0.1:8000/health
 ```
 
-### 坑 2：本机延迟数字不可引用
+### 坑 2：本机延迟数字可能被环境放大（不总是发生）
 
-同一份 `run_eval`，在本机每条 case 固定多出 ~30 ms；纯读一个 1 KB 夹具实测
+2026-11-23 那次，同一份 `run_eval` 在本机每条 case 固定多出 ~30 ms；纯读一个 1 KB 夹具实测
 **47 ms/次**（`json.loads(p.read_text())`），而正常机器是 0.1 ms 量级。
 `evals/history/2026-W48-w3-eval.md` 已把这一栏标成「环境伪影，勿引用」。
 
-后果有两个，都要知道：
+**2026-11-24 复跑同一命令，这个现象没再出现**：54 条 `run_eval` 耗时 2.14s、
+`pipeline.latency_p95_ms` 从 30.81 回到 **2.61**，`make gate` 直接通过。
+所以它更像"某些沙箱/容器状态下的文件系统放大"，不是稳定伪影。两个后果都要知道：
 
-- 报告里的 `latency p50/p95` 只能用来做**相对比较**（改前 vs 改后同一台机），不能当基线；
-- `make gate` 会因此判失败（见 §8.2），那不是代码退化。
+- 报告里的 `latency p50/p95` 只能用来做**相对比较**（改前 vs 改后同一台机、同一天），不能当基线；
+- `make gate` 偶发判失败时（见 §8.2），**先重跑一次 `run_eval` 再判**，别急着改代码。
 
 ### 坑 3：`pytest` 再手动加一个 `-q`，汇总行会消失
 
@@ -93,7 +97,7 @@ curl -s --noproxy '*' http://127.0.0.1:8000/health
 | 我想验证 | 命令 | 产物 / 看到什么 | 耗时 |
 |---|---|---|---|
 | 会话幂等、`provider_meta` 不丢 | `uv run pytest -k session` | `23 passed` | ~8s |
-| 队列状态机、限流器读 yaml | `uv run pytest -k "queue or concurrency"` | `21 passed, 1 failed`（§8.1 的别名问题） | ~9s |
+| 队列状态机、限流器读 yaml | `uv run pytest -k "queue or concurrency"` | `22 passed` | ~2s |
 | 过载 → 503 + `Retry-After`、无重试风暴 | `make e2e` | `[A]`–`[E]` 五行 | ~2s |
 | 队列端点能提交能轮询 | 起服务后打 `POST /v1/tasks` | `202` → `succeeded` | ~2s |
 | trace 贯穿（HTTP → LLM → 日志） | 起服务后 `curl -D` 看响应头 | `x-trace-id` == 日志 `trace_id` | ~1s |
@@ -102,7 +106,7 @@ curl -s --noproxy '*' http://127.0.0.1:8000/health
 | 54 条评测 + 分层指标 | `run_eval.py --no-write` | 50 passed / 4 skipped | ~6s |
 | 同一批 + judge | `run_eval.py --no-write --judge` | judge 均分 1.922 | ~6s |
 | Judge 与人工标注一致性 | `make judge-agreement` | kappa 0.3429 / 0.2 | ~2s |
-| 回归门禁 | `make gate WEEK=2026-W48` | 见 §8.2（当前 FAIL） | ~1s |
+| 回归门禁 | `make gate WEEK=2026-W48` | 该期快照 FAIL（环境伪影），重跑版通过 → §8.2 | ~1s |
 | Langfuse 上报 / 降级 | `uv run pytest -k langfuse` | `18 passed`（不联网） | ~8s |
 | 压测 100 并发 | `make load`（先起服务） | locust 汇总表 | 30–60s |
 
@@ -166,7 +170,7 @@ SESSION_BACKEND=redis REDIS_URL=redis://localhost:6379/0 uv run agent-server
 
 ```bash
 uv run pytest -k "queue or concurrency"
-# 1 failed, 21 passed  ← 红的那条是 §8.1 的别名问题，不是队列/限流坏了
+# 22 passed, 1479 deselected, 3 warnings in 2.13s
 ```
 
 **任务端点**（起服务后）：
@@ -463,11 +467,15 @@ make judge-agreement        # 等价于 uv run python evals/scripts/judge_agreem
 
 ---
 
-## 8. 仓库当前真实状态（2026-11-23）
+## 8. 仓库当前真实状态（2026-11-24）
 
-跑之前先知道这两处红，能省掉半小时自我怀疑。**它们都不是你操作错了。**
+**结论先说：现在全绿。** `1471 passed, 30 skipped`、`make smoke` 10/10、`make golden` 通过、
+`make e2e` 通过、54 条评测 50 passed / 4 skipped、`make gate` 通过。
+下面是 11-23 那两处红的历史与修法——**留着是因为「为什么会红」比「红了」更值得记**。
 
-### 8.1 `make test` = 3 failed（模型别名改名未同步测试）
+### 8.1 已修复：`make test` 曾 3 failed（模型别名改名只改了一个文件）
+
+11-23 的现象：
 
 ```
 FAILED packages/agent_framework/tests/test_config.py::test_repository_models_yaml_is_valid
@@ -475,24 +483,34 @@ FAILED packages/agent_framework/tests/test_concurrency.py::test_limiter_reads_li
 FAILED packages/agent_framework/tests/test_bench_baseline.py::test_resolve_targets_excludes_mock_by_default
 ```
 
-原因：HEAD 那笔提交把 `models.yaml` 的 `qwen3.7-plus` 改成了 `qwen3.8-flash` 并把它设成
-`default`/`cheap` 的首选，但这三条用例还钉着旧别名：
+起因是一笔提交把 `models.yaml` 的 `qwen3.7-plus` 改成 `qwen3.8-flash` 并设为
+`default`/`cheap` 首选，但只改了这一处。全仓库当时还有 **36 个文件、97 处**引用旧别名：
 
-| 文件 | 断言 |
-|---|---|
-| `test_config.py:64` | `catalog.resolve("chat")[0] == "qwen3.7-plus"` |
-| `test_config.py:66` | `catalog.get_model("qwen3.7-plus").model == "qwen3.7-plus-2026-05-26"` |
-| `test_concurrency.py:140` | `limiter.limit_for("qwen3.7-plus") == ...` |
-| `test_bench_baseline.py:129` | `set(models) == {"qwen3.7-plus", ...}` |
+| 位置 | 处数 | 性质 |
+|---|---|---|
+| `evals/golden/golden_v1.jsonl` | 55 | case 的 `online_model`（在线档按它选模型）+ 1 条题干 |
+| `tests/fixtures/qwen/**`、`_synthetic/qwen/**` | 20 | 录制回放的请求/响应载荷 |
+| `tests/test_*.py` 8 个文件 | 14 | 断言与 `conftest.PROVIDER_MODEL` |
+| `evals/scripts/*.py`、`ops/RUNBOOK.md` | 4 | 命令示例与注释 |
+| `docs/**` | 若干 | 历史报告里的模型名 |
 
-顺带发现一处**与 ADR-009 冲突**的地方：`models.yaml` 第 34 行注释写着
-「Qwen 必须钉日期快照」，但新条目是 `model: qwen3.8-flash`（无日期）。
-要么补回快照名，要么把这句注释改掉——两件事必须同时做，否则下一个人会照着注释改错。
+所以这不是"改 3 条测试"的事：**同一份 yaml 被 5 类消费者同时依赖**，改一处等于让其余 4 类
+各自漂一次。修法（2026-11-24 已做）：
 
-其余 1468 条通过、30 条 skip。修法是把上面五处旧别名换成新别名，
-并让 wire 名断言与 yaml 一致。**这是代码改动，本文不动它。**
+1. 代码/测试/夹具/golden 一次性迁到 `qwen3.8-flash`（36 文件 97 处）；
+2. `test_config.py` 里那条「wire 名必须是 `qwen3.7-plus-2026-05-26` 快照」的断言，
+   改成断言「wire 名与 alias 一致」——因为 3.8-flash 厂商**没有给带日期的快照 ID**；
+3. `models.yaml` 第 34 行那句「Qwen 必须钉日期快照」改成承认例外的写法，并在
+   `docs/w1/w1-day4.md` 补了 **ADR-009 附注二**，写明代价：跨周对比必须记模型版本。
 
-### 8.2 `make gate` = FAIL（延迟伪影，不是退化）
+**故意没改的**：`evals/history/*.json`（历史快照，改了就是伪造测量）与历史评测报告里的
+模型名（那些数字是用 3.7-plus 测的）。另有两处测量注释（`ops/RUNBOOK.md` 的 18.0s/990 tokens、
+`context_cost_ab.py` 的思考模式 token 数）标注了「用 3.7-plus 实测、未在 3.8 上重测」，
+**没有**跟着改名——否则等于给旧数字换了个新被测对象。
+
+### 8.2 `make gate` 偶发 FAIL：先重跑，再怀疑代码
+
+11-23 的现象：
 
 ```
 基线：2026-W46（commit afbded2）
@@ -501,11 +519,21 @@ FAILED packages/agent_framework/tests/test_bench_baseline.py::test_resolve_targe
 门禁失败：指标劣化
 ```
 
-`2.29 ms → 30.81 ms` 的来源就是 §2 的坑 2（本机每次文件读多 ~47 ms）。
-`error_code`、`retry_count`、`trace_id` 三项都是干净的，只有延迟这一列被环境污染。
+`make gate` 读的是**已落盘的快照**，不是现场重跑——所以它会把 11-23 那天的环境噪声
+永久保留在 `2026-W48-eval.json` 里。`error_code`、`retry_count`、`trace_id` 三项当时都是干净的，
+只有延迟这一列被放大（原因见 §2 坑 2）。
 
-在正常终端上重跑一次 `run_eval` 再 `make gate`，预计恢复通过；
-如果仍是 30 ms 量级，再按 `2026-W48-w3-eval.md` 里的 cProfile 结论查
+2026-11-24 实测的两步处置（已验证有效）：
+
+```bash
+uv run python evals/scripts/run_eval.py --week 2026-W48-local   # 不覆盖旧快照
+uv run python evals/scripts/regression_gate.py --current evals/history/2026-W48-local-eval.json
+# 基线：2026-W46（commit afbded2） / 对比了 2 个指标 / 门禁通过
+```
+
+新快照的 `pipeline.latency_p95_ms = 2.61`（旧快照 30.81）。**所以 `make gate WEEK=2026-W48`
+现在仍会 FAIL，那是历史快照的问题，不是当前代码的问题**——这点最容易误判。
+如果重跑后仍是 30 ms 量级，再按 `2026-W48-w3-eval.md` 里的 cProfile 结论查
 `sitecustomize.py` 是否又注入了 socket broker。
 
 ### 8.3 其他已知边界
@@ -525,7 +553,7 @@ FAILED packages/agent_framework/tests/test_bench_baseline.py::test_resolve_targe
 | 日志里 `built adapter alias=fixture provider=mock` | 正常：离线档走夹具 | — |
 | `make smoke` 全红且日志里有 `UPSTREAM_AUTH` | fixture 夹具有意注入的失败帧被误当成全局错误 | 只关注汇总行；`smoke-07/08` 就是错误映射用例 |
 | `run_eval` 某条 `skipped` | 4 条 adversarial 在离线档设计上跳过 | 正常，别改成 pass |
-| `make gate` 延迟项 FAIL | 本机文件读放大约 30–50 ms | 见 §8.2 |
+| `make gate` 延迟项 FAIL | 读的是旧快照，那天本机文件读被放大 | 用 `--week <期>-local` 重跑再 gate，见 §8.2 |
 | `pytest` 只输出一排点、没有 `N passed` | 自己又加了一个 `-q`（`addopts` 已带） | 去掉手写的 `-q` |
 | `pytest` 收集阶段被 SIGTERM | 在本机沙箱里连续跑多次 `uv run` 会被限流 | 一次跑一个，或合并成一条命令 |
 | Langfuse 无 trace | 缺 key 静默降级为 `NoopExporter` | 看日志有没有那行 INFO；有就说明 key 没读进来 |

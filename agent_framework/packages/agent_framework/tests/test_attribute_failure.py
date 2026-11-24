@@ -100,7 +100,7 @@ def test_tool_layer_on_http_error() -> None:
 def test_model_layer_on_upstream_code() -> None:
     attribution = attribute(
         [FailureCategory.UPSTREAM],
-        Signals(error_code="RATE_LIMITED", retry_count=2, fallback_from="qwen3.7-plus"),
+        Signals(error_code="RATE_LIMITED", retry_count=2, fallback_from="qwen3.8-flash"),
     )
 
     assert attribution.layer is Layer.MODEL

@@ -42,7 +42,7 @@ def make_outcome(text: str = "缓存里的旧答案") -> ChatOutcome:
         ),
         alias="gpt-4o-mini",
         retry_count=1,
-        fallback_from="qwen3.7-plus",
+        fallback_from="qwen3.8-flash",
     )
 
 

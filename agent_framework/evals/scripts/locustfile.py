@@ -22,7 +22,7 @@
         --headless -u 20 -r 5 -t 30s --host http://127.0.0.1:8000
 
     # 2) 在线档：换真实 alias（会花钱），并发按 models.yaml 的 limits 来
-    MODEL=qwen3.7-plus uv run --with locust locust -f evals/scripts/locustfile.py \
+    MODEL=qwen3.8-flash uv run --with locust locust -f evals/scripts/locustfile.py \
         --headless -u 100 -r 10 -t 60s --host http://127.0.0.1:8000
 
 判据（Gate「100 并发错误率 < 1%」）

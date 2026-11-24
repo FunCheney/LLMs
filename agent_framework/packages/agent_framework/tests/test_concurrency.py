@@ -137,7 +137,7 @@ def test_limiter_reads_limits_from_yaml() -> None:
         limiter.limit_for("claude-sonnet-4-6")
         == catalog.limits.per_alias["claude-sonnet-4-6"]
     )
-    assert limiter.limit_for("qwen3.7-plus") == catalog.limits.per_provider["qwen"]
+    assert limiter.limit_for("qwen3.8-flash") == catalog.limits.per_provider["qwen"]
     assert limiter.limit_for("unknown-alias") == catalog.limits.max_inflight
 
 

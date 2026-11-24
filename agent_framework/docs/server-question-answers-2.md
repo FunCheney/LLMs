@@ -469,9 +469,12 @@ return round(cost, 6)
 - 价格写在 `models.yaml` 的 alias 上（不是 wire 名）：换模型快照时价格跟着别名走，
   12 周的指标曲线才可比。
 
-例（`models.yaml`）：`qwen3.7-plus` 输入 2.0 / 输出 8.0 CNY per 1M；
+例（`models.yaml`）：`qwen3.8-flash` 输入 2.0 / 输出 8.0 CNY per 1M；
 `deepseek-flash` 1.5 / 4.5。混合币种（CNY/USD）是允许的，
 但报告必须按币种分组——`ChatOutcome` 里带 `currency` 就是为这个。
+
+> 2026-11-24 注：这两档价格是 2026-10-29 按 `qwen3.7-plus` 官网核的，alias 现已切到
+> `qwen3.8-flash`，**价格没有重核**。引用时要么重新核价，要么注明「沿用 3.7-plus 报价」。
 
 ### 17.2 用量从哪来
 

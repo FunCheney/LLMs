@@ -256,7 +256,7 @@ async def test_non_content_attributes_pass_through() -> None:
     exporter = _exporter(recorder)
 
     await exporter.export(
-        [_span(attributes={"model": "qwen3.7-plus", "prompt_tokens": 58})]
+        [_span(attributes={"model": "qwen3.8-flash", "prompt_tokens": 58})]
     )
 
     metadata = next(
@@ -265,7 +265,7 @@ async def test_non_content_attributes_pass_through() -> None:
         if item["type"] == "span-create"
     )
 
-    assert metadata["model"] == "qwen3.7-plus"
+    assert metadata["model"] == "qwen3.8-flash"
     assert metadata["prompt_tokens"] == 58
 
 
@@ -317,7 +317,7 @@ async def test_span_context_exports_through_configured_exporter() -> None:
     previous = configure_exporter(exporter)
 
     try:
-        async with span("llm.call", model="qwen3.7-plus") as item:
+        async with span("llm.call", model="qwen3.8-flash") as item:
             trace_id = item.trace_id
     finally:
         configure_exporter(previous if isinstance(previous, LangfuseExporter) else None)

@@ -883,6 +883,15 @@ grep -rn "reasoning_content\|input_schema\|enable_thinking" \
 
 **ADR-009 附注：允许混币种，但 `currency` 必须进日志。** W11 汇总成本时才引入汇率折算，W1 不做。
 
+**ADR-009 附注二（2026-11-24 补）：没有快照可钉时，wire 名暂时等于 alias。**
+`qwen3.8-flash` 厂商未提供带日期的快照 ID，`models.yaml` 里 `model: qwen3.8-flash` 与 alias 同名。这是**已知的例外**，不是回归，代价有三条：
+
+1. 同一 alias 在不同周可能指向不同权重 → 跨周对比报告必须显式写模型版本，否则曲线不具因果性；
+2. 原本靠 `model: qwenX-YYYY-MM-DD` 兜住的那条测试断言（`test_repository_models_yaml_is_valid`）失去意义，改为断言「yaml 里的 wire 名与 alias 保持一致」，即钉住"没偷偷换名"，不再钉"钉了快照"；
+3. 别名层本身没过期：一旦厂商放出快照名，只改 `model` 一行，评测集、日志字段、路由都不用动。
+
+判据：**这条例外只对一个 alias 成立**。若第二个 alias 也变成 `alias == model`，说明不是厂商问题而是没人再维护这一层，应在评审里拦下。
+
 ---
 
 ## 14. 可选增强（有余量再做，不做也行）

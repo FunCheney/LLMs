@@ -94,7 +94,8 @@ curl -s --noproxy '*' -X POST localhost:8100/v1/draft \
   -H 'Content-Type: application/json' \
   -d '{"brief":"测试离线回放链路","model":"fixture"}'
 
-# 真实供应商（实测 qwen3.7-plus，18.0s，990 output tokens）
+# 真实供应商（实测 18.0s / 990 output tokens；当时 alias 为 qwen3.7-plus，
+# 尚未在 qwen3.8-flash 上重测，引用这两数字时必须注明口径）
 curl -s --noproxy '*' -X POST localhost:8100/v1/draft \
   -H 'Content-Type: application/json' \
   -d '{"brief":"为小红书写一条咖啡机种草文案，突出静音研磨"}'

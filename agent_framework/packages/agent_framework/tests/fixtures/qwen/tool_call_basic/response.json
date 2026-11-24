@@ -2,7 +2,7 @@
   "id": "chatcmpl-qwen-tool",
   "object": "chat.completion",
   "created": 1700000000,
-  "model": "qwen3.7-plus",
+  "model": "qwen3.8-flash",
   "choices": [
     {
       "index": 0,

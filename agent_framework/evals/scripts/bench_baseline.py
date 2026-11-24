@@ -19,7 +19,7 @@
     uv run python evals/scripts/bench_baseline.py --dry-run --models fixture
 
     # 2) 真机基线（需 .env.local）
-    uv run python evals/scripts/bench_baseline.py --models qwen3.7-plus,deepseek-flash
+    uv run python evals/scripts/bench_baseline.py --models qwen3.8-flash,deepseek-flash
 
     # 3) 只测流式首 token
     uv run python evals/scripts/bench_baseline.py --modes stream --repeat 5

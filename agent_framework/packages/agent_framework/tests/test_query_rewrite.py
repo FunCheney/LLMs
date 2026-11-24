@@ -123,7 +123,7 @@ async def test_multi_query_counts_usage_and_cost(gateway) -> None:
     assert usage.input_tokens > 0
     assert usage.output_tokens > 0
     assert usage.tokens == usage.input_tokens + usage.output_tokens
-    # 夹具里 qwen3.7-plus 是 CNY 计价；能算出来说明取价链路通了
+    # 夹具里 qwen3.8-flash 是 CNY 计价；能算出来说明取价链路通了
     assert usage.currency == "CNY"
     assert usage.cost > 0
     assert usage.cost_per_call == pytest.approx(usage.cost)

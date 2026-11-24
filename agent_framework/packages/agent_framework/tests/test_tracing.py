@@ -45,7 +45,7 @@ def exporter() -> Iterator[InMemoryExporter]:
 
 async def test_span_exports_on_success(exporter: InMemoryExporter) -> None:
     with trace_scope("trace_ok"):
-        async with span("llm.call", alias="qwen3.7-plus", attempt=1) as item:
+        async with span("llm.call", alias="qwen3.8-flash", attempt=1) as item:
             item.attributes["first_token_ms"] = 123.4
 
     assert len(exporter.spans) == 1
@@ -54,14 +54,14 @@ async def test_span_exports_on_success(exporter: InMemoryExporter) -> None:
     assert recorded.trace_id == "trace_ok"
     assert recorded.name == "llm.call"
     assert recorded.status == "ok"
-    assert recorded.attributes["alias"] == "qwen3.7-plus"
+    assert recorded.attributes["alias"] == "qwen3.8-flash"
     assert recorded.attributes["first_token_ms"] == 123.4
     assert recorded.latency_ms >= 0
 
 
 async def test_span_exports_on_failure(exporter: InMemoryExporter) -> None:
     with pytest.raises(RuntimeError), trace_scope("trace_err"):
-        async with span("llm.call", alias="qwen3.7-plus"):
+        async with span("llm.call", alias="qwen3.8-flash"):
             raise RuntimeError("upstream boom")
 
     assert len(exporter.spans) == 1
@@ -128,7 +128,7 @@ def test_emit_fills_trace_and_span_ids(
     caplog.set_level(logging.INFO, logger="agent_framework.request")
 
     with trace_scope("trace_log"):
-        emit(RequestLog(task="chat", model="qwen3.7-plus"))
+        emit(RequestLog(task="chat", model="qwen3.8-flash"))
 
     payload = _last_payload(caplog)
 
