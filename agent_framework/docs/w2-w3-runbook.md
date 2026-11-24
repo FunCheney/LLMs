@@ -80,14 +80,20 @@ curl -s --noproxy '*' http://127.0.0.1:8000/health
 - 报告里的 `latency p50/p95` 只能用来做**相对比较**（改前 vs 改后同一台机），不能当基线；
 - `make gate` 会因此判失败（见 §8.2），那不是代码退化。
 
+### 坑 3：`pytest` 再手动加一个 `-q`，汇总行会消失
+
+本仓库 `pyproject.toml` 的 `addopts` 已经是 `-q --strict-markers`。
+自己再写 `pytest -q` 就是双重 quiet，输出只剩一排进度点，**看不到 `23 passed` 这一行**，
+很容易误判成「跑完了但没结果」。本文所有 pytest 命令都**不带** `-q`。
+
 ---
 
 ## 3. 命令地图
 
 | 我想验证 | 命令 | 产物 / 看到什么 | 耗时 |
 |---|---|---|---|
-| 会话幂等、`provider_meta` 不丢 | `uv run pytest -k session -q` | 23 条通过 | ~3s |
-| 队列状态机、限流器读 yaml | `uv run pytest -k "queue or concurrency" -q` | 全绿 | ~3s |
+| 会话幂等、`provider_meta` 不丢 | `uv run pytest -k session` | `23 passed` | ~8s |
+| 队列状态机、限流器读 yaml | `uv run pytest -k "queue or concurrency"` | `21 passed, 1 failed`（§8.1 的别名问题） | ~9s |
 | 过载 → 503 + `Retry-After`、无重试风暴 | `make e2e` | `[A]`–`[E]` 五行 | ~2s |
 | 队列端点能提交能轮询 | 起服务后打 `POST /v1/tasks` | `202` → `succeeded` | ~2s |
 | trace 贯穿（HTTP → LLM → 日志） | 起服务后 `curl -D` 看响应头 | `x-trace-id` == 日志 `trace_id` | ~1s |
@@ -97,7 +103,7 @@ curl -s --noproxy '*' http://127.0.0.1:8000/health
 | 同一批 + judge | `run_eval.py --no-write --judge` | judge 均分 1.922 | ~6s |
 | Judge 与人工标注一致性 | `make judge-agreement` | kappa 0.3429 / 0.2 | ~2s |
 | 回归门禁 | `make gate WEEK=2026-W48` | 见 §8.2（当前 FAIL） | ~1s |
-| Langfuse 上报 / 降级 | `uv run pytest -k langfuse -q` | 全绿（不联网） | ~1s |
+| Langfuse 上报 / 降级 | `uv run pytest -k langfuse` | `18 passed`（不联网） | ~8s |
 | 压测 100 并发 | `make load`（先起服务） | locust 汇总表 | 30–60s |
 
 `make` 不带参数会打印全部 target（`Makefile` 顶部有注释说明每条命令为什么必须免密钥可跑）。
@@ -111,7 +117,8 @@ curl -s --noproxy '*' http://127.0.0.1:8000/health
 **要验证的三件事**：多轮能存、重复 `request_id` 不翻倍、`provider_meta` 原样回来。
 
 ```bash
-uv run pytest -k session -q
+uv run pytest -k session
+# 23 passed, 1478 deselected, 3 warnings in 8.13s
 ```
 
 想直接看行为，跑这段（实跑输出已贴）：
@@ -158,7 +165,8 @@ SESSION_BACKEND=redis REDIS_URL=redis://localhost:6379/0 uv run agent-server
 ### 4.2 D2 · 并发闸门 + 任务队列
 
 ```bash
-uv run pytest -k "queue or concurrency" -q
+uv run pytest -k "queue or concurrency"
+# 1 failed, 21 passed  ← 红的那条是 §8.1 的别名问题，不是队列/限流坏了
 ```
 
 **任务端点**（起服务后）：
@@ -294,7 +302,8 @@ EXIT=1
 能跑的是边界用例：
 
 ```bash
-uv run pytest -k metrics -q
+uv run pytest -k metrics
+# 52 passed
 ```
 
 要确认的一件事：`success_rate` 的分母里**不含**「上游中断」。被 502/限流打断的 case 记
@@ -394,7 +403,8 @@ uv run agent-server
 不联网验证这三条（降级 / 隐私 / 失败不冒泡）：
 
 ```bash
-uv run pytest -k langfuse -q
+uv run pytest -k langfuse
+# 18 passed（httpx.MockTransport，不打真实网络）
 ```
 
 ### 5.5 D5 · 报告与失败分类
@@ -516,6 +526,7 @@ FAILED packages/agent_framework/tests/test_bench_baseline.py::test_resolve_targe
 | `make smoke` 全红且日志里有 `UPSTREAM_AUTH` | fixture 夹具有意注入的失败帧被误当成全局错误 | 只关注汇总行；`smoke-07/08` 就是错误映射用例 |
 | `run_eval` 某条 `skipped` | 4 条 adversarial 在离线档设计上跳过 | 正常，别改成 pass |
 | `make gate` 延迟项 FAIL | 本机文件读放大约 30–50 ms | 见 §8.2 |
+| `pytest` 只输出一排点、没有 `N passed` | 自己又加了一个 `-q`（`addopts` 已带） | 去掉手写的 `-q` |
 | `pytest` 收集阶段被 SIGTERM | 在本机沙箱里连续跑多次 `uv run` 会被限流 | 一次跑一个，或合并成一条命令 |
 | Langfuse 无 trace | 缺 key 静默降级为 `NoopExporter` | 看日志有没有那行 INFO；有就说明 key 没读进来 |
 | `TASK_QUEUE_SIZE` 设很小后提交报 503 | 队列满与限流过载共用 `ServerBusyError` → 503 + `Retry-After` | 正常；退避后重试 |
