@@ -19,6 +19,7 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["packages/agent_framework/tests", "apps/growth_agent/tests"]
+pythonpath = ["packages/agent_framework/tests", "packages/agent_framework/tests/w2"]
 addopts = "-q --strict-markers"
 # 适配器测试全是 async：auto 模式省掉每个用例的 @pytest.mark.asyncio
 asyncio_mode = "auto"

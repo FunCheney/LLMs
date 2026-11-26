@@ -183,6 +183,6 @@ def replay_transport(fixtures_root: str | Path, *, server: Any) -> Any:
     """给离线评测用的回放传输（`TOOLS` 与 `record` 都不在这里管）。
 
     单独一个函数是为了让"怎么录"和"怎么装配"分开：录制是脚本的事
-    （`evals/scripts/tool_boundary_check.py --record`），装配是产品的事。
+    （`evals/scripts/w8/tool_boundary_check.py --record`），装配是产品的事。
     """
     return RecordedToolTransport(fixtures_root=fixtures_root, upstream=server)

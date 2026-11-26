@@ -102,7 +102,7 @@ def build_pipeline(
 ) -> RetrievalPipeline:
     """把 `Settings` 的检索段翻译成 `RetrievalPipeline` 参数。
 
-    **唯一一处**做这个翻译。评测脚本（`evals/scripts/retrieval_metrics.py`）要跑
+    **唯一一处**做这个翻译。评测脚本（`evals/scripts/w5/retrieval_metrics.py`）要跑
     "同样口径、不同配置"的 A/B，如果它自己再写一遍 `budget_ms=...` 这串参数，
     那是两份可能漂移的真相：改了这里忘了那里，报告上的数字就不再是生产数字。
     所以评测只允许改 `Settings`，装配走同一个函数。

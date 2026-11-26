@@ -58,7 +58,7 @@ uv run uvicorn my_bot.app:app --reload
 `request_id`、错误契约都在框架里，`app.py` 一行都不写。
 
 "打包 → 装进干净 venv → 起服务 → 发请求"这条完整路径由
-`evals/scripts/scaffold_drill.py` 实跑：21.4s（build 0.1 / install 13.9 / boot 0.6 / ask 0.08）。
+`evals/scripts/w12/scaffold_drill.py` 实跑：21.4s（build 0.1 / install 13.9 / boot 0.6 / ask 0.08）。
 本仓库未发布到 PyPI，所以演练时用 `--framework-spec "agent-framework @ file:///...whl"`
 指向本地 wheel——这也是脚手架唯一没能验证到位的地方（缺"依赖从零解析"）。
 
@@ -125,7 +125,7 @@ evals/scripts  ─────┘        │
 | 约束 | 守它的东西 | 失守的后果 |
 |---|---|---|
 | 框架不 import 产品 | `test_framework_never_imports_product`（AST 扫） | 脚手架给第三方用直接不成立 |
-| 公共 API 是扫出来的，不是想出来的 | `evals/scripts/api_audit.py --check` + `test_audit_script_passes` | 私有符号被外部用 → 从此不能改 |
+| 公共 API 是扫出来的，不是想出来的 | `evals/scripts/w12/api_audit.py --check` + `test_audit_script_passes` | 私有符号被外部用 → 从此不能改 |
 | `import` 不付不该付的代价 | `test_importing_config_does_not_pull_httpx`（子进程跑） | 只想读一行配置却拉起 httpx，还会造循环导入 |
 | 跨 provider 语义一致 | `test_conformance.py` A1–A8 / A13 / A14（工具调用 / 流式=非流式 / usage / finish_reason / 错误类 / 单次请求 / 基线超集 / 工具入参合规） | 换模型时行为漂移，排查从"改配置"变成"读两个 SDK" |
 | 门禁默认离线 | `make test` / `make eval` 全用 fixture 模型 | 没 key 就跑不了的门禁 = 没门禁 |
@@ -189,7 +189,7 @@ evals/scripts  ─────┘        │
 | 评测集 | 10 条 smoke | 54 golden + 30 引用样本 + 16 红队（10 攻击 / 6 误报对照）+ 6 多 Agent |
 | ADR / 决策 | 4 篇 | 5 篇 ADR + 12 行 Decision Matrix |
 
-趋势图 `docs/w12/trends.svg`（由 `evals/scripts/plot_trends.py` 从 `evals/history/`
+趋势图 `docs/w12/trends.svg`（由 `evals/scripts/w12/plot_trends.py` 从 `evals/history/`
 生成，12 个点全部来自真实快照，无手工补点）。
 
 Gate 12 收官：**10 通过 / 2 partial / 0 未做**。两处 partial 见文末「已知边界」。
@@ -220,7 +220,7 @@ make up        # compose：agent-server / growth-agent / redis / pgvector（temp
 | 5 | 压测 / 混沌 / 安全红队三报告 | `evals/history/2026-W45-w2-load.md`、`docs/w11/chaos-report.md`、`docs/w10/threat-model.md` |
 | 6 | 单 vs 多 Agent 对比实验 | `docs/w9/single-vs-multi-ab.md` |
 | 7 | 5 篇线上 incident + runbook | `docs/w11/incidents/`、`ops/RUNBOOK.md` |
-| 8 | 架构图 + ADR + 可跑脚手架 | `docs/architecture-diagram.md`、`docs/adr/`、`evals/scripts/scaffold_drill.py` |
+| 8 | 架构图 + ADR + 可跑脚手架 | `docs/architecture-diagram.md`、`docs/adr/`、`evals/scripts/w12/scaffold_drill.py` |
 
 ## 文档地图
 
@@ -233,6 +233,7 @@ make up        # compose：agent-server / growth-agent / redis / pgvector（temp
 | 一次请求具体怎么走（11 问逐题解答） | `docs/server-question-answers.md` |
 | 为什么这么选、放弃了什么 | `docs/w12/decision-matrix.md`、`docs/adr/`（ADR-001…005） |
 | 每周做了什么、踩了什么坑 | `docs/log.md`、`docs/w1/` … `docs/w12/` |
+| 按周复习脚本与测试（W1–W12 逐周清单） | `docs/review-by-week.md`（含已实跑的复习命令） |
 | 怎么对着 JD 讲这个项目 | `docs/interview-feynman.md`（费曼五层）、`docs/w12/interview-prep.md` |
 | 数字怎么复现 | `evals/history/*.json` + `evals/scripts/` |
 | 这东西在技术地图上的位置 | `docs/w12/frontier-notes.md` |

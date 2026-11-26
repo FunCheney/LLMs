@@ -93,7 +93,7 @@ flowchart LR
 uv run agent-server                                   # 起框架服务
 curl -s -X POST localhost:8000/v1/chat -H 'content-type: application/json' \
   -d '{"messages":[{"role":"user","content":"你好"}],"task":"chat"}'
-uv run python evals/scripts/api_audit.py --check       # 公共面审计：0 泄漏 / 0 空壳
+uv run python evals/scripts/w12/api_audit.py --check       # 公共面审计：0 泄漏 / 0 空壳
 ```
 
 ### 费曼自检
@@ -286,7 +286,7 @@ sequenceDiagram
 ### 4.8 公共 API 是怎么定的？
 
 > 不是"我觉得该暴露什么"，是**扫产品真实 import 反推**：
-> `evals/scripts/api_audit.py` 用 AST 扫五个使用域，产品在用的 54 个模块 / 208 个符号才算契约。
+> `evals/scripts/w12/api_audit.py` 用 AST 扫五个使用域，产品在用的 54 个模块 / 208 个符号才算契约。
 
 - 数字：顶层只留 **13 个**符号（起一个服务 + 发一条 chat 所需），
   门禁是 0 私有符号泄漏 / 0 空壳模块 / 0 子包缺口。

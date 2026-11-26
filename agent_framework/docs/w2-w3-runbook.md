@@ -20,7 +20,7 @@ uv sync                                    # 首次约 10–40s（已缓存则 <
 
 make smoke                                 # W2 D5：10 条 smoke
 make golden                                # W3 D2：golden set 校验
-uv run python evals/scripts/run_eval.py --no-write   # W3 D3：54 条批量评测，不落盘
+uv run python evals/scripts/w3/run_eval.py --no-write   # W3 D3：54 条批量评测，不落盘
 make e2e                                   # W2 D2/D3：过载 503 / 任务端点 / trace 贯穿
 ```
 
@@ -243,7 +243,7 @@ make logs      # 跟踪 agent-server
 # 压测：先确保 8000 在跑（make up 或 uv run agent-server）
 make load      # 离线档 20 并发 30s，model=fixture
 # 100 并发加强版：
-uv run --with locust locust -f evals/scripts/locustfile.py \
+uv run --with locust locust -f evals/scripts/w2/locustfile.py \
   --headless -u 100 -r 25 -t 40s --host http://127.0.0.1:8000
 ```
 
@@ -261,7 +261,7 @@ uv run --with locust locust -f evals/scripts/locustfile.py \
 
 ```bash
 make smoke                                    # 全跑
-uv run python evals/scripts/run_smoke.py --only smoke-07 -v   # 单条排查
+uv run python evals/scripts/w2/run_smoke.py --only smoke-07 -v   # 单条排查
 ```
 
 **反向验证（门禁真的会红吗）**——这一步不做，等于没门禁。不要改仓库文件，
@@ -282,7 +282,7 @@ for ln in src.read_text().splitlines():
 pathlib.Path("/tmp/smoke_broken.jsonl").write_text("\n".join(out) + "\n")
 PY
 
-uv run python evals/scripts/run_smoke.py --golden /tmp/smoke_broken.jsonl; echo "EXIT=$?"
+uv run python evals/scripts/w2/run_smoke.py --golden /tmp/smoke_broken.jsonl; echo "EXIT=$?"
 ```
 
 ```
@@ -341,13 +341,13 @@ OK：字段、引用、夹具、难度分布全部通过
 
 ```bash
 # 只看结果，不落盘（推荐日常）
-uv run python evals/scripts/run_eval.py --no-write
+uv run python evals/scripts/w3/run_eval.py --no-write
 
 # 单条 / 区间排查
-uv run python evals/scripts/run_eval.py --only gold-c01 gold-e01 -v --no-write
+uv run python evals/scripts/w3/run_eval.py --only gold-c01 gold-e01 -v --no-write
 
 # 带 judge（离线档 = 规则基线，零成本）
-uv run python evals/scripts/run_eval.py --no-write --judge
+uv run python evals/scripts/w3/run_eval.py --no-write --judge
 ```
 
 输出尾部（实跑）：
@@ -365,7 +365,7 @@ judge 均分 1.922（50 条）
 **单条失败不中断整批**（Gate 3 #5）：
 
 ```bash
-uv run python evals/scripts/run_eval.py --no-write --break-case gold-c01
+uv run python evals/scripts/w3/run_eval.py --no-write --break-case gold-c01
 # 54 条：passed 49 / failed 1 / interrupted 0 / skipped 4 → success_rate 98.0%
 ```
 
@@ -375,7 +375,7 @@ uv run python evals/scripts/run_eval.py --no-write --break-case gold-c01
 所以直接 `make run-eval` 会覆盖本周已有快照。想留痕又不覆盖：
 
 ```bash
-uv run python evals/scripts/run_eval.py --week 2026-W48-local
+uv run python evals/scripts/w3/run_eval.py --week 2026-W48-local
 # 产出：evals/history/2026-W48-local-eval.json + -w3-eval.md
 ```
 
@@ -424,7 +424,7 @@ uv run pytest -k langfuse
 Judge 一致性（离线档是规则基线，作为**下限**）：
 
 ```bash
-make judge-agreement        # 等价于 uv run python evals/scripts/judge_agreement.py
+make judge-agreement        # 等价于 uv run python evals/scripts/w4/judge_agreement.py
 ```
 
 ```
@@ -526,8 +526,8 @@ FAILED packages/agent_framework/tests/test_bench_baseline.py::test_resolve_targe
 2026-11-24 实测的两步处置（已验证有效）：
 
 ```bash
-uv run python evals/scripts/run_eval.py --week 2026-W48-local   # 不覆盖旧快照
-uv run python evals/scripts/regression_gate.py --current evals/history/2026-W48-local-eval.json
+uv run python evals/scripts/w3/run_eval.py --week 2026-W48-local   # 不覆盖旧快照
+uv run python evals/scripts/w4/regression_gate.py --current evals/history/2026-W48-local-eval.json
 # 基线：2026-W46（commit afbded2） / 对比了 2 个指标 / 门禁通过
 ```
 

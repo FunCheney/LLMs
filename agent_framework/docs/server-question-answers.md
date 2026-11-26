@@ -97,7 +97,7 @@ flowchart TB
 W12 之后还有三条**装配层**纪律，属于「代码看不出来、出事才发现」那类：
 
 1. **产品代码只用公共面**（`docs/w12/framework-api.md`）。`apps/` 已无一处穿透实现模块，
-   `evals/scripts/api_audit.py --check` 守着；复用到实现模块意味着改一次内部结构就要改产品。
+   `evals/scripts/w12/api_audit.py --check` 守着；复用到实现模块意味着改一次内部结构就要改产品。
 2. **鉴权加在 RequestID 之前**。Starlette 的 `add_middleware` 是「后加的更外层」，
    所以产品先 `install_api_key_auth` 再 `add_middleware(RequestIDMiddleware)`，
    401 响应体里才有 `request_id`——而排障时最需要它的恰恰是被拒的那批请求。
@@ -469,7 +469,7 @@ class TaskQueue(Protocol):
 | `apps/growth_agent/src/growth_agent/rag.py` | `RagRuntime` 全部字段 |
 | `apps/growth_agent/src/growth_agent/routes_answer.py` | `AnswerRequest` / `AnswerResponse` 全部字段 |
 | `apps/growth_agent/src/growth_agent/routes_draft.py` | `DraftRequest` / `DraftResponse` 全部字段 |
-| `evals/scripts/citation_accuracy.py` | `Sample` / `CaseResult` 全部字段 |
+| `evals/scripts/w6/citation_accuracy.py` | `Sample` / `CaseResult` 全部字段 |
 
 **顺带修正**：`retrieval/acl.py` 模块 docstring 第 2 条仍写「过滤发生在精排之后、进 context 之前」，与 W6 已落地的代码相反。现改为与 `pipeline.py` 一致的「ACL 在精排之前」，并写明两个理由（省 4.7s 精排算力；**更重要的侧信道**——精排耗时随无权限块数量变化，会让无权限调用方推断库里有多少他看不到的文档）。
 
@@ -484,7 +484,7 @@ class TaskQueue(Protocol):
 | `runtime/flags.py:Flag` | `default` / `removal_deadline` | `default` 永远是旧行为（关）；`removal_deadline` 让「临时开关」能被查出来，否则临时会变成最长久的那两个词 |
 
 **验证（当次）**：`.venv/bin/ruff check` 全绿；`mypy` 62 个源文件 0 问题；`pytest -q` 全量 0 失败（原有 skip 保留）。
-**当前（W12 末）**：`ruff` 全绿、`mypy` 134 文件 0 问题、`pytest -q` **1471 passed / 30 skipped**、核心模块覆盖率 88.6%（`evals/scripts/coverage_report.py`）。
+**当前（W12 末）**：`ruff` 全绿、`mypy` 134 文件 0 问题、`pytest -q` **1471 passed / 30 skipped**、核心模块覆盖率 88.6%（`evals/scripts/w12/coverage_report.py`）。
 
 ---
 
@@ -502,7 +502,7 @@ class TaskQueue(Protocol):
 
 ## 维护说明：这份文档怎么跟着代码走
 
-1. **先跑门禁再看结论**：`uv run python evals/scripts/api_audit.py --check`（公共面）、`uv run pytest -q`（行为）、`uv run mypy`（类型）。任一红，本文档里对应的「当前」二字就该删掉。
+1. **先跑门禁再看结论**：`uv run python evals/scripts/w12/api_audit.py --check`（公共面）、`uv run pytest -q`（行为）、`uv run mypy`（类型）。任一红，本文档里对应的「当前」二字就该删掉。
 2. **优先按函数名定位**：`create_app` / `build_limiter` / `_chat_impl` / `_run_one` / `build_memory_runtime` 这些名字比行号稳定。
 3. **改了这几处就要回来改本文**：`server/app.py` 的装配顺序、`LLMGateway` 的公开入口或 `__init__` 字段、`TaskQueue` 契约、`SessionStore` 的真正消费者。
 4. **不要在这里写「计划」**：计划项（Redis 队列、Temporal、多副本）只写「现在没有 + 接入要做什么」，不写预期时间。

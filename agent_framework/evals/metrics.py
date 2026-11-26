@@ -340,7 +340,7 @@ class TaskMetrics:
     # -- W9 D5 填：Trajectory（过程）层 ---------------------------------------
     # 这一层回答"怎么做到的"。缺了它，"多 Agent 成功率 +8%"无法归因——
     # 分不清是分工对了、工具选对了，还是只是多花 token 多试了几次。
-    # 口径与取值规则见 `evals/scripts/trajectory_eval.py` 的模块 docstring。
+    # 口径与取值规则见 `evals/scripts/w9/trajectory_eval.py` 的模块 docstring。
     #
     # **谁会填它们**：`agent_paradigm_ab.py` + `trajectory_eval.py` 这条链，
     # 因为只有规划器会产出 `RunTrace`。54 条 golden 是 chat / tool_call 形态，

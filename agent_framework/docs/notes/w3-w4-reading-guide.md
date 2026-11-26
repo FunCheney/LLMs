@@ -132,13 +132,13 @@ UNKNOWN   → 先补埋点，缺哪个 span 就补哪个，别急着改代码
 
 ```bash
 # ① 单条：看它怎么从 json 变成 EvalResult（实测 0.19s，1 passed）
-uv run python evals/scripts/run_eval.py --only gold-c01 --no-write
+uv run python evals/scripts/w3/run_eval.py --only gold-c01 --no-write
 
 # ② 故意让这条 case 失败，验证"单条失败不中断整批"（实测跑全量 54 条，5.46s）
-uv run python evals/scripts/run_eval.py --break-case gold-c01 --no-write
+uv run python evals/scripts/w3/run_eval.py --break-case gold-c01 --no-write
 
 # ③ 对最新快照做四层归因（无参数时自动取 evals/history 最新一期）
-uv run python evals/scripts/attribute_failure.py
+uv run python evals/scripts/w4/attribute_failure.py
 ```
 
 第 ① 条的输出值得逐字读：`cost 0.000000`、`quality 块 null`、提示语写着"只说明执行管道通，不代表模型质量"。
